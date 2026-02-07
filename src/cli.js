@@ -266,18 +266,33 @@ function Compass({rootPath, initialView = 'navigator'}) {
     return map;
   }, [detailedIndexed]);
 
-  const killAllTasks = useCallback(() => {
-    runningProcessMap.current.forEach((proc) => {
-      try { 
+  const handleKillTask = useCallback((taskId) => {
+    const proc = runningProcessMap.current.get(taskId);
+    if (proc) {
+      addLogToTask(taskId, kleur.yellow('! Triggering emergency kill sequence...'));
+      try {
         if (process.platform === 'win32') {
           execa('taskkill', ['/pid', proc.pid, '/f', '/t']);
-        } else {
+        } else if (proc.pid) {
           process.kill(-proc.pid, 'SIGKILL');
+        } else {
+          proc.kill('SIGKILL');
         }
-      } catch { /* ignore */ }
+      } catch (e) {
+        addLogToTask(taskId, kleur.red(`✗ Kill failed: ${e.message}`));
+      }
+    } else {
+      setTasks(prev => prev.filter(t => t.id !== taskId));
+      if (activeTaskId === taskId) setActiveTaskId(null);
+    }
+  }, [activeTaskId, addLogToTask]);
+
+  const killAllTasks = useCallback(() => {
+    runningProcessMap.current.forEach((proc, tid) => {
+      handleKillTask(tid);
     });
     runningProcessMap.current.clear();
-  }, []);
+  }, [handleKillTask]);
 
   const runProjectCommand = useCallback(async (commandMeta, targetProject = selectedProject) => {
     const project = targetProject || selectedProject;
@@ -327,27 +342,6 @@ function Compass({rootPath, initialView = 'navigator'}) {
     }
   }, [addLogToTask, selectedProject]);
 
-  const handleKillTask = useCallback((taskId) => {
-    const proc = runningProcessMap.current.get(taskId);
-    if (proc) {
-      addLogToTask(taskId, kleur.yellow('! Force killing process group...'));
-      try {
-        if (process.platform === 'win32') {
-          execa('taskkill', ['/pid', proc.pid, '/f', '/t']);
-        } else if (proc.pid) {
-          process.kill(-proc.pid, 'SIGKILL');
-        } else {
-          proc.kill('SIGKILL');
-        }
-      } catch (e) {
-        addLogToTask(taskId, kleur.red(`✗ Kill failed: ${e.message}`));
-      }
-    } else {
-      setTasks(prev => prev.filter(t => t.id !== taskId));
-      if (activeTaskId === taskId) setActiveTaskId(null);
-    }
-  }, [activeTaskId, addLogToTask]);
-
   const exportLogs = useCallback(() => {
     const taskToExport = tasks.find(t => t.id === activeTaskId);
     if (!taskToExport || !taskToExport.logs.length) return;
@@ -366,6 +360,8 @@ function Compass({rootPath, initialView = 'navigator'}) {
       if (input?.toLowerCase() === 'n' || key.escape) { setQuitConfirm(false); return; }
       return;
     }
+
+    const isCtrlC = (key.ctrl && input === 'c') || input === '\u0003';
 
     if (customMode) {
       if (key.return) {
@@ -483,14 +479,14 @@ function Compass({rootPath, initialView = 'navigator'}) {
         if (key.downArrow) { setActiveTaskId(prev => tasks[(tasks.findIndex(t => t.id === prev) + 1) % tasks.length]?.id); return; }
         if (shiftCombo('k') && activeTaskId) { handleKillTask(activeTaskId); return; }
         if (shiftCombo('r') && activeTaskId) { setRenameMode(true); setRenameInput(activeTask.name); setRenameCursor(activeTask.name.length); return; }
-        if (key.ctrl && input === 'c') { handleKillTask(activeTaskId); return; }
+        if (isCtrlC) { handleKillTask(activeTaskId); return; }
       }
       if (key.return) { setMainView('navigator'); return; }
       return;
     }
 
     if (running && activeTaskId && runningProcessMap.current.has(activeTaskId)) {
-      if (key.ctrl && input === 'c') { handleKillTask(activeTaskId); setStdinBuffer(''); setStdinCursor(0); return; }
+      if (isCtrlC) { handleKillTask(activeTaskId); setStdinBuffer(''); setStdinCursor(0); return; }
       if (key.return) {
         const proc = runningProcessMap.current.get(activeTaskId);
         proc?.stdin?.write(stdinBuffer + '\n'); setStdinBuffer(''); setStdinCursor(0); return;
