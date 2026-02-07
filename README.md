@@ -32,10 +32,13 @@ Project Compass is a high-performance, TUI (Terminal User Interface) workspace o
 - **Rapid Scaffolding**: Create new projects from scratch using industry-standard templates.
 - **Interactive Prompts**: Safe, guided setup for directory structure and initial manifests.
 
+![Project Architect](./assets/screenshots/architect.jpg)
+
 ### 🎨 Omni-Studio & Art Board
 - **Environment Health (`Shift+A`)**: Audit your system dependencies and runtime versions.
 - **Build Atlas (`Shift+B`)**: A visual, art-coded representation of your project landscape.
 
+![Omni-Studio](./assets/screenshots/studio.jpg)
 ![Art Board](./assets/screenshots/artboard.jpg)
 
 ## ⌨️ Command Reference
