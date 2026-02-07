@@ -147,6 +147,24 @@ const Studio = memo(() => {
   );
 });
 
+const TaskManager = memo(({tasks, activeTaskId, renameMode, renameInput, renameCursor}) => {
+  return create(
+    Box,
+    {flexDirection: 'column', borderStyle: 'round', borderColor: 'yellow', padding: 1},
+    create(Text, {bold: true, color: 'yellow'}, '🛰️ Task Manager | Background Processes'),
+    create(Text, {dimColor: true, marginBottom: 1}, 'Up/Down: focus, Shift+K: Kill/Delete, Shift+R: Rename'),
+    ...tasks.map(t => create(
+      Box,
+      {key: t.id, marginBottom: 0, flexDirection: 'column'},
+      t.id === activeTaskId && renameMode 
+        ? create(Box, {flexDirection: 'row'}, create(Text, {color: 'cyan'}, '→ Rename to: '), create(CursorText, {value: renameInput, cursorIndex: renameCursor}))
+        : create(Text, {color: t.id === activeTaskId ? 'cyan' : 'white', bold: t.id === activeTaskId}, `${t.id === activeTaskId ? '→' : ' '} [${t.status.toUpperCase()}] ${t.name}`)
+    )),
+    !tasks.length && create(Text, {dimColor: true}, 'No active or background tasks.'),
+    create(Text, {marginTop: 1, dimColor: true}, 'Press Enter or Shift+T to return to Navigator.')
+  );
+});
+
 function CursorText({value, cursorIndex, active = true}) {
   const before = value.slice(0, cursorIndex);
   const charAt = value[cursorIndex] || ' ';
@@ -305,8 +323,8 @@ function Compass({rootPath, initialView = 'navigator'}) {
       const exportPath = path.resolve(process.cwd(), `compass-${activeTask.id}.txt`);
       fs.writeFileSync(exportPath, activeTask.logs.join('\n'));
       addLogToTask(activeTaskId, kleur.green(`✓ Logs exported to ${exportPath}`));
-    } catch (err) {
-      addLogToTask(activeTaskId, kleur.red(`✗ Export failed: ${err.message}`));
+    } catch {
+      addLogToTask(activeTaskId, kleur.red('✗ Export failed'));
     }
   }, [activeTask, activeTaskId, addLogToTask]);
 
@@ -490,35 +508,11 @@ function Compass({rootPath, initialView = 'navigator'}) {
     }
   });
 
-  const projectCountLabel = `${projects.length} project${projects.length === 1 ? '' : 's'}`;
+  const projectCountLabel = useMemo(() => `${projects.length} project${projects.length === 1 ? '' : 's'}`, [projects.length]);
   const toggleHint = config.showHelpCards ? 'Shift+H hide help' : 'Shift+H show help';
   const statusHint = activeTask ? `[${activeTask.status.toUpperCase()}] ${activeTask.name}` : 'Idle Navigator';
   const orbitHint = mainView === 'tasks' ? 'Tasks View' : `Orbit: ${tasks.length} tasks`;
   const artHint = config.showArtBoard ? 'Shift+B hide art' : 'Shift+B show art';
-
-  if (quitConfirm) {
-    return create(Box, {flexDirection: 'column', borderStyle: 'round', borderColor: 'red', padding: 1}, create(Text, {bold: true, color: 'red'}, '⚠️ Confirm Exit'), create(Text, null, `There are ${tasks.filter(t=>t.status==='running').length} tasks still running in the background.`), create(Text, null, 'Are you sure you want to quit and stop all processes?'), create(Text, {marginTop: 1}, kleur.bold('Y') + ' to Quit, ' + kleur.bold('N') + ' to Cancel'));
-  }
-
-  if (mainView === 'studio') return create(Studio);
-
-  if (mainView === 'tasks') {
-    return create(
-      Box,
-      {flexDirection: 'column', borderStyle: 'round', borderColor: 'yellow', padding: 1},
-      create(Text, {bold: true, color: 'yellow'}, '🛰️ Task Manager | Background Processes'),
-      create(Text, {dimColor: true, marginBottom: 1}, 'Up/Down: focus, Shift+K: Kill/Delete, Shift+R: Rename'),
-      ...tasks.map(t => create(
-        Box,
-        {key: t.id, marginBottom: 0, flexDirection: 'column'},
-        t.id === activeTaskId && renameMode 
-          ? create(Box, {flexDirection: 'row'}, create(Text, {color: 'cyan'}, '→ Rename to: '), create(CursorText, {value: renameInput, cursorIndex: renameCursor}))
-          : create(Text, {color: t.id === activeTaskId ? 'cyan' : 'white', bold: t.id === activeTaskId}, `${t.id === activeTaskId ? '→' : ' '} [${t.status.toUpperCase()}] ${t.name}`)
-      )),
-      !tasks.length && create(Text, {dimColor: true}, 'No active or background tasks.'),
-      create(Text, {marginTop: 1, dimColor: true}, 'Press Enter or Shift+T to return to Navigator.')
-    );
-  }
 
   const projectRows = useMemo(() => {
     if (loading) return [create(Text, {key: 'scanning', dimColor: true}, 'Scanning projects…')];
@@ -582,24 +576,25 @@ function Compass({rootPath, initialView = 'navigator'}) {
   const artTileNodes = useMemo(() => [
     {label: 'Pulse', detail: projectCountLabel, accent: 'magenta', icon: '●', subtext: `Workspace · ${path.basename(rootPath) || rootPath}`},
     {label: 'Focus', detail: selectedProject?.name || 'Selection', accent: 'cyan', icon: '◆', subtext: `${selectedProject?.type || 'Stack'}`},
-    {label: 'Orbit', detail: `${tasks.length} active tasks`, accent: 'yellow', icon: '■', subtext: running ? 'Busy streaming...' : 'Idle'}
+    {label: 'Orbit', detail: `${tasks.length} tasks`, accent: 'yellow', icon: '■', subtext: running ? 'Busy streaming...' : 'Idle'}
   ].map(tile => create(Box, {key: tile.label, flexDirection: 'column', padding: 1, marginRight: 1, borderStyle: 'single', borderColor: tile.accent, minWidth: 24},
     create(Text, {color: tile.accent, bold: true}, `${tile.icon} ${tile.label}`),
     create(Text, {bold: true}, tile.detail),
     create(Text, {dimColor: true}, tile.subtext)
   )), [projectCountLabel, rootPath, selectedProject, tasks.length, running]);
 
-  const artBoard = config.showArtBoard ? create(Box, {flexDirection: 'column', marginTop: 1, borderStyle: 'round', borderColor: 'gray', padding: 1},
-    create(Box, {flexDirection: 'row', justifyContent: 'space-between'}, create(Text, {color: 'magenta', bold: true}, 'Art-coded build atlas'), create(Text, {dimColor: true}, 'press ? for overlay help')),
-    create(Box, {flexDirection: 'row', marginTop: 1}, ...ART_CHARS.map((char, i) => create(Text, {key: i, color: ART_COLORS[i % ART_COLORS.length]}, char.repeat(2)))),
-    create(Box, {flexDirection: 'row', marginTop: 1}, ...artTileNodes)
-  ) : null;
-
   const helpCards = [
     {label: 'Navigation', color: 'magenta', body: ['↑ / ↓ move focus, Enter: details', 'Shift+↑ / ↓ scroll output', 'Shift+H toggle help cards', 'Shift+D detach from task']},
     {label: 'Commands', color: 'cyan', body: ['B / T / R build/test/run', '1-9 run detail commands', 'Shift+L rerun last command', 'Shift+X clear / Shift+E export']},
-    {label: 'Orbit & Studio', color: 'yellow', body: ['Shift+T task manager', 'Shift+A studio / Shift+B art board', 'Shift+C custom / Shift+Q quit']}
+    {label: 'Orbit & Studio', color: 'yellow', body: ['Shift+T task manager', 'Shift+A studio / Shift+B art board', 'Shift+S structure / Shift+Q quit']}
   ];
+
+  if (quitConfirm) {
+    return create(Box, {flexDirection: 'column', borderStyle: 'round', borderColor: 'red', padding: 1}, create(Text, {bold: true, color: 'red'}, '⚠️ Confirm Exit'), create(Text, null, `There are ${tasks.filter(t=>t.status==='running').length} tasks still running in the background.`), create(Text, null, 'Are you sure you want to quit and stop all processes?'), create(Text, {marginTop: 1}, kleur.bold('Y') + ' to Quit, ' + kleur.bold('N') + ' to Cancel'));
+  }
+
+  if (mainView === 'studio') return create(Studio);
+  if (mainView === 'tasks') return create(TaskManager, {tasks, activeTaskId, renameMode, renameInput, renameCursor});
 
   return create(Box, {flexDirection: 'column', padding: 1},
     create(Box, {justifyContent: 'space-between'},
@@ -609,7 +604,11 @@ function Compass({rootPath, initialView = 'navigator'}) {
         create(Text, {dimColor: true}, `${toggleHint} · ${orbitHint} · ${artHint} · Shift+Q: Quit`)
       )
     ),
-    artBoard,
+    config.showArtBoard && create(Box, {flexDirection: 'column', marginTop: 1, borderStyle: 'round', borderColor: 'gray', padding: 1},
+      create(Box, {flexDirection: 'row', justifyContent: 'space-between'}, create(Text, {color: 'magenta', bold: true}, 'Art-coded build atlas'), create(Text, {dimColor: true}, 'press ? for overlay help')),
+      create(Box, {flexDirection: 'row', marginTop: 1}, ...ART_CHARS.map((char, i) => create(Text, {key: i, color: ART_COLORS[i % ART_COLORS.length]}, char.repeat(2)))),
+      create(Box, {flexDirection: 'row', marginTop: 1}, ...artTileNodes)
+    ),
     create(Box, {marginTop: 1, flexDirection: 'row', alignItems: 'stretch', width: '100%', flexWrap: 'wrap'},
       create(Box, {flexGrow: 1, flexBasis: 0, minWidth: PROJECTS_MIN_WIDTH, marginRight: 1, borderStyle: 'round', borderColor: 'magenta', padding: 1}, create(Text, {bold: true, color: 'magenta'}, 'Projects'), create(Box, {flexDirection: 'column', marginTop: 1}, ...projectRows)),
       create(Box, {flexGrow: 1.3, flexBasis: 0, minWidth: DETAILS_MIN_WIDTH, borderStyle: 'round', borderColor: 'cyan', padding: 1, flexDirection: 'column'}, create(Text, {bold: true, color: 'cyan'}, 'Details'), ...detailContent)
