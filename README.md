@@ -28,6 +28,7 @@ npm install -g project-compass
 - **Background Orchestration**: Keep tasks running while you navigate the rest of your workspace.
 - **Process Management**: Monitor status (Running, Finished, Failed, Killed) and forcefully terminate processes with `Shift+K`.
 - **Task Identity**: Rename tasks on the fly with `Shift+R` to keep your workspace organized.
+- **Cross-Platform Safety**: Automatically handles process signaling for both Unix (SIGKILL) and Windows (taskkill) to ensure clean exits.
 
 ![Task Manager](https://raw.githubusercontent.com/CrimsonDevil333333/project-compass/master/assets/screenshots/taskmanager.jpg)
 
@@ -76,7 +77,8 @@ npm install -g project-compass
 
 Project Compass is designed to be personalized. All settings and custom commands are stored in a local JSON file.
 
-- **Location**: `~/.project-compass/config.json` (Automatically created on first run)
+- **Linux/macOS**: `~/.project-compass/config.json`
+- **Windows**: `C:\Users\<YourUser>\.project-compass\config.json`
 
 ### 🛠️ Adding Custom Commands
 You can add your own project-specific commands directly within the app by pressing **Shift+C** in the Detail View. Use the format `Label|Command` (e.g., `Deploy|npm run deploy`).
