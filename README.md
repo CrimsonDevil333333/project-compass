@@ -9,6 +9,7 @@ Project Compass is a futuristic CLI navigator built with [Ink](https://github.co
 - 🚀 Press **Enter** on any project to open the detail view, where you can inspect the type, manifest, frameworks, commands, and save custom actions.
 - 🎯 Built-in shortcuts (B/T/R) run the canonical build/test/run workflow, while numeric hotkeys (1, 2, 3...) execute whichever command is listed in the detail view.
 - 🧠 Add bespoke commands via **C** in detail view and store them globally (`~/.project-compass/config.json`) so every workspace remembers your favorite invocations.
+- 🎨 The top art board layers glyphs, neon-like tiles, and highlighted metrics (Pulse, Focus, Rhythm) so the CLI feels like a curated gallery instead of a bland table.
 - 🔌 Extend detection via plugins (JSON specs under `~/.project-compass/plugins.json`) to teach Project Compass about extra frameworks or command sets.
 - 📦 Install globally and invoke `project-compass` from any folder to activate the UI instantly.
 
@@ -60,6 +61,11 @@ You can teach it new frameworks by adding a `plugins.json` file in your config d
 
 Each command value can be a string or an array of tokens. When a plugin matches a project, its commands appear in the detail view with a `framework` badge, and the shortcut keys (B/T/R or numeric) can execute them.
 
+
+## Art board & detail view
+
+Project Compass now opens with a rounded art board that shuffles your glyph row (▁▃▄▅▇ with neon accents) and three branded tiles showing workspace pulse, the selected project focus, and the rhythm of commands. The detail view sits beside the project list as a gallery; border colors, badges, and the ambient header hint keep it feeling like a living installation rather than a vanilla CLI.
+
 ## Developer notes
 
 - `npm start` launches the Ink UI in the current directory.
@@ -70,3 +76,9 @@ Each command value can be a string or an array of tokens. When a plugin matches 
 ## License
 
 MIT © 2026 Satyaa & Clawdy
+## Release & packaging
+
+- Bump `package.json`/`package-lock.json` versions (e.g., `npm version 1.0.1 --no-git-tag-version`).
+- Run `npm run lint` and `npm run test` to validate the workspace before publishing.
+- Create the release artifact with `npm pack` (produces `project-compass-<version>.tgz` for uploading to GitHub Releases or npm).
+- Tag the repo `git tag v<version>` and push both commits and tags to publish the release.
