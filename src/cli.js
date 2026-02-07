@@ -261,7 +261,13 @@ function Compass({rootPath, initialView = 'navigator'}) {
 
   const killAllTasks = useCallback(() => {
     runningProcessMap.current.forEach((proc) => {
-      try { proc.kill('SIGKILL'); } catch { /* ignore */ }
+      try { 
+        if (proc.pid) {
+          process.kill(-proc.pid, 'SIGKILL');
+        } else {
+          proc.kill('SIGKILL');
+        }
+      } catch { /* ignore */ }
     });
     runningProcessMap.current.clear();
   }, []);
@@ -290,6 +296,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
         cwd: project.path,
         env: process.env,
         stdin: 'pipe',
+        detached: true,
         cleanup: true
       });
       runningProcessMap.current.set(taskId, subprocess);
@@ -316,12 +323,21 @@ function Compass({rootPath, initialView = 'navigator'}) {
   const handleKillTask = useCallback((taskId) => {
     const proc = runningProcessMap.current.get(taskId);
     if (proc) {
-      proc.kill('SIGKILL');
+      addLogToTask(taskId, kleur.yellow('! Force killing process group...'));
+      try {
+        if (proc.pid) {
+          process.kill(-proc.pid, 'SIGKILL');
+        } else {
+          proc.kill('SIGKILL');
+        }
+      } catch (e) {
+        addLogToTask(taskId, kleur.red(`✗ Kill failed: ${e.message}`));
+      }
     } else {
       setTasks(prev => prev.filter(t => t.id !== taskId));
       if (activeTaskId === taskId) setActiveTaskId(null);
     }
-  }, [activeTaskId]);
+  }, [activeTaskId, addLogToTask]);
 
   const exportLogs = useCallback(() => {
     const taskToExport = tasks.find(t => t.id === activeTaskId);
@@ -465,9 +481,11 @@ function Compass({rootPath, initialView = 'navigator'}) {
     }
 
     if (running && activeTaskId && runningProcessMap.current.has(activeTaskId)) {
-      const proc = runningProcessMap.current.get(activeTaskId);
-      if (key.ctrl && input === 'c') { proc.kill('SIGKILL'); setStdinBuffer(''); setStdinCursor(0); return; }
-      if (key.return) { proc.stdin?.write(stdinBuffer + '\n'); setStdinBuffer(''); setStdinCursor(0); return; }
+      if (key.ctrl && input === 'c') { handleKillTask(activeTaskId); setStdinBuffer(''); setStdinCursor(0); return; }
+      if (key.return) {
+        const proc = runningProcessMap.current.get(activeTaskId);
+        proc?.stdin?.write(stdinBuffer + '\n'); setStdinBuffer(''); setStdinCursor(0); return;
+      }
       if (key.backspace || key.delete) {
         if (stdinCursor > 0) {
           setStdinBuffer(prev => prev.slice(0, stdinCursor - 1) + prev.slice(stdinCursor));
