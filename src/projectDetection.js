@@ -323,7 +323,7 @@ const builtInFrameworks = [
     priority: 105,
     match(project) {
       const entry = findPythonEntry(project.path);
-      return Boolean(entry && dependencyMatches(project, 'flask'));
+      return Boolean(entry && (dependencyMatches(project, 'flask') || dependencyMatches(project, 'flask-restful') || dependencyMatches(project, 'flask-cors')));
     },
     commands(project) {
       const entry = findPythonEntry(project.path);
@@ -345,7 +345,7 @@ const builtInFrameworks = [
     priority: 105,
     match(project) {
       const entry = findPythonEntry(project.path);
-      return Boolean(entry && dependencyMatches(project, 'fastapi'));
+      return Boolean(entry && (dependencyMatches(project, 'fastapi') || dependencyMatches(project, 'pydantic') || dependencyMatches(project, 'uvicorn')));
     },
     commands(project) {
       const entry = findPythonEntry(project.path);
@@ -356,6 +356,59 @@ const builtInFrameworks = [
       return {
         run: {label: 'Uvicorn reload', command: ['uvicorn', `${moduleName}:app`, '--reload'], source: 'framework'},
         test: {label: 'Pytest', command: ['pytest'], source: 'framework'}
+      };
+    }
+  },
+  {
+    id: 'vite',
+    name: 'Vite',
+    icon: '⚡',
+    description: 'Vite-powered frontend',
+    languages: ['Node.js'],
+    priority: 100,
+    match(project) {
+      return hasProjectFile(project.path, 'vite.config.js') || hasProjectFile(project.path, 'vite.config.ts') || dependencyMatches(project, 'vite');
+    },
+    commands(project) {
+      const commands = {};
+      const add = (key, label, fallback) => {
+        const tokens = resolveScriptCommand(project, key, fallback);
+        if (tokens) {
+          commands[key] = {label, command: tokens, source: 'framework'};
+        }
+      };
+      add('run', 'Vite dev', () => ['npx', 'vite']);
+      add('build', 'Vite build', () => ['npx', 'vite', 'build']);
+      add('preview', 'Vite preview', () => ['npx', 'vite', 'preview']);
+      return commands;
+    }
+  },
+  {
+    id: 'tailwind',
+    name: 'Tailwind CSS',
+    icon: '🎨',
+    description: 'Tailwind utility-first CSS',
+    languages: ['Node.js'],
+    priority: 50,
+    match(project) {
+      return hasProjectFile(project.path, 'tailwind.config.js') || hasProjectFile(project.path, 'tailwind.config.ts') || dependencyMatches(project, 'tailwindcss');
+    },
+    commands() { return {}; }
+  },
+  {
+    id: 'prisma',
+    name: 'Prisma',
+    icon: '◮',
+    description: 'Prisma ORM',
+    languages: ['Node.js'],
+    priority: 50,
+    match(project) {
+      return hasProjectFile(project.path, 'prisma/schema.prisma') || dependencyMatches(project, '@prisma/client');
+    },
+    commands() {
+      return {
+        generate: {label: 'Prisma generate', command: ['npx', 'prisma', 'generate'], source: 'framework'},
+        studio: {label: 'Prisma studio', command: ['npx', 'prisma', 'studio'], source: 'framework'}
       };
     }
   },

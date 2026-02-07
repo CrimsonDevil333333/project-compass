@@ -1,4 +1,4 @@
-# Project Compass (v2.1.0)
+# Project Compass (v2.2.0)
 
 Project Compass is a futuristic CLI navigator built with [Ink](https://github.com/vadimdemedes/ink) that scans your current folder tree for familiar code projects and gives you one-keystroke access to build, test, or run them.
 
@@ -8,8 +8,8 @@ Project Compass is a futuristic CLI navigator built with [Ink](https://github.co
 - 🎨 Futuristic layout with glyph-based art board and split Projects/Details rows.
 - 🚀 **New Keyboard-Centric UX**: Shortcuts now use **Shift** instead of Ctrl to avoid terminal interference.
 - 💡 **Refined Output**: Improved stdin buffer with proper spacing and reliable scrolling (Shift+↑/↓).
-- 🧠 **Smart Detection**: Support for 12+ frameworks with specialized build/run commands and setup hints.
-- 🔌 **Extensible**: Add custom commands with **C** and frameworks via `plugins.json`.
+- 🧠 **Smart Detection**: Support for 15+ frameworks (Vite, Prisma, Tailwind, etc.) with specialized build/run commands and setup hints.
+- 🔌 **Extensible**: Add custom commands with **Shift+C** and frameworks via `plugins.json`.
 
 ## Installation
 
@@ -30,7 +30,7 @@ project-compass [--dir /path/to/workspace]
 | ↑ / ↓ | Move focus, **Enter**: toggle details |
 | B / T / R | Build / Test / Run |
 | 1‑9 | Execute numbered detail commands |
-| C | Add a custom command (`label|cmd`) |
+| **Shift+C** | Add a custom command (`label|cmd`) |
 | **Shift ↑ / ↓** | Scroll output buffer |
 | **Shift+L** | Rerun last command |
 | **Shift+H** | Toggle help cards |
@@ -45,7 +45,7 @@ Project Compass features a split layout where Projects and Details stay paired w
 
 ## Frameworks
 
-Detects **Next.js**, **React**, **Vue**, **NestJS**, **FastAPI**, **Django**, and more. Recognizes frameworks and injects specialized commands automatically.
+Detects **Next.js**, **React**, **Vue**, **NestJS**, **FastAPI**, **Django**, **Vite**, **Prisma**, **Tailwind**, and more. Recognizes frameworks and injects specialized commands automatically.
 
 ## License
 

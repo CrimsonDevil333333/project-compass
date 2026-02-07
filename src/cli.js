@@ -306,11 +306,11 @@ function Compass({rootPath}) {
     }
 
     if (key.shift && key.upArrow) {
-      scrollLogs(-1);
+      scrollLogs(1);
       return;
     }
     if (key.shift && key.downArrow) {
-      scrollLogs(1);
+      scrollLogs(-1);
       return;
     }
 
@@ -342,7 +342,7 @@ function Compass({rootPath}) {
       exit();
       return;
     }
-    if (normalizedInput === 'c' && viewMode === 'detail' && selectedProject) {
+    if (shiftCombo('c') && viewMode === 'detail' && selectedProject) {
       setCustomMode(true);
       setCustomInput('');
       return;
@@ -412,19 +412,19 @@ const projectRows = [];
     detailContent.push(create(Text, {bold: true, marginTop: 1}, 'Commands'));
     detailedIndexed.forEach((command) => {
       detailContent.push(
-        create(Text, {key: `detail-${command.shortcut}-${command.label}`}, `${command.shortcut}. ${command.label} ${command.source === 'custom' ? kleur.magenta('(custom)') : command.source === 'framework' ? kleur.cyan('(framework)') : ''}`)
+        create(Text, {key: `detail-${command.shortcut}-${command.label}`}, `${command.shortcut}. ${command.label} ${command.source === 'custom' ? kleur.magenta('(custom)') : command.source === 'framework' ? kleur.cyan('(framework)') : command.source === 'plugin' ? kleur.green('(plugin)') : ''}`)
       );
       detailContent.push(create(Text, {dimColor: true}, `   ↳ ${command.command.join(' ')}`));
     });
     if (!detailedIndexed.length) {
-      detailContent.push(create(Text, {dimColor: true}, 'No built-in commands yet. Add a custom command with C.'));
+      detailContent.push(create(Text, {dimColor: true}, 'No built-in commands yet. Add a custom command with Shift+C.'));
     }
     const setupHints = selectedProject.extra?.setupHints || [];
     if (setupHints.length) {
       detailContent.push(create(Text, {dimColor: true, marginTop: 1}, 'Setup hints:'));
       setupHints.forEach((hint) => detailContent.push(create(Text, {dimColor: true}, `  • ${hint}`)));
     }
-    detailContent.push(create(Text, {dimColor: true}, 'Press C → label|cmd to save custom actions, Enter to close detail view.'));
+    detailContent.push(create(Text, {dimColor: true}, 'Press Shift+C → label|cmd to save custom actions, Enter to close detail view.'));
   } else {
     detailContent.push(create(Text, {dimColor: true}, 'Press Enter on a project to reveal details (icons, commands, frameworks, custom actions).'));
   }
@@ -546,7 +546,7 @@ const projectRows = [];
       body: [
         recentRuns.length ? `${recentRuns.length} runs recorded` : 'No runs yet · start with B/T/R',
         'Shift+S toggles structure guide',
-        'C save custom action',
+        'Shift+C save custom action',
         'Shift+Q quit application'
       ]
     }
@@ -618,7 +618,7 @@ const projectRows = [];
 
   const toggleHint = showHelpCards ? 'Shift+H hides the help cards' : 'Shift+H shows the help cards';
   const headerHint = viewMode === 'detail'
-    ? `Detail mode · 1-${Math.max(detailedIndexed.length, 1)} to execute, C: add custom commands, Enter: back to list, Shift+Q: quit · ${toggleHint}, Shift+S toggles structure guide`
+    ? `Detail mode · 1-${Math.max(detailedIndexed.length, 1)} to execute, Shift+C: add custom commands, Enter: back to list, Shift+Q: quit · ${toggleHint}, Shift+S toggles structure guide`
     : `Quick run · B/T/R to build/test/run, Enter: view details, Shift+Q: quit · ${toggleHint}, Shift+S toggles structure guide`;
 
   return create(
