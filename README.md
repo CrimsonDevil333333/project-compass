@@ -25,7 +25,7 @@ npm install -g project-compass
 ## Usage
 
 ```bash
-project-compass [--dir /path/to/workspace] [--studio]
+project-compass [--dir /path/to/workspace] [--studio] [--version]
 ```
 
 ### Keyboard Guide

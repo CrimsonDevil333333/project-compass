@@ -2,6 +2,7 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState, memo} from 'react';
 import {render, Box, Text, useApp, useInput} from 'ink';
 import path from 'path';
+import {fileURLToPath} from 'url';
 import fs from 'fs';
 import kleur from 'kleur';
 import {execa} from 'execa';
@@ -580,6 +581,7 @@ function parseArgs() {
     if ((token === '--dir' || token === '--path') && tokens[i + 1]) { args.root = tokens[i + 1]; i += 1; }
     else if (token === '--mode' && tokens[i + 1]) { args.mode = tokens[i + 1]; i += 1; }
     else if (token === '--help' || token === '-h') args.help = true;
+    else if (token === '--version' || token === '-v') args.version = true;
     else if (token === '--studio') args.view = 'studio';
   }
   return args;
@@ -587,6 +589,12 @@ function parseArgs() {
 
 async function main() {
   const args = parseArgs();
+  if (args.version) {
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf-8'));
+    console.log(`v${pkg.version}`);
+    return;
+  }
   if (args.help) {
     console.log(kleur.cyan('Project Compass · Ink project navigator/runner'));
     console.log('');
