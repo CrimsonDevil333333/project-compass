@@ -358,12 +358,19 @@ function Compass({rootPath, initialView = 'navigator'}) {
 
     const normalizedInput = input?.toLowerCase();
     const shiftCombo = (char) => key.shift && normalizedInput === char;
+
+    const clearAndSwitch = (view) => {
+      console.clear();
+      setMainView(view);
+      setViewMode('list');
+      setShowHelp(false);
+    };
     
     if (shiftCombo('h')) { setConfig(prev => { const next = {...prev, showHelpCards: !prev.showHelpCards}; saveConfig(next); return next; }); return; }
     if (shiftCombo('s')) { setConfig(prev => { const next = {...prev, showStructureGuide: !prev.showStructureGuide}; saveConfig(next); return next; }); return; }
-    if (shiftCombo('a')) { setMainView((prev) => (prev === 'navigator' ? 'studio' : 'navigator')); setViewMode('list'); setShowHelp(false); return; }
-    if (shiftCombo('p')) { setMainView((prev) => (prev === 'navigator' ? 'registry' : 'navigator')); setViewMode('list'); setShowHelp(false); return; }
-    if (shiftCombo('n')) { setMainView((prev) => (prev === 'navigator' ? 'architect' : 'navigator')); setViewMode('list'); setShowHelp(false); return; }
+    if (shiftCombo('a')) { clearAndSwitch(mainView === 'navigator' ? 'studio' : 'navigator'); return; }
+    if (shiftCombo('p')) { clearAndSwitch(mainView === 'navigator' ? 'registry' : 'navigator'); return; }
+    if (shiftCombo('n')) { clearAndSwitch(mainView === 'navigator' ? 'architect' : 'navigator'); return; }
     if (shiftCombo('x')) { setTasks(prev => prev.map(t => t.id === activeTaskId ? {...t, logs: []} : t)); setLogOffset(0); return; }
     if (shiftCombo('e')) { exportLogs(); return; }
     if (shiftCombo('d')) { setActiveTaskId(null); return; }
@@ -371,6 +378,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
     
     if (shiftCombo('t')) { 
       setMainView((prev) => {
+        console.clear();
         if (prev === 'tasks') return 'navigator';
         if (tasks.length > 0 && !activeTaskId) setActiveTaskId(tasks[0].id);
         return 'tasks';
@@ -382,9 +390,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
     
     if (key.escape) {
       if (mainView !== 'navigator') {
-        setMainView('navigator');
-        setViewMode('list');
-        setShowHelp(false);
+        clearAndSwitch('navigator');
         return;
       }
     }
@@ -445,6 +451,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
     if (key.downArrow && !key.shift && projects.length > 0) { setSelectedIndex((prev) => (prev + 1) % projects.length); return; }
     if (key.return) {
       if (!selectedProject) return;
+      console.clear();
       setViewMode((prev) => (prev === 'detail' ? 'list' : 'detail'));
       return;
     }
