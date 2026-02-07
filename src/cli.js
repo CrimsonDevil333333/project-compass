@@ -366,11 +366,11 @@ function Compass({rootPath, initialView = 'navigator'}) {
     }
 
     if (key.shift && key.upArrow) {
-      scrollLogs(-1);
+      scrollLogs(1);
       return;
     }
     if (key.shift && key.downArrow) {
-      scrollLogs(1);
+      scrollLogs(-1);
       return;
     }
 
@@ -418,21 +418,18 @@ function Compass({rootPath, initialView = 'navigator'}) {
     }
   });
 
-  if (mainView === 'studio') {
-    return create(Studio);
-  }
-
-const projectRows = [];
+  const projectCountLabel = `${projects.length} project${projects.length === 1 ? '' : 's'}`;
+  const projectRows = [];
   if (loading) {
-    projectRows.push(create(Text, {dimColor: true}, 'Scanning projects…'));
+    projectRows.push(create(Text, {key: 'scanning', dimColor: true}, 'Scanning projects…'));
   }
   if (error) {
-    projectRows.push(create(Text, {color: 'red'}, `Unable to scan: ${error}`));
+    projectRows.push(create(Text, {key: 'error', color: 'red'}, `Unable to scan: ${error}`));
   }
   if (!loading && !error && projects.length === 0) {
-    projectRows.push(create(Text, {dimColor: true}, 'No recognizable project manifests found.'));
+    projectRows.push(create(Text, {key: 'empty', dimColor: true}, 'No recognizable project manifests found.'));
   }
-  if (!loading) {
+  if (!loading && mainView === 'navigator') {
     projects.forEach((project, index) => {
       const isSelected = index === selectedIndex;
       const frameworkBadges = (project.frameworks || []).map((frame) => `${frame.icon} ${frame.name}`).join(', ');
@@ -466,59 +463,58 @@ const projectRows = [];
     detailContent.push(
       create(
         Box,
-        {flexDirection: 'row'},
+        {key: 'title-row', flexDirection: 'row'},
         create(Text, {color: 'cyan', bold: true}, `${selectedProject.icon} ${selectedProject.name}`),
         selectedProject.missingBinaries && selectedProject.missingBinaries.length > 0 && create(Text, {color: 'red', bold: true}, '  ⚠️ MISSING RUNTIME')
       ),
-      create(Text, {dimColor: true}, `${selectedProject.type} · ${selectedProject.manifest || 'detected manifest'}`),
-      create(Text, {dimColor: true}, `Location: ${path.relative(rootPath, selectedProject.path) || '.'}`)
+      create(Text, {key: 'manifest', dimColor: true}, `${selectedProject.type} · ${selectedProject.manifest || 'detected manifest'}`),
+      create(Text, {key: 'loc', dimColor: true}, `Location: ${path.relative(rootPath, selectedProject.path) || '.'}`)
     );
     if (selectedProject.description) {
-      detailContent.push(create(Text, null, selectedProject.description));
+      detailContent.push(create(Text, {key: 'desc'}, selectedProject.description));
     }
     const frameworks = (selectedProject.frameworks || []).map((lib) => `${lib.icon} ${lib.name}`).join(', ');
     if (frameworks) {
-      detailContent.push(create(Text, {dimColor: true}, `Frameworks: ${frameworks}`));
+      detailContent.push(create(Text, {key: 'frames', dimColor: true}, `Frameworks: ${frameworks}`));
     }
     if (selectedProject.extra?.scripts && selectedProject.extra.scripts.length) {
-      detailContent.push(create(Text, {dimColor: true}, `Scripts: ${selectedProject.extra.scripts.join(', ')}`));
+      detailContent.push(create(Text, {key: 'scripts', dimColor: true}, `Scripts: ${selectedProject.extra.scripts.join(', ')}`));
     }
 
     if (selectedProject.missingBinaries && selectedProject.missingBinaries.length > 0) {
       detailContent.push(
-        create(Text, {color: 'red', bold: true, marginTop: 1}, 'MISSING BINARIES:'),
-        create(Text, {color: 'red'}, `Please install: ${selectedProject.missingBinaries.join(', ')}`),
-        create(Text, {dimColor: true}, 'Project commands may fail until these are in your PATH.')
+        create(Text, {key: 'missing-title', color: 'red', bold: true, marginTop: 1}, 'MISSING BINARIES:'),
+        create(Text, {key: 'missing-list', color: 'red'}, `Please install: ${selectedProject.missingBinaries.join(', ')}`),
+        create(Text, {key: 'missing-hint', dimColor: true}, 'Project commands may fail until these are in your PATH.')
       );
     }
 
-    detailContent.push(create(Text, {dimColor: true, marginTop: 1}, `Custom commands stored in ${CONFIG_PATH}`));
-    detailContent.push(create(Text, {dimColor: true, marginBottom: 1}, `Extend frameworks via ${PLUGIN_FILE}`));
-    detailContent.push(create(Text, {bold: true, marginTop: 1}, 'Commands'));
+    detailContent.push(create(Text, {key: 'config-path', dimColor: true, marginTop: 1}, `Custom commands stored in ${CONFIG_PATH}`));
+    detailContent.push(create(Text, {key: 'plugin-path', dimColor: true, marginBottom: 1}, `Extend frameworks via ${PLUGIN_FILE}`));
+    detailContent.push(create(Text, {key: 'cmd-header', bold: true, marginTop: 1}, 'Commands'));
     detailedIndexed.forEach((command) => {
       detailContent.push(
         create(Text, {key: `detail-${command.shortcut}-${command.label}`}, `${command.shortcut}. ${command.label} ${command.source === 'custom' ? kleur.magenta('(custom)') : command.source === 'framework' ? kleur.cyan('(framework)') : command.source === 'plugin' ? kleur.green('(plugin)') : ''}`)
       );
-      detailContent.push(create(Text, {dimColor: true}, `   ↳ ${command.command.join(' ')}`));
+      detailContent.push(create(Text, {key: `detail-line-${command.shortcut}-${command.label}`, dimColor: true}, `   ↳ ${command.command.join(' ')}`));
     });
     if (!detailedIndexed.length) {
-      detailContent.push(create(Text, {dimColor: true}, 'No built-in commands yet. Add a custom command with Shift+C.'));
+      detailContent.push(create(Text, {key: 'no-cmds', dimColor: true}, 'No built-in commands yet. Add a custom command with Shift+C.'));
     }
     const setupHints = selectedProject.extra?.setupHints || [];
     if (setupHints.length) {
-      detailContent.push(create(Text, {dimColor: true, marginTop: 1}, 'Setup hints:'));
-      setupHints.forEach((hint) => detailContent.push(create(Text, {dimColor: true}, `  • ${hint}`)));
+      detailContent.push(create(Text, {key: 'setup-header', dimColor: true, marginTop: 1}, 'Setup hints:'));
+      setupHints.forEach((hint, hidx) => detailContent.push(create(Text, {key: `hint-${hidx}`, dimColor: true}, `  • ${hint}`)));
     }
-    detailContent.push(create(Text, {dimColor: true}, 'Press Shift+C → label|cmd to save custom actions, Enter to close detail view.'));
+    detailContent.push(create(Text, {key: 'hint-line', dimColor: true}, 'Press Shift+C → label|cmd to save custom actions, Enter to close detail view.'));
   } else {
-    detailContent.push(create(Text, {dimColor: true}, 'Press Enter on a project to reveal details (icons, commands, frameworks, custom actions).'));
+    detailContent.push(create(Text, {key: 'enter-hint', dimColor: true}, 'Press Enter on a project to reveal details (icons, commands, frameworks, custom actions).'));
   }
 
   if (customMode) {
-    detailContent.push(create(Text, {color: 'cyan'}, `Type label|cmd (Enter to save, Esc to cancel): ${customInput}`));
+    detailContent.push(create(Text, {key: 'custom-input', color: 'cyan'}, `Type label|cmd (Enter to save, Esc to cancel): ${customInput}`));
   }
 
-  const projectCountLabel = `${projects.length} project${projects.length === 1 ? '' : 's'}`;
   const artTileNodes = useMemo(() => {
     const selectedName = selectedProject?.name || 'Awaiting selection';
     const selectedType = selectedProject?.type || 'Unknown stack';
@@ -602,7 +598,7 @@ const projectRows = [];
   const visibleLogs = logLines.slice(logWindowStart, logWindowEnd);
   const logNodes = visibleLogs.length
     ? visibleLogs.map((line, index) => create(Text, {key: index}, line))
-    : [create(Text, {dimColor: true}, 'Logs will appear here once you run a command.')];
+    : [create(Text, {key: 'no-logs', dimColor: true}, 'Logs will appear here once you run a command.')];
 
   const helpCards = [
     {
@@ -662,7 +658,7 @@ const projectRows = [];
           )
         )
       )
-    : create(Text, {dimColor: true, marginTop: 1}, 'Help cards hidden · press Shift+H to show navigation, command flow, and recent runs.');
+    : create(Text, {key: 'help-hint', dimColor: true, marginTop: 1}, 'Help cards hidden · press Shift+H to show navigation, command flow, and recent runs.');
 
   const structureGuide = showStructureGuide
     ? create(
@@ -700,6 +696,10 @@ const projectRows = [];
         create(Text, null, 'Structure guide lists the manifests that trigger each language detection.')
       )
     : null;
+
+  if (mainView === 'studio') {
+    return create(Studio);
+  }
 
   const toggleHint = showHelpCards ? 'Shift+H hides the help cards' : 'Shift+H shows the help cards';
   const headerHint = viewMode === 'detail'
