@@ -123,13 +123,11 @@ const builtInFrameworks = [
           commands[key] = {label, command: tokens, source: 'framework'};
         }
       };
-      const buildFallback = () => ['npx', 'next', 'build'];
-      const startFallback = () => ['npx', 'next', 'start'];
-      const devFallback = () => ['npx', 'next', 'dev'];
-      add('run', 'Next dev', devFallback);
-      add('build', 'Next build', buildFallback);
+      add('install', 'Next install', () => ['npm', 'install']);
+      add('run', 'Next dev', () => ['npx', 'next', 'dev']);
+      add('build', 'Next build', () => ['npx', 'next', 'build']);
       add('test', 'Next test', () => ['npm', 'run', 'test']);
-      add('start', 'Next start', startFallback);
+      add('start', 'Next start', () => ['npx', 'next', 'start']);
       return commands;
     }
   },
@@ -151,6 +149,7 @@ const builtInFrameworks = [
           commands[key] = {label, command: tokens, source: 'framework'};
         }
       };
+      add('install', 'React install', () => ['npm', 'install']);
       add('run', 'React dev', () => ['npm', 'run', 'dev']);
       add('build', 'React build', () => ['npm', 'run', 'build']);
       add('test', 'React test', () => ['npm', 'run', 'test']);
@@ -175,6 +174,7 @@ const builtInFrameworks = [
           commands[key] = {label, command: tokens, source: 'framework'};
         }
       };
+      add('install', 'Vue install', () => ['npm', 'install']);
       add('run', 'Vue dev', () => ['npm', 'run', 'dev']);
       add('build', 'Vue build', () => ['npm', 'run', 'build']);
       add('test', 'Vue test', () => ['npm', 'run', 'test']);
@@ -199,6 +199,7 @@ const builtInFrameworks = [
           commands[key] = {label, command: tokens, source: 'framework'};
         }
       };
+      add('install', 'Nest install', () => ['npm', 'install']);
       add('run', 'Nest dev', () => ['npm', 'run', 'start:dev']);
       add('build', 'Nest build', () => ['npm', 'run', 'build']);
       add('test', 'Nest test', () => ['npm', 'run', 'test']);
@@ -223,6 +224,7 @@ const builtInFrameworks = [
           commands[key] = {label, command: tokens, source: 'framework'};
         }
       };
+      add('install', 'Angular install', () => ['npm', 'install']);
       add('run', 'Angular serve', () => ['npm', 'run', 'start']);
       add('build', 'Angular build', () => ['npm', 'run', 'build']);
       add('test', 'Angular test', () => ['npm', 'run', 'test']);
@@ -247,6 +249,7 @@ const builtInFrameworks = [
           commands[key] = {label, command: tokens, source: 'framework'};
         }
       };
+      add('install', 'SvelteKit install', () => ['npm', 'install']);
       add('run', 'SvelteKit dev', () => ['npm', 'run', 'dev']);
       add('build', 'SvelteKit build', () => ['npm', 'run', 'build']);
       add('test', 'SvelteKit test', () => ['npm', 'run', 'test']);
@@ -272,6 +275,7 @@ const builtInFrameworks = [
           commands[key] = {label, command: tokens, source: 'framework'};
         }
       };
+      add('install', 'Nuxt install', () => ['npm', 'install']);
       add('run', 'Nuxt dev', () => ['npm', 'run', 'dev']);
       add('build', 'Nuxt build', () => ['npm', 'run', 'build']);
       add('start', 'Nuxt start', () => ['npm', 'run', 'start']);
@@ -297,6 +301,7 @@ const builtInFrameworks = [
           commands[key] = {label, command: tokens, source: 'framework'};
         }
       };
+      add('install', 'Astro install', () => ['npm', 'install']);
       add('run', 'Astro dev', () => ['npm', 'run', 'dev']);
       add('build', 'Astro build', () => ['npm', 'run', 'build']);
       add('preview', 'Astro preview', () => ['npm', 'run', 'preview']);
@@ -315,14 +320,16 @@ const builtInFrameworks = [
     },
     commands(project) {
       const managePath = path.join(project.path, 'manage.py');
-      if (!fs.existsSync(managePath)) {
-        return {};
+      const commands = {};
+      if (hasProjectFile(project.path, 'requirements.txt')) {
+        commands.install = {label: 'Pip install', command: ['pip', 'install', '-r', 'requirements.txt'], source: 'framework'};
       }
-      return {
-        run: {label: 'Django runserver', command: ['python', 'manage.py', 'runserver'], source: 'framework'},
-        test: {label: 'Django test', command: ['python', 'manage.py', 'test'], source: 'framework'},
-        migrate: {label: 'Django migrate', command: ['python', 'manage.py', 'migrate'], source: 'framework'}
-      };
+      if (fs.existsSync(managePath)) {
+        commands.run = {label: 'Django runserver', command: ['python', 'manage.py', 'runserver'], source: 'framework'};
+        commands.test = {label: 'Django test', command: ['python', 'manage.py', 'test'], source: 'framework'};
+        commands.migrate = {label: 'Django migrate', command: ['python', 'manage.py', 'migrate'], source: 'framework'};
+      }
+      return commands;
     }
   },
   {
@@ -338,13 +345,15 @@ const builtInFrameworks = [
     },
     commands(project) {
       const entry = findPythonEntry(project.path);
-      if (!entry) {
-        return {};
+      const commands = {};
+      if (hasProjectFile(project.path, 'requirements.txt')) {
+        commands.install = {label: 'Pip install', command: ['pip', 'install', '-r', 'requirements.txt'], source: 'framework'};
       }
-      return {
-        run: {label: 'Flask app', command: ['python', entry], source: 'framework'},
-        test: {label: 'Pytest', command: ['pytest'], source: 'framework'}
-      };
+      if (entry) {
+        commands.run = {label: 'Flask app', command: ['python', entry], source: 'framework'};
+        commands.test = {label: 'Pytest', command: ['pytest'], source: 'framework'};
+      }
+      return commands;
     }
   },
   {
@@ -360,14 +369,16 @@ const builtInFrameworks = [
     },
     commands(project) {
       const entry = findPythonEntry(project.path);
-      if (!entry) {
-        return {};
+      const commands = {};
+      if (hasProjectFile(project.path, 'requirements.txt')) {
+        commands.install = {label: 'Pip install', command: ['pip', 'install', '-r', 'requirements.txt'], source: 'framework'};
       }
-      const moduleName = entry.split('.').slice(0, -1).join('.') || entry;
-      return {
-        run: {label: 'Uvicorn reload', command: ['uvicorn', `${moduleName}:app`, '--reload'], source: 'framework'},
-        test: {label: 'Pytest', command: ['pytest'], source: 'framework'}
-      };
+      if (entry) {
+        const moduleName = entry.split('.').slice(0, -1).join('.') || entry;
+        commands.run = {label: 'Uvicorn reload', command: ['uvicorn', `${moduleName}:app`, '--reload'], source: 'framework'};
+        commands.test = {label: 'Pytest', command: ['pytest'], source: 'framework'};
+      }
+      return commands;
     }
   },
   {
@@ -388,6 +399,7 @@ const builtInFrameworks = [
           commands[key] = {label, command: tokens, source: 'framework'};
         }
       };
+      add('install', 'Vite install', () => ['npm', 'install']);
       add('run', 'Vite dev', () => ['npx', 'vite']);
       add('build', 'Vite build', () => ['npx', 'vite', 'build']);
       add('preview', 'Vite preview', () => ['npx', 'vite', 'preview']);
@@ -404,7 +416,7 @@ const builtInFrameworks = [
     match(project) {
       return hasProjectFile(project.path, 'tailwind.config.js') || hasProjectFile(project.path, 'tailwind.config.ts') || dependencyMatches(project, 'tailwindcss');
     },
-    commands() { return {}; }
+    commands() { return { install: {label: 'Tailwind install', command: ['npm', 'install', '-D', 'tailwindcss'], source: 'framework'} }; }
   },
   {
     id: 'prisma',
@@ -418,6 +430,7 @@ const builtInFrameworks = [
     },
     commands() {
       return {
+        install: {label: 'Prisma install', command: ['npm', 'install', '@prisma/client'], source: 'framework'},
         generate: {label: 'Prisma generate', command: ['npx', 'prisma', 'generate'], source: 'framework'},
         studio: {label: 'Prisma studio', command: ['npx', 'prisma', 'studio'], source: 'framework'}
       };
@@ -441,6 +454,7 @@ const builtInFrameworks = [
       const hasGradlew = hasProjectFile(project.path, 'gradlew');
       if (hasGradlew) {
         return {
+          install: {label: 'Gradle Resolve', command: ['./gradlew', 'dependencies'], source: 'framework'},
           run: {label: 'Gradle BootRun', command: ['./gradlew', 'bootRun'], source: 'framework'},
           build: {label: 'Gradle Build', command: ['./gradlew', 'build'], source: 'framework'},
           test: {label: 'Gradle Test', command: ['./gradlew', 'test'], source: 'framework'}
@@ -448,6 +462,7 @@ const builtInFrameworks = [
       }
       const base = hasMvnw ? './mvnw' : 'mvn';
       return {
+        install: {label: 'Maven Install', command: [base, 'install'], source: 'framework'},
         run: {label: 'Spring Boot run', command: [base, 'spring-boot:run'], source: 'framework'},
         build: {label: 'Maven package', command: [base, 'package'], source: 'framework'},
         test: {label: 'Maven test', command: [base, 'test'], source: 'framework'}
@@ -466,6 +481,7 @@ const builtInFrameworks = [
     },
     commands() {
       return {
+        install: {label: 'Cargo Fetch', command: ['cargo', 'fetch'], source: 'framework'},
         run: {label: 'Rocket Run', command: ['cargo', 'run'], source: 'framework'},
         test: {label: 'Rocket Test', command: ['cargo', 'test'], source: 'framework'}
       };
@@ -483,6 +499,7 @@ const builtInFrameworks = [
     },
     commands() {
       return {
+        install: {label: 'Cargo Fetch', command: ['cargo', 'fetch'], source: 'framework'},
         run: {label: 'Actix Run', command: ['cargo', 'run'], source: 'framework'},
         test: {label: 'Actix Test', command: ['cargo', 'test'], source: 'framework'}
       };
@@ -501,6 +518,7 @@ const builtInFrameworks = [
     },
     commands() {
       return {
+        install: {label: 'dotnet restore', command: ['dotnet', 'restore'], source: 'framework'},
         run: {label: 'dotnet run', command: ['dotnet', 'run'], source: 'framework'},
         watch: {label: 'dotnet watch', command: ['dotnet', 'watch', 'run'], source: 'framework'},
         test: {label: 'dotnet test', command: ['dotnet', 'test'], source: 'framework'}
@@ -519,6 +537,7 @@ const builtInFrameworks = [
     },
     commands() {
       return {
+        install: {label: 'Composer install', command: ['composer', 'install'], source: 'framework'},
         run: {label: 'Artisan Serve', command: ['php', 'artisan', 'serve'], source: 'framework'},
         test: {label: 'Artisan Test', command: ['php', 'artisan', 'test'], source: 'framework'},
         migrate: {label: 'Artisan Migrate', command: ['php', 'artisan', 'migrate'], source: 'framework'}
@@ -568,6 +587,7 @@ class SchemaRegistry {
               }
             }
           };
+          commands.install = {label: 'Install', command: ['npm', 'install']};
           preferScript('build', ['build', 'compile', 'dist'], 'Build');
           preferScript('test', ['test', 'check', 'spec'], 'Test');
           preferScript('run', ['start', 'dev', 'serve', 'run'], 'Start');
@@ -618,6 +638,9 @@ class SchemaRegistry {
         async build(projectPath, manifest) {
           const missingBinaries = this.binaries.filter(b => !checkBinary(b));
           const commands = {};
+          if (hasProjectFile(projectPath, 'requirements.txt')) {
+            commands.install = {label: 'Pip Install', command: ['pip', 'install', '-r', 'requirements.txt']};
+          }
           if (hasProjectFile(projectPath, 'pyproject.toml')) {
             commands.test = {label: 'Pytest', command: ['pytest']};
           } else {
@@ -677,6 +700,7 @@ class SchemaRegistry {
             icon: '🦀',
             priority: this.priority,
             commands: {
+              install: {label: 'Cargo fetch', command: ['cargo', 'fetch']},
               build: {label: 'Cargo build', command: ['cargo', 'build']},
               test: {label: 'Cargo test', command: ['cargo', 'test']},
               run: {label: 'Cargo run', command: ['cargo', 'run']}
@@ -708,6 +732,7 @@ class SchemaRegistry {
             icon: '🐹',
             priority: this.priority,
             commands: {
+              install: {label: 'Go tidy', command: ['go', 'mod', 'tidy']},
               build: {label: 'Go build', command: ['go', 'build', './...']},
               test: {label: 'Go test', command: ['go', 'test', './...']},
               run: {label: 'Go run', command: ['go', 'run', '.']}
@@ -735,9 +760,11 @@ class SchemaRegistry {
           const hasGradlew = hasProjectFile(projectPath, 'gradlew');
           const commands = {};
           if (hasGradlew) {
+            commands.install = {label: 'Gradle resolve', command: ['./gradlew', 'dependencies']};
             commands.build = {label: 'Gradle build', command: ['./gradlew', 'build']};
             commands.test = {label: 'Gradle test', command: ['./gradlew', 'test']};
           } else if (hasMvnw) {
+            commands.install = {label: 'Maven install', command: ['./mvnw', 'install']};
             commands.build = {label: 'Maven package', command: ['./mvnw', 'package']};
             commands.test = {label: 'Maven test', command: ['./mvnw', 'test']};
           } else {
@@ -780,6 +807,7 @@ class SchemaRegistry {
             icon: '🔵',
             priority: this.priority,
             commands: {
+              install: {label: 'sbt update', command: ['sbt', 'update']},
               build: {label: 'sbt compile', command: ['sbt', 'compile']},
               test: {label: 'sbt test', command: ['sbt', 'test']},
               run: {label: 'sbt run', command: ['sbt', 'run']}
@@ -811,6 +839,7 @@ class SchemaRegistry {
             icon: '🐘',
             priority: this.priority,
             commands: {
+              install: {label: 'Composer install', command: ['composer', 'install']},
               test: {label: 'PHP -v', command: ['php', '-v']}
             },
             metadata: {},
@@ -840,6 +869,7 @@ class SchemaRegistry {
             icon: '💎',
             priority: this.priority,
             commands: {
+              install: {label: 'Bundle install', command: ['bundle', 'install']},
               run: {label: 'Ruby console', command: ['ruby', 'app.rb']},
               test: {label: 'Ruby test', command: ['bundle', 'exec', 'rspec']}
             },
@@ -870,6 +900,7 @@ class SchemaRegistry {
             icon: '🔷',
             priority: this.priority,
             commands: {
+              install: {label: 'dotnet restore', command: ['dotnet', 'restore']},
               build: {label: 'dotnet build', command: ['dotnet', 'build']},
               test: {label: 'dotnet test', command: ['dotnet', 'test']},
               run: {label: 'dotnet run', command: ['dotnet', 'run']}

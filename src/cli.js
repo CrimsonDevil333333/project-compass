@@ -465,6 +465,10 @@ function Compass({rootPath, initialView = 'navigator'}) {
   });
 
   const projectCountLabel = `${projects.length} project${projects.length === 1 ? '' : 's'}`;
+  const toggleHint = config.showHelpCards ? 'Shift+H hide help' : 'Shift+H show help';
+  const statusHint = activeTask ? `[${activeTask.status.toUpperCase()}] ${activeTask.name}` : 'Idle Navigator';
+  const orbitHint = mainView === 'tasks' ? 'Tasks View' : `Orbit: ${tasks.length} tasks`;
+  const artHint = config.showArtBoard ? 'Shift+B hide art' : 'Shift+B show art';
 
   if (quitConfirm) {
     return create(Box, {flexDirection: 'column', borderStyle: 'round', borderColor: 'red', padding: 1}, create(Text, {bold: true, color: 'red'}, '⚠️ Confirm Exit'), create(Text, null, `There are ${tasks.filter(t=>t.status==='running').length} tasks still running in the background.`), create(Text, null, 'Are you sure you want to quit and stop all processes?'), create(Text, {marginTop: 1}, kleur.bold('Y') + ' to Quit, ' + kleur.bold('N') + ' to Cancel'));
@@ -578,11 +582,13 @@ function Compass({rootPath, initialView = 'navigator'}) {
     {label: 'Orbit & Studio', color: 'yellow', body: ['Shift+T task manager', 'Shift+A studio / Shift+B art board', 'Shift+S structure / Shift+Q quit']}
   ];
 
-  const toggleHint = config.showHelpCards ? 'Shift+H hide help' : 'Shift+H show help';
   return create(Box, {flexDirection: 'column', padding: 1},
     create(Box, {justifyContent: 'space-between'},
       create(Box, {flexDirection: 'column'}, create(Text, {color: 'magenta', bold: true}, 'Project Compass'), create(Text, {dimColor: true}, `${projectCountLabel} detected in ${rootPath}`)),
-      create(Box, {flexDirection: 'column', alignItems: 'flex-end'}, create(Text, {color: running ? 'yellow' : 'green'}, activeTask ? `[${activeTask.status.toUpperCase()}] ${activeTask.name}` : 'Idle Navigator'), create(Text, {dimColor: true}, `${toggleHint}, Shift+T: Tasks, Shift+Q: Quit`))
+      create(Box, {flexDirection: 'column', alignItems: 'flex-end'}, 
+        create(Text, {color: running ? 'yellow' : 'green'}, statusHint), 
+        create(Text, {dimColor: true}, `${toggleHint} · ${orbitHint} · ${artHint} · Shift+Q: Quit`)
+      )
     ),
     artBoard,
     create(Box, {marginTop: 1, flexDirection: 'row', alignItems: 'stretch', width: '100%', flexWrap: 'wrap'},
@@ -597,7 +603,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
     ),
     config.showHelpCards && create(Box, {marginTop: 1, flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap'}, ...helpCards.map((card, idx) => create(Box, {key: card.label, flexGrow: 1, flexBasis: 0, minWidth: HELP_CARD_MIN_WIDTH, marginRight: idx < 2 ? 1 : 0, marginBottom: 1, borderStyle: 'round', borderColor: card.color, padding: 1, flexDirection: 'column'}, create(Text, {color: card.color, bold: true, marginBottom: 1}, card.label), ...card.body.map((line, lidx) => create(Text, {key: lidx, dimColor: card.color === 'yellow'}, line))))),
     config.showStructureGuide && create(Box, {flexDirection: 'column', borderStyle: 'round', borderColor: 'blue', marginTop: 1, padding: 1}, create(Text, {color: 'cyan', bold: true}, 'Structure guide · press Shift+S to hide'), ...SCHEMA_GUIDE.map(e => create(Text, {key: e.type, dimColor: true}, `• ${e.icon} ${e.label}: ${e.files.join(', ')}`))),
-    showHelp && create(Box, {flexDirection: 'column', borderStyle: 'double', borderColor: 'cyan', marginTop: 1, padding: 1}, create(Text, {color: 'cyan', bold: true}, 'Help overlay'), create(Text, null, 'Shift+↑/↓ scrolls logs; Shift+X clears; Shift+E exports; Shift+A Studio; Shift+T Tasks; Shift+D Detach; Shift+B Toggle Art.'))
+    showHelp && create(Box, {flexDirection: 'column', borderStyle: 'double', borderColor: 'cyan', marginTop: 1, padding: 1}, create(Text, {color: 'cyan', bold: true}, 'Help overlay'), create(Text, null, 'Shift+↑/↓ scrolls logs; Shift+X clears; Shift+E exports; Shift+A Studio; Shift+T Tasks; Shift+D Detach; Shift+B Toggle Art Board.'))
   );
 }
 
