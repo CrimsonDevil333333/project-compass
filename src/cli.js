@@ -6,7 +6,7 @@ import fs from 'fs';
 import kleur from 'kleur';
 import {execa} from 'execa';
 import {discoverProjects, SCHEMA_GUIDE, checkBinary} from './projectDetection.js';
-import {CONFIG_PATH, PLUGIN_FILE, ensureConfigDir} from './configPaths.js';
+import {CONFIG_PATH, ensureConfigDir} from './configPaths.js';
 
 const create = React.createElement;
 const DEFAULT_CONFIG = {customCommands: {}};
@@ -17,7 +17,6 @@ const OUTPUT_WINDOW_HEIGHT = OUTPUT_WINDOW_SIZE + 2;
 const PROJECTS_MIN_WIDTH = 32;
 const DETAILS_MIN_WIDTH = 44;
 const HELP_CARD_MIN_WIDTH = 28;
-const RECENT_RUN_LIMIT = 5;
 const ACTION_MAP = {
   b: 'build',
   t: 'test',
@@ -175,7 +174,6 @@ function Compass({rootPath, initialView = 'navigator'}) {
   const [tasks, setTasks] = useState([]);
   const [activeTaskId, setActiveTaskId] = useState(null);
   const [logOffset, setLogOffset] = useState(0);
-  const [lastAction, setLastAction] = useState(null);
   const [customMode, setCustomMode] = useState(false);
   const [customInput, setCustomInput] = useState('');
   const [customCursor, setCustomCursor] = useState(0);
@@ -185,7 +183,6 @@ function Compass({rootPath, initialView = 'navigator'}) {
   const [stdinBuffer, setStdinBuffer] = useState('');
   const [stdinCursor, setStdinCursor] = useState(0);
   const [showHelp, setShowHelp] = useState(false);
-  const [recentRuns, setRecentRuns] = useState([]);
   const selectedProject = projects[selectedIndex] || null;
   const runningProcessMap = useRef(new Map());
   const lastCommandRef = useRef(null);
@@ -232,12 +229,6 @@ function Compass({rootPath, initialView = 'navigator'}) {
     setTasks(prev => [...prev, newTask]);
     setActiveTaskId(taskId);
     lastCommandRef.current = {project, commandMeta};
-    setLastAction(newTask.name);
-    
-    setRecentRuns((prev) => {
-      const entry = {project: project.name, command: commandLabel, time: new Date().toLocaleTimeString()};
-      return [entry, ...prev].slice(0, RECENT_RUN_LIMIT);
-    });
 
     try {
       const subprocess = execa(commandMeta.command[0], commandMeta.command.slice(1), {
@@ -404,6 +395,8 @@ function Compass({rootPath, initialView = 'navigator'}) {
       runProjectCommand(detailShortcutMap.get(normalizedInput), selectedProject);
     }
   });
+
+  const projectCountLabel = `${projects.length} project${projects.length === 1 ? '' : 's'}`;
 
   if (mainView === 'studio') return create(Studio);
 
