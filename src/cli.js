@@ -455,10 +455,12 @@ function Compass({rootPath, initialView = 'navigator'}) {
       return;
     }
     if (viewMode === 'detail' && normalizedInput && detailShortcutMap.has(normalizedInput)) {
-      if (key.shift) {
+      if (!isNaN(parseInt(normalizedInput))) {
         runProjectCommand(detailShortcutMap.get(normalizedInput), selectedProject);
         return;
-      } else if (!isNaN(parseInt(normalizedInput))) {
+      }
+      const reserved = ['a', 'p', 'n', 'x', 'e', 'd', 'b', 't', 'q', 'h', 's', 'l', 'c'];
+      if (key.shift && !reserved.includes(normalizedInput)) {
         runProjectCommand(detailShortcutMap.get(normalizedInput), selectedProject);
         return;
       }
@@ -545,7 +547,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
   }
 
   if (mainView === 'studio') return create(Studio);
-  if (mainView === 'tasks') return create(TaskManager, {tasks, activeTaskId, setActiveTaskId, renameMode, renameInput, renameCursor, CursorText});
+  if (mainView === 'tasks') return create(TaskManager, {tasks, activeTaskId, renameMode, renameInput, renameCursor, CursorText});
   if (mainView === 'registry') return create(PackageRegistry, {selectedProject, onRunCommand: runProjectCommand, CursorText});
   if (mainView === 'architect') return create(ProjectArchitect, {onRunCommand: runProjectCommand, CursorText});
 
@@ -570,7 +572,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
       create(Box, {flexDirection: 'row', justifyContent: 'space-between'}, create(Text, {bold: true, color: 'yellow'}, `Output: ${activeTask?.name || 'None'}`), create(Text, {dimColor: true}, logOffset ? `Scrolled ${logOffset} lines` : 'Live log view')),
       create(OutputPanel, {activeTask, logOffset}),
       create(Box, {marginTop: 1, flexDirection: 'row', justifyContent: 'space-between'}, create(Text, {dimColor: true}, running ? 'Type to feed stdin; Enter: submit.' : 'Run a command or press Shift+T to switch tasks.'), create(Text, {dimColor: true}, `${toggleHint}, Shift+S: Structure Guide`)),
-      create(Box, {marginTop: 1, flexDirection: 'row', borderStyle: 'round', borderColor: running ? 'green' : 'gray', paddingX: 1}, create(Text, {bold: true, color: 'green'}, running ? ' Stdin buffer ' : ' Input ready '), create(Box, {marginLeft: 1}, create(CursorText, {value: stdinBuffer || (running ? '' : 'Start a command to feed stdin'), cursorIndex: stdinCursor, active: running})))
+      create(Box, {marginTop: 1, flexDirection: 'row', borderStyle: 'round', borderColor: running ? 'green' : 'gray', paddingX: 1}, create(Text, {bold: true, color: running ? 'green' : 'white'}, running ? ' Stdin buffer ' : ' Input ready '), create(Box, {marginLeft: 1}, create(CursorText, {value: stdinBuffer || (running ? '' : 'Start a command to feed stdin'), cursorIndex: stdinCursor, active: running})))
     ),
     config.showHelpCards && create(Box, {marginTop: 1, flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap'}, [
       {label: 'Navigation', color: 'magenta', body: ['↑ / ↓ move focus, Enter: details', 'Shift+↑ / ↓ scroll output', 'Shift+H toggle help cards', 'Shift+D detach from task']},
