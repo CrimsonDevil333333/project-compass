@@ -455,7 +455,13 @@ function Compass({rootPath, initialView = 'navigator'}) {
       return;
     }
     if (viewMode === 'detail' && normalizedInput && detailShortcutMap.has(normalizedInput)) {
-      runProjectCommand(detailShortcutMap.get(normalizedInput), selectedProject);
+      if (key.shift) {
+        runProjectCommand(detailShortcutMap.get(normalizedInput), selectedProject);
+        return;
+      } else if (!isNaN(parseInt(normalizedInput))) {
+        runProjectCommand(detailShortcutMap.get(normalizedInput), selectedProject);
+        return;
+      }
     }
   });
 
