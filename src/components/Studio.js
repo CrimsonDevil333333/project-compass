@@ -42,7 +42,7 @@ const Studio = memo(() => {
 
   return create(
     Box,
-    {flexDirection: 'column', borderStyle: 'double', borderColor: 'blue', padding: 1},
+    {flexDirection: 'column', borderStyle: 'double', borderColor: 'blue', padding: 1, width: '100%'},
     create(Text, {bold: true, color: 'blue'}, '💎 Omni-Studio | Environment Intelligence'),
     create(Text, {dimColor: true, marginBottom: 1}, 'Overview of installed languages and build tools.'),
     loading
@@ -56,8 +56,7 @@ const Studio = memo(() => {
             create(Text, {width: 20, color: r.status === 'ok' ? 'green' : 'red'}, `${r.status === 'ok' ? '✓' : '✗'} ${r.name}`),
             create(Text, {dimColor: r.status !== 'ok'}, `:  ${r.version}`)
           )),
-          create(Text, {marginTop: 1, color: 'yellow'}, '🛠️ Interactive Project Creator coming soon in v3.0'),
-          create(Text, {dimColor: true}, 'Press Shift+A to return to Navigator.')
+          create(Text, {marginTop: 1, dimColor: true}, 'Press Shift+A to return to Navigator.')
         )
   );
 });
