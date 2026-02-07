@@ -9,7 +9,6 @@ import {discoverProjects, SCHEMA_GUIDE, checkBinary} from './projectDetection.js
 import {CONFIG_PATH, ensureConfigDir} from './configPaths.js';
 
 const create = React.createElement;
-const DEFAULT_CONFIG = {customCommands: {}};
 const ART_CHARS = ['▁', '▃', '▄', '▅', '▇'];
 const ART_COLORS = ['magenta', 'blue', 'cyan', 'yellow', 'red'];
 const OUTPUT_WINDOW_SIZE = 8;
@@ -38,18 +37,15 @@ function loadConfig() {
       const payload = fs.readFileSync(CONFIG_PATH, 'utf-8');
       const parsed = JSON.parse(payload || '{}');
       return {
-        ...DEFAULT_CONFIG,
+        customCommands: {},
+        showArtBoard: true,
         ...parsed,
-        customCommands: {
-          ...DEFAULT_CONFIG.customCommands,
-          ...(parsed.customCommands || {})
-        }
       };
     }
   } catch (error) {
     console.error(`Ignoring corrupt config: ${error.message}`);
   }
-  return {...DEFAULT_CONFIG};
+  return {customCommands: {}, showArtBoard: true};
 }
 
 function useScanner(rootPath) {
@@ -179,7 +175,6 @@ function Compass({rootPath, initialView = 'navigator'}) {
   const [renameInput, setRenameInput] = useState('');
   const [renameCursor, setRenameCursor] = useState(0);
   const [quitConfirm, setQuitConfirm] = useState(false);
-  const [showArtBoard, setShowArtBoard] = useState(true);
   const [config, setConfig] = useState(() => loadConfig());
   const [showHelpCards, setShowHelpCards] = useState(false);
   const [showStructureGuide, setShowStructureGuide] = useState(false);
@@ -215,6 +210,13 @@ function Compass({rootPath, initialView = 'navigator'}) {
     return map;
   }, [detailedIndexed]);
 
+  const killAllTasks = useCallback(() => {
+    runningProcessMap.current.forEach((proc) => {
+      try { proc.kill('SIGINT'); } catch { /* ignore */ }
+    });
+    runningProcessMap.current.clear();
+  }, []);
+
   const runProjectCommand = useCallback(async (commandMeta, targetProject = selectedProject) => {
     const project = targetProject || selectedProject;
     if (!project) return;
@@ -249,7 +251,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
       setTasks(prev => prev.map(t => t.id === taskId ? {...t, status: 'finished'} : t));
       addLogToTask(taskId, kleur.green(`✓ ${commandLabel} finished`));
     } catch (error) {
-      if (error.isCanceled) {
+      if (error.isCanceled || error.killed) {
         setTasks(prev => prev.map(t => t.id === taskId ? {...t, status: 'killed'} : t));
         addLogToTask(taskId, kleur.yellow(`! Task killed by user`));
       } else {
@@ -284,8 +286,8 @@ function Compass({rootPath, initialView = 'navigator'}) {
 
     useInput((input, key) => {
     if (quitConfirm) {
-      if (input?.toLowerCase() === 'y') exit();
-      if (input?.toLowerCase() === 'n' || key.escape) setQuitConfirm(false);
+      if (input?.toLowerCase() === 'y') { killAllTasks(); exit(); return; }
+      if (input?.toLowerCase() === 'n' || key.escape) { setQuitConfirm(false); return; }
       return;
     }
 
@@ -358,7 +360,14 @@ function Compass({rootPath, initialView = 'navigator'}) {
     if (shiftCombo('x')) { setTasks(prev => prev.map(t => t.id === activeTaskId ? {...t, logs: []} : t)); setLogOffset(0); return; }
     if (shiftCombo('e')) { exportLogs(); return; }
     if (shiftCombo('d')) { setActiveTaskId(null); return; }
-    if (shiftCombo('b')) { setShowArtBoard(prev => !prev); return; }
+    if (shiftCombo('b')) { 
+      setConfig(prev => {
+        const next = {...prev, showArtBoard: !prev.showArtBoard};
+        saveConfig(next);
+        return next;
+      });
+      return; 
+    }
     
     if (shiftCombo('t')) { 
       setMainView((prev) => {
@@ -537,7 +546,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
     create(Text, {dimColor: true}, tile.subtext)
   ));
 
-  const artBoard = showArtBoard ? create(Box, {flexDirection: 'column', marginTop: 1, borderStyle: 'round', borderColor: 'gray', padding: 1},
+  const artBoard = config.showArtBoard ? create(Box, {flexDirection: 'column', marginTop: 1, borderStyle: 'round', borderColor: 'gray', padding: 1},
     create(Box, {flexDirection: 'row', justifyContent: 'space-between'}, create(Text, {color: 'magenta', bold: true}, 'Art-coded build atlas'), create(Text, {dimColor: true}, 'press ? for overlay help')),
     create(Box, {flexDirection: 'row', marginTop: 1}, ...ART_CHARS.map((char, i) => create(Text, {key: i, color: ART_COLORS[i % ART_COLORS.length]}, char.repeat(2)))),
     create(Box, {flexDirection: 'row', marginTop: 1}, ...artTileNodes)

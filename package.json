@@ -1,6 +1,6 @@
 {
   "name": "project-compass",
-  "version": "2.9.0",
+  "version": "2.9.1",
   "description": "Ink-based project explorer that detects local repos and lets you build/test/run them without memorizing commands.",
   "main": "src/cli.js",
   "type": "module",
