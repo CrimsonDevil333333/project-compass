@@ -1,14 +1,15 @@
 # Project Compass
 
-Project Compass is a terminal-first explorer built with [Ink](https://github.com/vadimdemedes/ink) that helps you visualize every recognizable project inside the current directory tree and run the right commands with a single keystroke.
+Project Compass is a futuristic CLI navigator built with [Ink](https://github.com/vadimdemedes/ink) that scans your current folder tree for familiar code projects and gives you one keystroke access to build, test, or run them.
 
-## Features
+## Highlights
 
-- 🔍 Scans the current folder and subfolders for Node.js, Python, Rust, Go, Java, and Scala projects.
-- 🧭 Displays a modern Ink dashboard with icons, relative paths, and live command logs.
-- 🎯 Lets you use arrow keys to pick a project and press `B/T/R` to build, test, or run it.
-- ⚙️ Runs sensible defaults per language (scripts for Node.js, `cargo`, `go`, `sbt`, `mvn`, `pytest`, etc.) without memorizing commands.
-- 📦 Installs globally via `npm install -g` so you can launch `project-compass` from anywhere.
+- 🔍 Scans directories for Node.js, Python, Rust, Go, Java, and Scala projects by looking at their manifest files.
+- ✨ Presents a modern Ink dashboard with an interactive project list, icons, and live stdout/stderr logs.
+- 🚀 Press **Enter** on any project to open the detail view, where you can inspect the type, manifest, description, commands, and save custom actions.
+- 🎯 Built-in shortcuts (B/T/R) run the canonical build/test/run workflow, while numeric hotkeys (1, 2, 3...) execute whichever command is listed in the detail view.
+- 🧠 Add bespoke commands via `C` in detail view and store them globally (`~/.project-compass/config.json`) so every workspace remembers your custom invocations.
+- 📦 Install globally and invoke `project-compass` from any folder to activate the UI instantly.
 
 ## Installation
 
@@ -22,18 +23,23 @@ npm install -g project-compass
 project-compass [--dir /path/to/workspace]
 ```
 
-Once the UI shows up:
+### Keyboard guide
 
-- Navigate projects with **↑ / ↓**.
-- Press **B** to build, **T** to test, **R** to run (if a command is available).
-- Tail the log panel on the right for real-time feedback.
-- Press **Q** to quit.
+| Key | Action |
+| --- | --- |
+| ↑ / ↓ | Navigate the project list |
+| Enter | Toggle the detail view with icons, commands, and info |
+| B / T / R | Quick build / test / run actions (when available) |
+| 1‑9 | Execute the numbered command inside the detail view |
+| C | Add a custom command (`label|cmd`) that saves to `~/.project-compass/config.json` |
+| Q | Quit |
 
 ## Developer notes
 
 - `npm start` launches the Ink UI in the current directory.
-- `npm test` runs the detection routine in `--mode test` so you can assert the scanner output before pushing.
-- Add new languages or custom command presets by editing `src/cli.js` and extending the `SCHEMAS` table.
+- `npm test` runs `node src/cli.js --mode test` to verify the scanner output.
+- Extend support for more languages by editing `SCHEMAS` in `src/cli.js`.
+- Config lives at `~/.project-compass/config.json`. Drop custom commands there if you want to preseed them or share with teammates.
 
 ## License
 

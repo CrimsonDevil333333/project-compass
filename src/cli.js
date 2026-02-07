@@ -4,12 +4,52 @@ import {render, Box, Text, useApp, useInput} from 'ink';
 import fastGlob from 'fast-glob';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import {fileURLToPath} from 'url';
 import kleur from 'kleur';
 import {execa} from 'execa';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const create = React.createElement;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const CONFIG_DIR = path.join(os.homedir(), '.project-compass');
+const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
+const DEFAULT_CONFIG = {customCommands: {}};
+
+function ensureConfigDir() {
+  if (!fs.existsSync(CONFIG_DIR)) {
+    fs.mkdirSync(CONFIG_DIR, {recursive: true});
+  }
+}
+
+function saveConfig(config) {
+  try {
+    ensureConfigDir();
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+  } catch (error) {
+    console.error(`Unable to persist config: ${error.message}`);
+  }
+}
+
+function loadConfig() {
+  try {
+    if (fs.existsSync(CONFIG_PATH)) {
+      const payload = fs.readFileSync(CONFIG_PATH, 'utf-8');
+      const parsed = JSON.parse(payload || '{}');
+      return {
+        ...DEFAULT_CONFIG,
+        ...parsed,
+        customCommands: {
+          ...DEFAULT_CONFIG.customCommands,
+          ...(parsed.customCommands || {})
+        }
+      };
+    }
+  } catch (error) {
+    console.error(`Ignoring corrupt config: ${error.message}`);
+  }
+  return {...DEFAULT_CONFIG};
+}
 
 const IGNORE_PATTERNS = ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/build/**', '**/target/**'];
 
@@ -20,13 +60,13 @@ const SCHEMAS = [
     icon: '🟢',
     priority: 90,
     files: ['package.json'],
-    async build(projectPath) {
+    async build(projectPath, manifest) {
       const pkgPath = path.join(projectPath, 'package.json');
       if (!fs.existsSync(pkgPath)) {
         return null;
       }
-      const pkgContent = await fs.promises.readFile(pkgPath, 'utf-8');
-      const pkg = JSON.parse(pkgContent);
+      const content = await fs.promises.readFile(pkgPath, 'utf-8');
+      const pkg = JSON.parse(content);
       const scripts = pkg.scripts || {};
       const preferScript = (names) => {
         for (const name of names) {
@@ -59,7 +99,11 @@ const SCHEMAS = [
         icon: '🟢',
         priority: this.priority,
         commands,
-        description: pkg.description || ''
+        manifest: path.basename(manifest),
+        description: pkg.description || '',
+        extra: {
+          scripts: Object.keys(scripts)
+        }
       };
     }
   },
@@ -69,18 +113,17 @@ const SCHEMAS = [
     icon: '🐍',
     priority: 80,
     files: ['pyproject.toml', 'requirements.txt', 'setup.py'],
-    async build(projectPath) {
+    async build(projectPath, manifest) {
       const commands = {};
-      const hasPyproject = fs.existsSync(path.join(projectPath, 'pyproject.toml'));
-      if (hasPyproject) {
+      if (fs.existsSync(path.join(projectPath, 'pyproject.toml'))) {
         commands.test = {label: 'Pytest', command: ['pytest']};
       } else {
         commands.test = {label: 'Unittest', command: ['python', '-m', 'unittest', 'discover']};
       }
 
-      const entryPoint = await findPythonEntry(projectPath);
-      if (entryPoint) {
-        commands.run = {label: 'Run', command: ['python', entryPoint]};
+      const entry = await findPythonEntry(projectPath);
+      if (entry) {
+        commands.run = {label: 'Run', command: ['python', entry]};
       }
 
       return {
@@ -91,7 +134,11 @@ const SCHEMAS = [
         icon: '🐍',
         priority: this.priority,
         commands,
-        description: ''
+        manifest: path.basename(manifest),
+        description: '',
+        extra: {
+          entry
+        }
       };
     }
   },
@@ -101,7 +148,7 @@ const SCHEMAS = [
     icon: '🦀',
     priority: 85,
     files: ['Cargo.toml'],
-    async build(projectPath) {
+    async build(projectPath, manifest) {
       return {
         id: `${projectPath}::rust`,
         path: projectPath,
@@ -114,7 +161,9 @@ const SCHEMAS = [
           test: {label: 'Cargo test', command: ['cargo', 'test']},
           run: {label: 'Cargo run', command: ['cargo', 'run']}
         },
-        description: ''
+        manifest: path.basename(manifest),
+        description: '',
+        extra: {}
       };
     }
   },
@@ -124,7 +173,7 @@ const SCHEMAS = [
     icon: '🐹',
     priority: 80,
     files: ['go.mod'],
-    async build(projectPath) {
+    async build(projectPath, manifest) {
       return {
         id: `${projectPath}::go`,
         path: projectPath,
@@ -137,7 +186,9 @@ const SCHEMAS = [
           test: {label: 'Go test', command: ['go', 'test', './...']},
           run: {label: 'Go run', command: ['go', 'run', '.']}
         },
-        description: ''
+        manifest: path.basename(manifest),
+        description: '',
+        extra: {}
       };
     }
   },
@@ -147,7 +198,7 @@ const SCHEMAS = [
     icon: '☕️',
     priority: 75,
     files: ['pom.xml', 'build.gradle', 'build.gradle.kts'],
-    async build(projectPath) {
+    async build(projectPath, manifest) {
       const hasMvnw = fs.existsSync(path.join(projectPath, 'mvnw'));
       const hasGradlew = fs.existsSync(path.join(projectPath, 'gradlew'));
       const commands = {};
@@ -170,7 +221,9 @@ const SCHEMAS = [
         icon: '☕️',
         priority: this.priority,
         commands,
-        description: ''
+        manifest: path.basename(manifest),
+        description: '',
+        extra: {}
       };
     }
   },
@@ -180,7 +233,7 @@ const SCHEMAS = [
     icon: '🔵',
     priority: 70,
     files: ['build.sbt'],
-    async build(projectPath) {
+    async build(projectPath, manifest) {
       return {
         id: `${projectPath}::scala`,
         path: projectPath,
@@ -193,7 +246,9 @@ const SCHEMAS = [
           test: {label: 'sbt test', command: ['sbt', 'test']},
           run: {label: 'sbt run', command: ['sbt', 'run']}
         },
-        description: ''
+        manifest: path.basename(manifest),
+        description: '',
+        extra: {}
       };
     }
   }
@@ -227,19 +282,17 @@ async function discoverProjects(root) {
       if (existing && existing.priority >= schema.priority) {
         continue;
       }
-      const entry = await schema.build(projectDir);
+      const entry = await schema.build(projectDir, match);
       if (!entry) {
         continue;
       }
       projectMap.set(projectDir, entry);
     }
   }
-  const projects = Array.from(projectMap.values());
-  projects.sort((a, b) => b.priority - a.priority);
-  return projects;
+  return Array.from(projectMap.values()).sort((a, b) => b.priority - a.priority);
 }
 
-const ACTION_KEYS = {
+const ACTION_MAP = {
   b: 'build',
   t: 'test',
   r: 'run'
@@ -270,31 +323,61 @@ function useScanner(rootPath) {
   return state;
 }
 
+function buildDetailCommands(project, config) {
+  if (!project) {
+    return [];
+  }
+  const builtins = Object.values(project.commands || {}).map((command) => ({
+    ...command,
+    source: 'builtin'
+  }));
+  const custom = (config.customCommands?.[project.path] || []).map((entry) => ({
+    label: entry.label,
+    command: entry.command,
+    source: 'custom'
+  }));
+  return [...builtins, ...custom];
+}
+
 function Compass({rootPath}) {
   const {exit} = useApp();
   const {projects, loading, error} = useScanner(rootPath);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [viewMode, setViewMode] = useState('list');
   const [logLines, setLogLines] = useState([]);
   const [running, setRunning] = useState(false);
   const [lastAction, setLastAction] = useState(null);
+  const [customMode, setCustomMode] = useState(false);
+  const [customInput, setCustomInput] = useState('');
+  const [config, setConfig] = useState(() => loadConfig());
 
   const selectedProject = projects[selectedIndex] || null;
 
   const addLog = useCallback((line) => {
-    setLogLines((prev) => [...prev.slice(-200), line]);
+    setLogLines((prev) => [...prev.slice(-200), typeof line === 'string' ? line : JSON.stringify(line)]);
   }, []);
 
-  const runProjectCommand = useCallback(async (action) => {
+  const detailCommands = useMemo(() => buildDetailCommands(selectedProject, config), [selectedProject, config]);
+  const detailedIndexed = useMemo(() => detailCommands.map((command, index) => ({
+    ...command,
+    shortcut: `${index + 1}`
+  })), [detailCommands]);
+  const detailShortcutMap = useMemo(() => {
+    const map = new Map();
+    detailedIndexed.forEach((cmd) => map.set(cmd.shortcut, cmd));
+    return map;
+  }, [detailedIndexed]);
+
+  const runProjectCommand = useCallback(async (commandMeta) => {
     if (!selectedProject) {
+      return;
+    }
+    if (!commandMeta || !Array.isArray(commandMeta.command) || commandMeta.command.length === 0) {
+      addLog(kleur.gray('(no command configured)'));
       return;
     }
     if (running) {
       addLog(kleur.yellow('→ Wait for the current task to finish.'));
-      return;
-    }
-    const commandMeta = selectedProject.commands[action];
-    if (!commandMeta || !commandMeta.command?.length) {
-      addLog(kleur.gray(`(no ${action} command available for ${selectedProject.type})`));
       return;
     }
 
@@ -323,42 +406,119 @@ function Compass({rootPath}) {
     } finally {
       setRunning(false);
     }
-  }, [addLog, running, selectedProject]);
+  }, [selectedProject, addLog, running]);
+
+  const handleAddCustomCommand = useCallback((label, commandTokens) => {
+    if (!selectedProject) {
+      return;
+    }
+    setConfig((prev) => {
+      const projectKey = selectedProject.path;
+      const existing = prev.customCommands?.[projectKey] || [];
+      const nextCustom = [...existing, {label, command: commandTokens}];
+      const nextConfig = {
+        ...prev,
+        customCommands: {
+          ...prev.customCommands,
+          [projectKey]: nextCustom
+        }
+      };
+      saveConfig(nextConfig);
+      return nextConfig;
+    });
+    addLog(kleur.yellow(`Saved custom command "${label}" for ${selectedProject.name}`));
+  }, [selectedProject, addLog]);
+
+  const handleCustomSubmit = useCallback(() => {
+    const raw = customInput.trim();
+    if (!selectedProject) {
+      setCustomMode(false);
+      return;
+    }
+    if (!raw) {
+      addLog(kleur.gray('Canceled custom command (empty).'));
+      setCustomMode(false);
+      setCustomInput('');
+      return;
+    }
+    const [labelPart, commandPart] = raw.split('|');
+    const commandTokens = (commandPart || labelPart).trim().split(/\s+/).filter(Boolean);
+    if (!commandTokens.length) {
+      addLog(kleur.red('Custom command needs at least one token.'));
+      setCustomMode(false);
+      setCustomInput('');
+      return;
+    }
+    const label = commandPart ? labelPart.trim() : `Custom ${selectedProject.name}`;
+    handleAddCustomCommand(label || 'Custom', commandTokens);
+    setCustomMode(false);
+    setCustomInput('');
+  }, [customInput, selectedProject, handleAddCustomCommand, addLog]);
 
   useInput((input, key) => {
+    if (customMode) {
+      if (key.return) {
+        handleCustomSubmit();
+        return;
+      }
+      if (key.escape) {
+        setCustomMode(false);
+        setCustomInput('');
+        return;
+      }
+      if (key.backspace) {
+        setCustomInput((prev) => prev.slice(0, -1));
+        return;
+      }
+      if (input) {
+        setCustomInput((prev) => prev + input);
+      }
+      return;
+    }
+
     if (key.upArrow && projects.length > 0) {
       setSelectedIndex((prev) => (prev - 1 + projects.length) % projects.length);
-    } else if (key.downArrow && projects.length > 0) {
+      return;
+    }
+    if (key.downArrow && projects.length > 0) {
       setSelectedIndex((prev) => (prev + 1) % projects.length);
-    } else if (input === 'q') {
+      return;
+    }
+    if (key.return) {
+      if (!selectedProject) {
+        return;
+      }
+      setViewMode((prev) => (prev === 'detail' ? 'list' : 'detail'));
+      return;
+    }
+    if (input === 'q') {
       exit();
-    } else if (ACTION_KEYS[input]) {
-      runProjectCommand(ACTION_KEYS[input]);
+      return;
+    }
+    if (input === 'c' && viewMode === 'detail' && selectedProject) {
+      setCustomMode(true);
+      setCustomInput('');
+      return;
+    }
+    if (ACTION_MAP[input]) {
+      const commandMeta = selectedProject?.commands?.[ACTION_MAP[input]];
+      runProjectCommand(commandMeta);
+      return;
+    }
+    if (viewMode === 'detail' && detailShortcutMap.has(input)) {
+      runProjectCommand(detailShortcutMap.get(input));
     }
   });
 
-  const actionHints = useMemo(() => {
-    if (!selectedProject) {
-      return 'Waiting for projects to appear...';
-    }
-    const available = Object.entries(ACTION_KEYS)
-      .map(([key, actionName]) => {
-        const meta = selectedProject.commands[actionName];
-        return `${key.toUpperCase()}:${meta ? meta.label : '—'}`;
-      })
-      .join('  ');
-    return `Actions: ${available}  |  q: quit  |  arrows: pick project`;
-  }, [selectedProject]);
-
   const projectRows = [];
   if (loading) {
-    projectRows.push(create(Text, {dimColor: true}, 'Searching for projects…'));
+    projectRows.push(create(Text, {dimColor: true}, 'Scanning for projects…'));
   }
   if (error) {
-    projectRows.push(create(Text, {color: 'red'}, `Unable to list projects: ${error}`));
+    projectRows.push(create(Text, {color: 'red'}, `Unable to scan: ${error}`));
   }
   if (!loading && !error && projects.length === 0) {
-    projectRows.push(create(Text, {dimColor: true}, 'Nothing recognized yet. Make sure the workspace contains known manifest files (package.json, pyproject.toml, etc.).'));
+    projectRows.push(create(Text, {dimColor: true}, 'No recognizable project manifests found.'));
   }
   if (!loading) {
     projects.forEach((project, index) => {
@@ -380,9 +540,46 @@ function Compass({rootPath}) {
     });
   }
 
+  const detailContent = [];
+  if (viewMode === 'detail' && selectedProject) {
+    detailContent.push(
+      create(Text, {color: 'yellow', bold: true}, `${selectedProject.icon} ${selectedProject.name}`),
+      create(Text, {dimColor: true}, `${selectedProject.type} · ${selectedProject.manifest || 'detected manifest'}`),
+      create(Text, {dimColor: true}, `Location: ${path.relative(rootPath, selectedProject.path) || '.'}`)
+    );
+    if (selectedProject.description) {
+      detailContent.push(create(Text, null, selectedProject.description));
+    }
+    if (selectedProject.extra?.scripts && selectedProject.extra.scripts.length) {
+      detailContent.push(create(Text, {dimColor: true}, `Scripts: ${selectedProject.extra.scripts.join(', ')}`));
+    }
+    detailContent.push(create(Text, {dimColor: true}, `Custom commands stored in ${CONFIG_PATH}`));
+    detailContent.push(create(Text, {bold: true, marginTop: 1}, 'Commands')); // show label
+    detailedIndexed.forEach((command) => {
+      detailContent.push(
+        create(Text, {key: `${command.shortcut}-${command.label}`}, `${command.shortcut}. ${command.label} ${command.source === 'custom' ? kleur.magenta('(custom)') : ''}`)
+      );
+      detailContent.push(create(Text, {dimColor: true}, `   ↳ ${command.command.join(' ')}`));
+    });
+    if (!detailedIndexed.length) {
+      detailContent.push(create(Text, {dimColor: true}, 'No built-in commands yet. Add a custom command with C.'));
+    }
+    detailContent.push(create(Text, {dimColor: true}, 'Press C → label|cmd to save custom actions, Enter to close detail view.'));
+  } else {
+    detailContent.push(create(Text, {dimColor: true}, 'Press Enter on a project to reveal details (icons, info, commands, customizations).'));
+  }
+
+  if (customMode) {
+    detailContent.push(create(Text, {color: 'cyan'}, `Type label|cmd (Enter to save, Esc to cancel): ${customInput}`));
+  }
+
   const logNodes = logLines.length
     ? logLines.map((line, index) => create(Text, {key: `${line}-${index}`}, line))
-    : [create(Text, {dimColor: true}, 'Logs will appear here when you run a command.')];
+    : [create(Text, {dimColor: true}, 'Logs will appear here once you run a command.')];
+
+  const headerHint = viewMode === 'detail'
+    ? `Detail mode · 1-${Math.max(detailedIndexed.length, 1)} to execute, C: add custom commands, Enter: back to list, q: quit`
+    : `Quick run · B/T/R to build/test/run, Enter: view details, q: quit`;
 
   return create(
     Box,
@@ -394,13 +591,13 @@ function Compass({rootPath}) {
         Box,
         {flexDirection: 'column'},
         create(Text, {color: 'cyan', bold: true}, 'Project Compass'),
-        create(Text, null, loading ? 'Scanning for repositories...' : `${projects.length} projects detected in ${rootPath}`)
+        create(Text, null, loading ? 'Scanning workspaces…' : `${projects.length} project(s) detected in ${rootPath}`)
       ),
       create(
         Box,
         {flexDirection: 'column', alignItems: 'flex-end'},
         create(Text, null, running ? 'Busy 🔁' : lastAction ? `Last: ${lastAction}` : 'Idle'),
-        create(Text, {dimColor: true}, actionHints)
+        create(Text, {dimColor: true}, headerHint)
       )
     ),
     create(
@@ -414,7 +611,25 @@ function Compass({rootPath}) {
       ),
       create(
         Box,
-        {flexDirection: 'column', flexGrow: 1, borderStyle: 'round', borderColor: 'gray'},
+        {
+          flexDirection: 'column',
+          width: 44,
+          marginRight: 2,
+          borderStyle: 'round',
+          borderColor: 'gray',
+          padding: 1
+        },
+        create(Text, {bold: true}, 'Details'),
+        ...detailContent
+      ),
+      create(
+        Box,
+        {
+          flexDirection: 'column',
+          flexGrow: 1,
+          borderStyle: 'round',
+          borderColor: 'gray'
+        },
         create(Text, {bold: true}, 'Output'),
         create(Box, {flexDirection: 'column', marginTop: 1, height: 12, overflow: 'hidden'}, ...logNodes)
       )
@@ -427,11 +642,11 @@ function parseArgs() {
   const tokens = process.argv.slice(2);
   for (let i = 0; i < tokens.length; i += 1) {
     const token = tokens[i];
-    if (token === '--mode' && tokens[i + 1]) {
-      args.mode = tokens[i + 1];
-      i += 1;
-    } else if ((token === '--dir' || token === '--path') && tokens[i + 1]) {
+    if ((token === '--dir' || token === '--path') && tokens[i + 1]) {
       args.root = tokens[i + 1];
+      i += 1;
+    } else if (token === '--mode' && tokens[i + 1]) {
+      args.mode = tokens[i + 1];
       i += 1;
     } else if (token === '--help' || token === '-h') {
       args.help = true;
