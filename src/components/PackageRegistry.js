@@ -63,9 +63,19 @@ const PackageRegistry = memo(({selectedProject, onRunCommand, CursorText}) => {
     return null;
   };
 
+  if (!selectedProject) {
+    return create(
+      Box,
+      {flexDirection: 'column', borderStyle: 'round', borderColor: 'red', padding: 1, width: '100%'},
+      create(Text, {bold: true, color: 'red'}, '📦 Package Registry | No Project Selected'),
+      create(Text, {marginTop: 1}, 'Please select a project in the Navigator first before opening the Registry.'),
+      create(Text, {dimColor: true, marginTop: 1}, 'Press Shift+P to return to Navigator.')
+    );
+  }
+
   return create(
     Box,
-    {flexDirection: 'column', borderStyle: 'round', borderColor: 'magenta', padding: 1},
+    {flexDirection: 'column', borderStyle: 'round', borderColor: 'magenta', padding: 1, width: '100%'},
     create(
       Box,
       {justifyContent: 'space-between'},

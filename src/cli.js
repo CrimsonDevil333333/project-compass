@@ -377,6 +377,13 @@ function Compass({rootPath, initialView = 'navigator'}) {
       });
       return; 
     }
+    
+    if (key.escape) {
+      if (mainView !== 'navigator') {
+        setMainView('navigator');
+        return;
+      }
+    }
 
     const scrollLogs = (delta) => {
       setLogOffset((prev) => {
@@ -541,10 +548,10 @@ function Compass({rootPath, initialView = 'navigator'}) {
     return create(Box, {flexDirection: 'column', borderStyle: 'round', borderColor: 'red', padding: 1}, create(Text, {bold: true, color: 'red'}, '⚠️ Confirm Exit'), create(Text, null, `There are ${tasks.filter(t=>t.status==='running').length} tasks still running in the background.`), create(Text, null, 'Are you sure you want to quit and stop all processes?'), create(Text, {marginTop: 1}, kleur.bold('Y') + ' to Quit, ' + kleur.bold('N') + ' to Cancel'));
   }
 
-  if (mainView === 'studio') return create(Studio);
-  if (mainView === 'tasks') return create(TaskManager, {tasks, activeTaskId, renameMode, renameInput, renameCursor, CursorText});
-  if (mainView === 'registry') return create(PackageRegistry, {selectedProject, onRunCommand: runProjectCommand, CursorText});
-  if (mainView === 'architect') return create(ProjectArchitect, {rootPath, onRunCommand: runProjectCommand, CursorText, onReturn: () => setMainView('navigator')});
+  if (mainView === 'studio') return create(Box, {flexDirection: 'column', width: '100%'}, create(Studio));
+  if (mainView === 'tasks') return create(Box, {flexDirection: 'column', width: '100%'}, create(TaskManager, {tasks, activeTaskId, renameMode, renameInput, renameCursor, CursorText}));
+  if (mainView === 'registry') return create(Box, {flexDirection: 'column', width: '100%'}, create(PackageRegistry, {selectedProject, onRunCommand: runProjectCommand, CursorText}));
+  if (mainView === 'architect') return create(Box, {flexDirection: 'column', width: '100%'}, create(ProjectArchitect, {rootPath, onRunCommand: runProjectCommand, CursorText, onReturn: () => setMainView('navigator')}));
 
   return create(Box, {flexDirection: 'column', padding: 1},
     create(Box, {justifyContent: 'space-between'},
