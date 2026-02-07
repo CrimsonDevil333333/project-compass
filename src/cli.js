@@ -121,13 +121,6 @@ function Compass({rootPath}) {
       const normalized = typeof line === 'string' ? line : JSON.stringify(line);
       const appended = [...prev, normalized];
       const next = appended.length > 250 ? appended.slice(appended.length - 250) : appended;
-      setLogOffset((prevOffset) => {
-        const maxScroll = Math.max(0, next.length - OUTPUT_WINDOW_SIZE);
-        if (prevOffset === 0) {
-          return 0;
-        }
-        return Math.min(maxScroll, prevOffset + 1);
-      });
       return next;
     });
   }, []);
@@ -263,7 +256,6 @@ function Compass({rootPath}) {
     }
 
     const normalizedInput = input?.toLowerCase();
-    const ctrlCombo = (char) => key.ctrl && normalizedInput === char;
     const shiftCombo = (char) => key.shift && normalizedInput === char;
     const toggleShortcut = (char) => shiftCombo(char);
     if (toggleShortcut('h')) {
@@ -306,11 +298,11 @@ function Compass({rootPath}) {
     }
 
     if (key.shift && key.upArrow) {
-      scrollLogs(1);
+      scrollLogs(-1);
       return;
     }
     if (key.shift && key.downArrow) {
-      scrollLogs(-1);
+      scrollLogs(1);
       return;
     }
 
@@ -524,20 +516,20 @@ const projectRows = [];
       label: 'Navigation',
       color: 'magenta',
       body: [
-        '↑ / ↓ move the project focus',
-        'Enter toggles details view',
-        'Shift+↑ / ↓ scroll output buffer',
-        'Shift+H toggles help cards'
+        '↑ / ↓ move focus, Enter: details',
+        'Shift+↑ / ↓ scroll output',
+        'Shift+H toggle help cards',
+        '? opens the overlay help'
       ]
     },
     {
       label: 'Command flow',
       color: 'cyan',
       body: [
-        'B / T / R run build/test/run',
-        '1-9 execute detail commands',
-        'Shift+L reruns last command',
-        'Ctrl+C aborts; type feeds stdin'
+        'B / T / R build/test/run',
+        '1-9 run detail commands',
+        'Shift+L rerun last command',
+        'Ctrl+C abort; type feeds stdin'
       ]
     },
     {
@@ -545,7 +537,7 @@ const projectRows = [];
       color: 'yellow',
       body: [
         recentRuns.length ? `${recentRuns.length} runs recorded` : 'No runs yet · start with B/T/R',
-        'Shift+S toggles structure guide',
+        'Shift+S toggle structure guide',
         'Shift+C save custom action',
         'Shift+Q quit application'
       ]
@@ -609,10 +601,10 @@ const projectRows = [];
         },
         create(Text, {color: 'cyan', bold: true}, 'Help overlay · press ? to hide'),
         create(Text, null, 'Shift+↑/↓ scrolls the log buffer while commands stream; type to feed stdin (Enter submits, Ctrl+C aborts).'),
-        create(Text, null, 'B/T/R run build/test/run; 1-9 executes detail commands; Ctrl+L reruns the previous command.'),
-        create(Text, null, 'Ctrl+H toggles these help cards, Ctrl+S toggles the structure guide, ? toggles this overlay, Ctrl+Q quits.'),
+        create(Text, null, 'B/T/R run build/test/run; 1-9 executes detail commands; Shift+L reruns the previous command.'),
+        create(Text, null, 'Shift+H toggles these help cards, Shift+S toggles the structure guide, ? toggles this overlay, Shift+Q quits.'),
         create(Text, null, 'Projects + Details stay paired while Output keeps its own full-width band.'),
-        create(Text, null, 'Structure guide lists the manifests that trigger each language detection (Ctrl+S to toggle).')
+        create(Text, null, 'Structure guide lists the manifests that trigger each language detection (Shift+S to toggle).')
       )
     : null;
 
