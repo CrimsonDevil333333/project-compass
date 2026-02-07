@@ -1098,4 +1098,4 @@ const SCHEMA_GUIDE = schemaRegistry.getSchemas().map((schema) => ({
   files: schema.files
 }));
 
-export {discoverProjects, SCHEMA_GUIDE};
+export {discoverProjects, SCHEMA_GUIDE, checkBinary};

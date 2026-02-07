@@ -5,7 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import kleur from 'kleur';
 import {execa} from 'execa';
-import {discoverProjects, SCHEMA_GUIDE} from './projectDetection.js';
+import {discoverProjects, SCHEMA_GUIDE, checkBinary} from './projectDetection.js';
 import {CONFIG_PATH, PLUGIN_FILE, ensureConfigDir} from './configPaths.js';
 
 const create = React.createElement;
@@ -95,11 +95,69 @@ function buildDetailCommands(project, config) {
   return [...builtins, ...custom];
 }
 
-function Compass({rootPath}) {
+function Studio() {
+  const [runtimes, setRuntimes] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const checks = [
+      {name: 'Node.js', binary: 'node', versionCmd: ['-v']},
+      {name: 'npm', binary: 'npm', versionCmd: ['-v']},
+      {name: 'Python', binary: process.platform === 'win32' ? 'python' : 'python3', versionCmd: ['--version']},
+      {name: 'Rust (Cargo)', binary: 'cargo', versionCmd: ['--version']},
+      {name: 'Go', binary: 'go', versionCmd: ['version']},
+      {name: 'Java', binary: 'java', versionCmd: ['-version']},
+      {name: 'PHP', binary: 'php', versionCmd: ['-v']},
+      {name: 'Ruby', binary: 'ruby', versionCmd: ['-v']},
+      {name: '.NET', binary: 'dotnet', versionCmd: ['--version']}
+    ];
+
+    (async () => {
+      const results = await Promise.all(checks.map(async (lang) => {
+        if (!checkBinary(lang.binary)) {
+          return {...lang, status: 'missing', version: 'not installed'};
+        }
+        try {
+          const {stdout, stderr} = await execa(lang.binary, lang.versionCmd);
+          const version = (stdout || stderr || '').split('\n')[0].trim();
+          return {...lang, status: 'ok', version};
+        } catch {
+          return {...lang, status: 'error', version: 'failed to check'};
+        }
+      }));
+      setRuntimes(results);
+      setLoading(false);
+    })();
+  }, []);
+
+  return create(
+    Box,
+    {flexDirection: 'column', borderStyle: 'double', borderColor: 'blue', padding: 1},
+    create(Text, {bold: true, color: 'blue'}, '💎 Omni-Studio | Environment Intelligence'),
+    create(Text, {dimColor: true, marginBottom: 1}, 'Overview of installed languages and build tools.'),
+    loading
+      ? create(Text, {dimColor: true}, 'Gathering intelligence...')
+      : create(
+          Box,
+          {flexDirection: 'column'},
+          ...runtimes.map(r => create(
+            Box,
+            {key: r.name, marginBottom: 1},
+            create(Text, {width: 15, color: r.status === 'ok' ? 'green' : 'red'}, `${r.status === 'ok' ? '✓' : '✗'} ${r.name}`),
+            create(Text, {dimColor: r.status !== 'ok'}, r.version)
+          )),
+          create(Text, {marginTop: 1, color: 'yellow'}, '🛠️ Interactive Project Creator coming soon in v3.0'),
+          create(Text, {dimColor: true}, 'Press Shift+A to return to Navigator.')
+        )
+  );
+}
+
+function Compass({rootPath, initialView = 'navigator'}) {
   const {exit} = useApp();
   const {projects, loading, error} = useScanner(rootPath);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [viewMode, setViewMode] = useState('list');
+  const [mainView, setMainView] = useState(initialView);
   const [logLines, setLogLines] = useState([]);
   const [logOffset, setLogOffset] = useState(0);
   const [running, setRunning] = useState(false);
@@ -120,7 +178,7 @@ function Compass({rootPath}) {
     setLogLines((prev) => {
       const normalized = typeof line === 'string' ? line : JSON.stringify(line);
       const appended = [...prev, normalized];
-      const next = appended.length > 250 ? appended.slice(appended.length - 250) : appended;
+      const next = appended.length > 500 ? appended.slice(appended.length - 500) : appended;
       return next;
     });
   }, []);
@@ -256,6 +314,7 @@ function Compass({rootPath}) {
     }
 
     const normalizedInput = input?.toLowerCase();
+    const ctrlCombo = (char) => key.ctrl && normalizedInput === char;
     const shiftCombo = (char) => key.shift && normalizedInput === char;
     const toggleShortcut = (char) => shiftCombo(char);
     if (toggleShortcut('h')) {
@@ -264,6 +323,15 @@ function Compass({rootPath}) {
     }
     if (toggleShortcut('s')) {
       setShowStructureGuide((prev) => !prev);
+      return;
+    }
+    if (toggleShortcut('a')) {
+      setMainView((prev) => (prev === 'navigator' ? 'studio' : 'navigator'));
+      return;
+    }
+    if (toggleShortcut('x')) {
+      setLogLines([]);
+      setLogOffset(0);
       return;
     }
 
@@ -349,6 +417,11 @@ function Compass({rootPath}) {
       runProjectCommand(detailShortcutMap.get(normalizedInput), selectedProject);
     }
   });
+
+  if (mainView === 'studio') {
+    return create(Studio);
+  }
+
 const projectRows = [];
   if (loading) {
     projectRows.push(create(Text, {dimColor: true}, 'Scanning projects…'));
@@ -549,14 +622,14 @@ const projectRows = [];
         'B / T / R build/test/run',
         '1-9 run detail commands',
         'Shift+L rerun last command',
-        'Ctrl+C abort; type feeds stdin'
+        'Shift+X clear output logs'
       ]
     },
     {
-      label: 'Recent runs',
+      label: 'System & Studio',
       color: 'yellow',
       body: [
-        recentRuns.length ? `${recentRuns.length} runs recorded` : 'No runs yet · start with B/T/R',
+        'Shift+A open Omni-Studio',
         'Shift+S toggle structure guide',
         'Shift+C save custom action',
         'Shift+Q quit application'
@@ -620,11 +693,11 @@ const projectRows = [];
           padding: 1
         },
         create(Text, {color: 'cyan', bold: true}, 'Help overlay · press ? to hide'),
-        create(Text, null, 'Shift+↑/↓ scrolls the log buffer while commands stream; type to feed stdin (Enter submits, Ctrl+C aborts).'),
+        create(Text, null, 'Shift+↑/↓ scrolls the log buffer; Shift+X clears logs; Shift+A opens Omni-Studio.'),
         create(Text, null, 'B/T/R run build/test/run; 1-9 executes detail commands; Shift+L reruns the previous command.'),
-        create(Text, null, 'Shift+H toggles these help cards, Shift+S toggles the structure guide, ? toggles this overlay, Shift+Q quits.'),
+        create(Text, null, 'Shift+H toggles help cards, Shift+S structure guide, ? overlay, Shift+Q quits.'),
         create(Text, null, 'Projects + Details stay paired while Output keeps its own full-width band.'),
-        create(Text, null, 'Structure guide lists the manifests that trigger each language detection (Shift+S to toggle).')
+        create(Text, null, 'Structure guide lists the manifests that trigger each language detection.')
       )
     : null;
 
@@ -751,6 +824,8 @@ function parseArgs() {
       i += 1;
     } else if (token === '--help' || token === '-h') {
       args.help = true;
+    } else if (token === '--studio') {
+      args.view = 'studio';
     }
   }
   return args;
@@ -760,7 +835,7 @@ async function main() {
   const args = parseArgs();
   if (args.help) {
     console.log('Project Compass · Ink project runner');
-    console.log('Usage: project-compass [--dir <path>] [--mode test]');
+    console.log('Usage: project-compass [--dir <path>] [--mode test] [--studio]');
     return;
   }
   const rootPath = args.root ? path.resolve(args.root) : process.cwd();
@@ -773,7 +848,7 @@ async function main() {
     return;
   }
 
-  render(create(Compass, {rootPath}));
+  render(create(Compass, {rootPath, initialView: args.view || 'navigator'}));
 }
 
 main().catch((error) => {
