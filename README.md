@@ -1,14 +1,14 @@
-# Project Compass (v2.2.0)
+# Project Compass (v2.3.0)
 
 Project Compass is a futuristic CLI navigator built with [Ink](https://github.com/vadimdemedes/ink) that scans your current folder tree for familiar code projects and gives you one-keystroke access to build, test, or run them.
 
 ## Highlights
 
-- 🔍 Scans directories for Node.js, Python, Rust, Go, Java, and Scala projects.
+- 🔍 Scans directories for Node.js, Python, Rust, Go, Java, Scala, PHP, Ruby, and .NET projects.
 - 🎨 Futuristic layout with glyph-based art board and split Projects/Details rows.
 - 🚀 **New Keyboard-Centric UX**: Shortcuts now use **Shift** instead of Ctrl to avoid terminal interference.
 - 💡 **Refined Output**: Improved stdin buffer with proper spacing and reliable scrolling (Shift+↑/↓).
-- 🧠 **Smart Detection**: Support for 15+ frameworks (Vite, Prisma, Tailwind, etc.) with specialized build/run commands and setup hints.
+- 🧠 **Smart Detection**: Support for 20+ frameworks including **Spring Boot** (Maven/Gradle), **ASP.NET Core**, **Rocket/Actix** (Rust), **Laravel** (PHP), **Vite**, **Prisma**, and more.
 - 🔌 **Extensible**: Add custom commands with **Shift+C** and frameworks via `plugins.json`.
 
 ## Installation
@@ -45,7 +45,13 @@ Project Compass features a split layout where Projects and Details stay paired w
 
 ## Frameworks
 
-Detects **Next.js**, **React**, **Vue**, **NestJS**, **FastAPI**, **Django**, **Vite**, **Prisma**, **Tailwind**, and more. Recognizes frameworks and injects specialized commands automatically.
+Supports a wide array of modern stacks:
+- **Node.js**: Next.js, React, Vue, NestJS, Vite, Prisma, Tailwind
+- **Python**: FastAPI, Django, Flask
+- **Java/Kotlin**: Spring Boot (Maven & Gradle)
+- **Rust**: Rocket, Actix Web
+- **.NET**: ASP.NET Core
+- **PHP**: Laravel
 
 ## License
 

@@ -417,18 +417,100 @@ const builtInFrameworks = [
     name: 'Spring Boot',
     icon: '🌱',
     description: 'Spring Boot apps',
-    languages: ['Java'],
+    languages: ['Java', 'Kotlin'],
     priority: 105,
     match(project) {
-      return dependencyMatches(project, 'spring-boot-starter') || hasProjectFile(project.path, 'src/main/java');
+      return dependencyMatches(project, 'spring-boot-starter') || 
+             dependencyMatches(project, 'spring-boot-autoconfigure') ||
+             hasProjectFile(project.path, 'src/main/resources/application.properties') ||
+             hasProjectFile(project.path, 'src/main/resources/application.yml');
     },
     commands(project) {
       const hasMvnw = hasProjectFile(project.path, 'mvnw');
+      const hasGradlew = hasProjectFile(project.path, 'gradlew');
+      if (hasGradlew) {
+        return {
+          run: {label: 'Gradle BootRun', command: ['./gradlew', 'bootRun'], source: 'framework'},
+          build: {label: 'Gradle Build', command: ['./gradlew', 'build'], source: 'framework'},
+          test: {label: 'Gradle Test', command: ['./gradlew', 'test'], source: 'framework'}
+        };
+      }
       const base = hasMvnw ? './mvnw' : 'mvn';
       return {
         run: {label: 'Spring Boot run', command: [base, 'spring-boot:run'], source: 'framework'},
         build: {label: 'Maven package', command: [base, 'package'], source: 'framework'},
         test: {label: 'Maven test', command: [base, 'test'], source: 'framework'}
+      };
+    }
+  },
+  {
+    id: 'rocket',
+    name: 'Rocket',
+    icon: '🚀',
+    description: 'Rocket Rust Web',
+    languages: ['Rust'],
+    priority: 105,
+    match(project) {
+      return dependencyMatches(project, 'rocket');
+    },
+    commands() {
+      return {
+        run: {label: 'Rocket Run', command: ['cargo', 'run'], source: 'framework'},
+        test: {label: 'Rocket Test', command: ['cargo', 'test'], source: 'framework'}
+      };
+    }
+  },
+  {
+    id: 'actix',
+    name: 'Actix Web',
+    icon: '🦀',
+    description: 'Actix Rust Web',
+    languages: ['Rust'],
+    priority: 105,
+    match(project) {
+      return dependencyMatches(project, 'actix-web');
+    },
+    commands() {
+      return {
+        run: {label: 'Actix Run', command: ['cargo', 'run'], source: 'framework'},
+        test: {label: 'Actix Test', command: ['cargo', 'test'], source: 'framework'}
+      };
+    }
+  },
+  {
+    id: 'aspnet',
+    name: 'ASP.NET Core',
+    icon: '🌐',
+    description: 'ASP.NET Core Web App',
+    languages: ['.NET'],
+    priority: 105,
+    match(project) {
+      return hasProjectFile(project.path, 'Program.cs') && 
+             (hasProjectFile(project.path, 'appsettings.json') || hasProjectFile(project.path, 'web.config'));
+    },
+    commands() {
+      return {
+        run: {label: 'dotnet run', command: ['dotnet', 'run'], source: 'framework'},
+        watch: {label: 'dotnet watch', command: ['dotnet', 'watch', 'run'], source: 'framework'},
+        test: {label: 'dotnet test', command: ['dotnet', 'test'], source: 'framework'}
+      };
+    }
+  },
+  {
+    id: 'laravel',
+    name: 'Laravel',
+    icon: '🧡',
+    description: 'Laravel PHP Framework',
+    languages: ['PHP'],
+    priority: 105,
+    match(project) {
+      return hasProjectFile(project.path, 'artisan') || dependencyMatches(project, 'laravel/framework');
+    },
+    commands() {
+      return {
+        run: {label: 'Artisan Serve', command: ['php', 'artisan', 'serve'], source: 'framework'},
+        test: {label: 'Artisan Test', command: ['php', 'artisan', 'test'], source: 'framework'},
+        migrate: {label: 'Artisan Migrate', command: ['php', 'artisan', 'migrate'], source: 'framework'}
       };
     }
   }
