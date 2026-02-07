@@ -434,8 +434,8 @@ function Compass({rootPath, initialView = 'navigator'}) {
       return;
     }
 
-    if (key.shift && key.upArrow) { scrollLogs(-1); return; }
-    if (key.shift && key.downArrow) { scrollLogs(1); return; }
+    if (key.shift && key.upArrow) { scrollLogs(1); return; }
+    if (key.shift && key.downArrow) { scrollLogs(-1); return; }
 
     if (normalizedInput === '?') { setShowHelp((prev) => !prev); return; }
     if (shiftCombo('l') && lastCommandRef.current) { runProjectCommand(lastCommandRef.current.commandMeta, lastCommandRef.current.project); return; }
