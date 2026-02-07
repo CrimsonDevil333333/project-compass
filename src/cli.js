@@ -5,19 +5,14 @@ import fastGlob from 'fast-glob';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
-import {fileURLToPath} from 'url';
 import kleur from 'kleur';
 import {execa} from 'execa';
 
 const create = React.createElement;
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
 const CONFIG_DIR = path.join(os.homedir(), '.project-compass');
 const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
 const PLUGIN_FILE = path.join(CONFIG_DIR, 'plugins.json');
 const DEFAULT_CONFIG = {customCommands: {}};
-const DEFAULT_PLUGIN_CONFIG = {plugins: []};
-
 function ensureConfigDir() {
   if (!fs.existsSync(CONFIG_DIR)) {
     fs.mkdirSync(CONFIG_DIR, {recursive: true});
@@ -1214,6 +1209,7 @@ function Compass({rootPath}) {
       )
     )
   );
+}
 
 function parseArgs() {
   const args = {};

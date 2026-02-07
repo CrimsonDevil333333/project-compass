@@ -9,7 +9,8 @@
   },
   "scripts": {
     "start": "node src/cli.js",
-    "test": "node src/cli.js --mode test"
+    "test": "node src/cli.js --mode test",
+    "lint": "eslint src"
   },
   "keywords": [
     "cli",
@@ -25,5 +26,9 @@
     "fast-glob": "^3.3.3",
     "ink": "^6.6.0",
     "kleur": "^4.1.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.0.0"
   }
 }
