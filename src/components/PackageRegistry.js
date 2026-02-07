@@ -3,20 +3,34 @@ import {Box, Text, useInput} from 'ink';
 
 const create = React.createElement;
 
-const PackageRegistry = memo(({selectedProject, onRunCommand, CursorText}) => {
+const PackageRegistry = memo(({selectedProject, projects = [], onRunCommand, CursorText, onSelectProject}) => {
+  const [view, setView] = useState(selectedProject ? 'manage' : 'select'); // select | manage
   const [mode, setMode] = useState('list'); // list | add | remove
   const [input, setInput] = useState('');
   const [cursor, setCursor] = useState(0);
+  const [selIdx, setSelIdx] = useState(0);
 
-  const projectType = selectedProject?.type || 'Unknown';
-  const deps = selectedProject?.metadata?.dependencies || [];
+  const activeProject = view === 'manage' ? selectedProject : projects[selIdx];
+  const projectType = activeProject?.type || 'Unknown';
+  const deps = activeProject?.metadata?.dependencies || [];
 
   useInput((inputStr, key) => {
+    if (view === 'select') {
+      if (key.upArrow) { setSelIdx(prev => (prev - 1 + projects.length) % projects.length); return; }
+      if (key.downArrow) { setSelIdx(prev => (prev + 1) % projects.length); return; }
+      if (key.return && projects[selIdx]) {
+        if (onSelectProject) onSelectProject(selIdx);
+        setView('manage');
+        return;
+      }
+      return;
+    }
+
     if (mode === 'add' || mode === 'remove') {
       if (key.return) {
         if (input.trim()) {
           const cmd = mode === 'add' ? getAddCmd(projectType, input.trim()) : getRemoveCmd(projectType, input.trim());
-          if (cmd) onRunCommand({label: `${mode === 'add' ? 'Add' : 'Remove'} ${input}`, command: cmd});
+          if (cmd) onRunCommand({label: `${mode === 'add' ? 'Add' : 'Remove'} ${input}`, command: cmd}, activeProject);
         }
         setMode('list'); setInput(''); setCursor(0);
         return;
@@ -40,8 +54,9 @@ const PackageRegistry = memo(({selectedProject, onRunCommand, CursorText}) => {
 
     if (inputStr.toLowerCase() === 'a') { setMode('add'); setInput(''); setCursor(0); }
     if (inputStr.toLowerCase() === 'r') { setMode('remove'); setInput(''); setCursor(0); }
+    if (inputStr.toLowerCase() === 's') { setView('select'); }
     if (inputStr.toLowerCase() === 'v' && projectType === 'Python') {
-      onRunCommand({label: 'Create venv', command: ['python3', '-m', 'venv', '.venv']});
+      onRunCommand({label: 'Create venv', command: ['python3', '-m', 'venv', '.venv']}, activeProject);
     }
   });
 
@@ -63,13 +78,14 @@ const PackageRegistry = memo(({selectedProject, onRunCommand, CursorText}) => {
     return null;
   };
 
-  if (!selectedProject) {
+  if (view === 'select') {
     return create(
       Box,
-      {flexDirection: 'column', borderStyle: 'round', borderColor: 'red', padding: 1, width: '100%'},
-      create(Text, {bold: true, color: 'red'}, '📦 Package Registry | No Project Selected'),
-      create(Text, {marginTop: 1}, 'Please select a project in the Navigator first before opening the Registry.'),
-      create(Text, {dimColor: true, marginTop: 1}, 'Press Shift+P to return to Navigator.')
+      {flexDirection: 'column', borderStyle: 'round', borderColor: 'cyan', padding: 1, width: '100%'},
+      create(Text, {bold: true, color: 'cyan'}, '📦 Package Registry | Select Project'),
+      create(Text, {dimColor: true, marginBottom: 1}, 'Choose a project to manage dependencies:'),
+      ...projects.map((p, i) => create(Text, {key: p.id, color: i === selIdx ? 'cyan' : 'white'}, `${i === selIdx ? '→' : ' '} ${p.icon} ${p.name} (${p.type})`)),
+      create(Text, {dimColor: true, marginTop: 1}, 'Arrows: Move, Enter: Select, Shift+P: Back')
     );
   }
 
@@ -79,7 +95,7 @@ const PackageRegistry = memo(({selectedProject, onRunCommand, CursorText}) => {
     create(
       Box,
       {justifyContent: 'space-between'},
-      create(Text, {bold: true, color: 'magenta'}, `📦 Package Registry | ${selectedProject?.name}`),
+      create(Text, {bold: true, color: 'magenta'}, `📦 Package Registry | ${activeProject?.name}`),
       create(Text, {dimColor: true}, projectType)
     ),
     create(Text, {dimColor: true, marginBottom: 1}, 'Manage dependencies and environments for this project.'),
@@ -97,8 +113,9 @@ const PackageRegistry = memo(({selectedProject, onRunCommand, CursorText}) => {
             Box,
             {marginTop: 1, flexDirection: 'column'},
             create(Text, {color: 'cyan'}, 'A: Add Package  |  R: Remove Package'),
+            create(Text, {color: 'blue'}, 'S: Switch Project'),
             projectType === 'Python' && create(Text, {color: 'yellow'}, 'V: Create .venv'),
-            create(Text, {dimColor: true, marginTop: 1}, 'Press Shift+P to return to Navigator.')
+            create(Text, {dimColor: true, marginTop: 1}, 'Press Shift+P or Esc to return to Navigator.')
           )
         )
       : create(
