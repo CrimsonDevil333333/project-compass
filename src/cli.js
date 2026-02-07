@@ -177,9 +177,9 @@ function Compass({rootPath, initialView = 'navigator'}) {
   const addLog = useCallback((line) => {
     setLogLines((prev) => {
       const normalized = typeof line === 'string' ? line : JSON.stringify(line);
-      const appended = [...prev, normalized];
-      const next = appended.length > 500 ? appended.slice(appended.length - 500) : appended;
-      return next;
+      const lines = normalized.split(/\r?\n/).filter(l => l.trim().length > 0);
+      const appended = [...prev, ...lines];
+      return appended.length > 500 ? appended.slice(appended.length - 500) : appended;
     });
   }, []);
 
@@ -228,10 +228,10 @@ function Compass({rootPath, initialView = 'navigator'}) {
       runningProcessRef.current = subprocess;
 
       subprocess.stdout?.on('data', (chunk) => {
-        addLog(chunk.toString().trimEnd());
+        addLog(chunk.toString());
       });
       subprocess.stderr?.on('data', (chunk) => {
-        addLog(kleur.red(chunk.toString().trimEnd()));
+        addLog(kleur.red(chunk.toString()));
       });
 
       await subprocess;
@@ -292,6 +292,19 @@ function Compass({rootPath, initialView = 'navigator'}) {
     setCustomInput('');
   }, [customInput, selectedProject, handleAddCustomCommand, addLog]);
 
+  const exportLogs = useCallback(() => {
+    if (!logLines.length) {
+      return;
+    }
+    try {
+      const exportPath = path.resolve(process.cwd(), `compass-logs-${Date.now()}.txt`);
+      fs.writeFileSync(exportPath, logLines.join('\n'));
+      addLog(kleur.green(`✓ Logs exported to ${exportPath}`));
+    } catch (err) {
+      addLog(kleur.red(`✗ Export failed: ${err.message}`));
+    }
+  }, [logLines, addLog]);
+
     useInput((input, key) => {
     if (customMode) {
       if (key.return) {
@@ -332,6 +345,10 @@ function Compass({rootPath, initialView = 'navigator'}) {
     if (toggleShortcut('x')) {
       setLogLines([]);
       setLogOffset(0);
+      return;
+    }
+    if (shiftCombo('e')) {
+      exportLogs();
       return;
     }
 
@@ -618,7 +635,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
         'B / T / R build/test/run',
         '1-9 run detail commands',
         'Shift+L rerun last command',
-        'Shift+X clear output logs'
+        'Shift+X clear / Shift+E export'
       ]
     },
     {
@@ -689,9 +706,9 @@ function Compass({rootPath, initialView = 'navigator'}) {
           padding: 1
         },
         create(Text, {color: 'cyan', bold: true}, 'Help overlay · press ? to hide'),
-        create(Text, null, 'Shift+↑/↓ scrolls the log buffer; Shift+X clears logs; Shift+A opens Omni-Studio.'),
-        create(Text, null, 'B/T/R run build/test/run; 1-9 executes detail commands; Shift+L reruns the previous command.'),
-        create(Text, null, 'Shift+H toggles help cards, Shift+S structure guide, ? overlay, Shift+Q quits.'),
+        create(Text, null, 'Shift+↑/↓ scrolls logs; Shift+X clears; Shift+E exports to file; Shift+A Omni-Studio.'),
+        create(Text, null, 'B/T/R run build/test/run; 1-9 detail commands; Shift+L reruns previous command.'),
+        create(Text, null, 'Shift+H help cards, Shift+S structure guide, ? overlay, Shift+Q quits.'),
         create(Text, null, 'Projects + Details stay paired while Output keeps its own full-width band.'),
         create(Text, null, 'Structure guide lists the manifests that trigger each language detection.')
       )
@@ -834,8 +851,32 @@ function parseArgs() {
 async function main() {
   const args = parseArgs();
   if (args.help) {
-    console.log('Project Compass · Ink project runner');
-    console.log('Usage: project-compass [--dir <path>] [--mode test] [--studio]');
+    console.log(kleur.cyan('Project Compass · Ink project navigator/runner'));
+    console.log('');
+    console.log(kleur.bold('Usage:'));
+    console.log('  project-compass [--dir <path>] [--studio]');
+    console.log('');
+    console.log(kleur.bold('Arguments:'));
+    console.log('  --dir, --path <path>  Specify root workspace directory to scan');
+    console.log('  --studio              Launch directly into Omni-Studio mode');
+    console.log('  --help, -h            Show this help menu');
+    console.log('');
+    console.log(kleur.bold('Core Keybinds:'));
+    console.log('  ↑ / ↓                 Move project focus');
+    console.log('  Enter                 Toggle detail view for selected project');
+    console.log('  Shift+A               Switch to Omni-Studio (Environment Health)');
+    console.log('  Shift+X               Clear the output log buffer');
+    console.log('  Shift+E               Export current logs to a .txt file');
+    console.log('  Shift+↑ / ↓           Scroll the output logs back/forward');
+    console.log('  Shift+Q               Quit application');
+    console.log('');
+    console.log(kleur.bold('Execution shortcuts:'));
+    console.log('  B / T / R             Quick run: Build / Test / Run');
+    console.log('  1-9                   Run numbered commands in detail view');
+    console.log('  Shift+L               Rerun the last executed command');
+    console.log('  Shift+C               Add a custom command (in detail view)');
+    console.log('');
+    console.log(kleur.dim('Documentation: https://github.com/CrimsonDevil333333/project-compass'));
     return;
   }
   const rootPath = args.root ? path.resolve(args.root) : process.cwd();

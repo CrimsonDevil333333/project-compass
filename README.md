@@ -1,4 +1,4 @@
-# Project Compass (v2.5.0)
+# Project Compass (v2.6.0)
 
 Project Compass is a futuristic CLI navigator built with [Ink](https://github.com/vadimdemedes/ink) that scans your current folder tree for familiar code projects and gives you one-keystroke access to build, test, or run them.
 
@@ -11,6 +11,7 @@ Project Compass is a futuristic CLI navigator built with [Ink](https://github.co
 - 🧠 **Smart Detection**: Support for 20+ frameworks including **Spring Boot** (Maven/Gradle), **ASP.NET Core**, **Rocket/Actix** (Rust), **Laravel** (PHP), **Vite**, **Prisma**, and more.
 - ⚠️ **Runtime Health**: Automatically checks if the required language/runtime (e.g., `node`, `python`, `cargo`) is installed and warns you if it's missing.
 - 💎 **Omni-Studio**: A new interactive environment intelligence mode to see all installed runtimes and versions.
+- 📂 **Log Management**: Clear output with **Shift+X** or export logs to a text file with **Shift+E**.
 - 🔌 **Extensible**: Add custom commands with **Shift+C** and frameworks via `plugins.json`.
 
 ## Installation
@@ -35,7 +36,8 @@ project-compass [--dir /path/to/workspace] [--studio]
 | **Shift+A** | Open **Omni-Studio** (Environment View) |
 | **Shift+C** | Add a custom command (`label|cmd`) |
 | **Shift+X** | **Clear output logs** |
-| **Shift ↑ / ↓** | Scroll output buffer |
+| **Shift+E** | **Export logs to .txt** |
+| **Shift ↑ / ↓** | Scroll output buffer (Intuitive Direction) |
 | **Shift+L** | Rerun last command |
 | **Shift+H** | Toggle help cards |
 | **Shift+S** | Toggle structure guide |
