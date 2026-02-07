@@ -1,20 +1,17 @@
-# Project Compass (v2.9.2)
+# Project Compass (v3.5.1)
 
-Project Compass is a futuristic CLI navigator built with [Ink](https://github.com/vadimdemedes/ink) that scans your current folder tree for familiar code projects and gives you one-keystroke access to build, test, or run them.
+Project Compass is a futuristic CLI navigator and lifecycle orchestrator built with [Ink](https://github.com/vadimdemedes/ink). It scans your folder tree for code projects and provides a unified interface to install, build, test, and manage them.
 
 ## Highlights
 
-- 🔍 Scans directories for Node.js, Python, Rust, Go, Java, Scala, PHP, Ruby, and .NET projects.
-- 🎨 Futuristic layout with glyph-based art board and split Projects/Details rows.
-- 🚀 **New Keyboard-Centric UX**: Shortcuts now use **Shift** instead of Ctrl to avoid terminal interference.
-- 💡 **Refined Output**: Improved stdin buffer with proper spacing and reliable scrolling (Shift+↑/↓).
-- 🧠 **Smart Detection**: Support for 20+ frameworks including **Spring Boot** (Maven/Gradle), **ASP.NET Core**, **Rocket/Actix** (Rust), **Laravel** (PHP), **Vite**, **Prisma**, and more.
-- 🛰️ **Orbit Task Manager**: Run commands and **Detach** (**Shift+D**) them to the background. Manage multiple processes via **Shift+T**.
-- ⚠️ **Runtime Health**: Automatically checks if the required language/runtime (e.g., `node`, `python`, `cargo`) is installed and warns you if it's missing.
-- 💎 **Omni-Studio**: A new interactive environment intelligence mode to see all installed runtimes and versions.
-- 📂 **Log Management**: Clear output with **Shift+X** or export logs to a text file with **Shift+E**.
-- 🔌 **Extensible**: Add custom commands with **Shift+C** and frameworks via `plugins.json`.
-- 💾 **Persistence**: Saves your UI preferences (Art Board, Help, Structure Guide) globally in `~/.project-compass/config.json`.
+- 🔍 **Omni-Scanner**: Deep-scans directories for Node.js, Python, Rust, Go, Java, Scala, PHP, Ruby, and .NET projects.
+- 🏗️ **Project Architect (Shift+N)**: Scaffold new projects from industry-standard templates (Next.js, Vite, Rust, Go) into any target path.
+- 📦 **Package Registry (Shift+P)**: Interactively add/remove dependencies and manage environments (like Python `.venv`) without leaving the CLI.
+- 🛰️ **Orbit Task Manager (Shift+T)**: Run multiple commands in parallel, detach them to the background (**Shift+D**), and manage them (Rename/Kill).
+- 💀 **Atomic Kill (Ctrl+C)**: Forcefully wipe out entire process trees and zombie servers using kernel-level signal forwarding.
+- 💎 **Omni-Studio (Shift+A)**: Real-time environment intelligence dashboard showing all installed runtimes and versions.
+- 💾 **Global Persistence**: Remembers your UI preferences (Art Board, Help, Structure Guide) via `~/.project-compass/config.json`.
+- 🎨 **Flicker-Free UI**: Isolated rendering architecture ensures zero UI jitter even during high-velocity log streaming.
 
 ## Installation
 
@@ -28,41 +25,33 @@ npm install -g project-compass
 project-compass [--dir /path/to/workspace] [--studio] [--version]
 ```
 
-### Keyboard Guide
+### Keyboard Master Guide
 
 | Key | Action |
 | --- | --- |
-| ↑ / ↓ | Move focus, **Enter**: toggle details |
-| B / T / R | Build / Test / Run |
-| 1‑9 | Execute numbered detail commands |
+| ↑ / ↓ | Move focus between projects |
+| **Enter** | Toggle Detail View / Return from Tasks |
+| **Shift+N** | Open **Project Architect** (Create new project) |
+| **Shift+P** | Open **Package Registry** (Manage dependencies) |
 | **Shift+T** | Open **Orbit Task Manager** |
-| **Shift+D** | **Detach** from active task (runs in background) |
-| **Shift+A** | Open **Omni-Studio** (Environment View) |
+| **Shift+D** | **Detach** active task to background |
+| **Shift+A** | Open **Omni-Studio** (Environment intelligence) |
 | **Shift+B** | Toggle **Art Board** visibility |
 | **Shift+H** | Toggle **Help Cards** visibility |
-| **Shift+S** | Toggle **Structure Guide** visibility |
-| **Shift+C** | Add a custom command (`label|cmd`) |
-| **Shift+X** | **Clear output logs** |
-| **Shift+E** | **Export logs to .txt** |
-| **Shift ↑ / ↓** | Scroll output buffer |
-| **Shift+L** | Rerun last command |
-| **Shift+Q** | Quit app (with confirmation if tasks run) |
-| ? | Toggle help overlay |
-| Shift+Q | Quit app (with confirmation if tasks run) |
-| **Ctrl+C** | Force quit and kill all background tasks |
+| **Shift+S** | Toggle **Structure Guide** |
+| **Shift+X** | **Clear** log buffer for active task |
+| **Shift+E** | **Export** current logs to `.txt` |
+| **Shift+L** | **Rerun** last executed command |
+| **Shift+Q** | **Quit** (Confirms if tasks are running) |
+| **Ctrl+C** | **Force Kill** all background tasks and exit |
+| Shift+↑ / ↓ | Scroll output logs (Intuitive direction) |
+| **?** | Toggle help overlay |
 
-## Orbit Task Manager
+## Framework Support
 
-Project Compass introduces background task management. You can start a build, press **Shift+D** to detach and return to the navigator, then start another task. 
+Compass provides specialized intelligence for 20+ stacks including **Next.js, React, Vue, NestJS, Spring Boot, ASP.NET Core, Laravel, Rocket, Actix, Prisma, and Tailwind**.
 
-Inside the Task Manager (**Shift+T**):
-- **Shift+K**: Kill a running process or remove a task from history.
-- **Shift+R**: Rename a task for better organization.
-- **Enter**: Switch back to the Navigator with the selected task's logs.
-
-## Omni-Studio
-
-Launch with `project-compass --studio` or press **Shift+A** inside the app. Omni-Studio provides real-time intelligence on your installed development environments, checking versions for Node, Python, Rust, Go, Java, and more. 
+For a full list of framework-specific commands and shortcuts, see [commands.md](./commands.md).
 
 ## License
 
