@@ -48,7 +48,8 @@ project-compass [--dir /path/to/workspace] [--studio] [--version]
 | **Shift+L** | Rerun last command |
 | **Shift+Q** | Quit app (with confirmation if tasks run) |
 | ? | Toggle help overlay |
-| Ctrl+C | Interrupt running command |
+| Shift+Q | Quit app (with confirmation if tasks run) |
+| **Ctrl+C** | Force quit and kill all background tasks |
 
 ## Orbit Task Manager
 
