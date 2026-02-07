@@ -152,6 +152,27 @@ function Studio() {
   );
 }
 
+function CursorText({value, cursorIndex, active = true}) {
+  const [visible, setVisible] = useState(true);
+  useEffect(() => {
+    if (!active) return;
+    const interval = setInterval(() => setVisible(v => !v), 500);
+    return () => clearInterval(interval);
+  }, [active]);
+
+  const before = value.slice(0, cursorIndex);
+  const charAt = value[cursorIndex] || ' ';
+  const after = value.slice(cursorIndex + 1);
+
+  return create(
+    Text,
+    null,
+    before,
+    active && visible ? create(Text, {backgroundColor: 'white', color: 'black'}, charAt) : charAt,
+    after
+  );
+}
+
 function Compass({rootPath, initialView = 'navigator'}) {
   const {exit} = useApp();
   const {projects, loading, error} = useScanner(rootPath);
@@ -164,10 +185,12 @@ function Compass({rootPath, initialView = 'navigator'}) {
   const [lastAction, setLastAction] = useState(null);
   const [customMode, setCustomMode] = useState(false);
   const [customInput, setCustomInput] = useState('');
+  const [customCursor, setCustomCursor] = useState(0);
   const [config, setConfig] = useState(() => loadConfig());
   const [showHelpCards, setShowHelpCards] = useState(false);
   const [showStructureGuide, setShowStructureGuide] = useState(false);
   const [stdinBuffer, setStdinBuffer] = useState('');
+  const [stdinCursor, setStdinCursor] = useState(0);
   const [showHelp, setShowHelp] = useState(false);
   const [recentRuns, setRecentRuns] = useState([]);
   const selectedProject = projects[selectedIndex] || null;
@@ -241,6 +264,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
     } finally {
       setRunning(false);
       setStdinBuffer('');
+      setStdinCursor(0);
       runningProcessRef.current = null;
     }
   }, [addLog, running, selectedProject]);
@@ -276,6 +300,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
       addLog(kleur.gray('Canceled custom command (empty).'));
       setCustomMode(false);
       setCustomInput('');
+      setCustomCursor(0);
       return;
     }
     const [labelPart, commandPart] = raw.split('|');
@@ -284,12 +309,14 @@ function Compass({rootPath, initialView = 'navigator'}) {
       addLog(kleur.red('Custom command needs at least one token.'));
       setCustomMode(false);
       setCustomInput('');
+      setCustomCursor(0);
       return;
     }
     const label = commandPart ? labelPart.trim() : `Custom ${selectedProject.name}`;
     handleAddCustomCommand(label || 'Custom', commandTokens);
     setCustomMode(false);
     setCustomInput('');
+    setCustomCursor(0);
   }, [customInput, selectedProject, handleAddCustomCommand, addLog]);
 
   const exportLogs = useCallback(() => {
@@ -314,14 +341,27 @@ function Compass({rootPath, initialView = 'navigator'}) {
       if (key.escape) {
         setCustomMode(false);
         setCustomInput('');
+        setCustomCursor(0);
         return;
       }
-      if (key.backspace) {
-        setCustomInput((prev) => prev.slice(0, -1));
+      if (key.backspace || key.delete) {
+        if (customCursor > 0) {
+          setCustomInput((prev) => prev.slice(0, customCursor - 1) + prev.slice(customCursor));
+          setCustomCursor(c => Math.max(0, c - 1));
+        }
+        return;
+      }
+      if (key.leftArrow) {
+        setCustomCursor(c => Math.max(0, c - 1));
+        return;
+      }
+      if (key.rightArrow) {
+        setCustomCursor(c => Math.min(customInput.length, c + 1));
         return;
       }
       if (input) {
-        setCustomInput((prev) => prev + input);
+        setCustomInput((prev) => prev.slice(0, customCursor) + input + prev.slice(customCursor));
+        setCustomCursor(c => c + input.length);
       }
       return;
     }
@@ -363,21 +403,33 @@ function Compass({rootPath, initialView = 'navigator'}) {
       if (key.ctrl && input === 'c') {
         runningProcessRef.current.kill('SIGINT');
         setStdinBuffer('');
+        setStdinCursor(0);
         return;
       }
       if (key.return) {
-        runningProcessRef.current.stdin?.write('\n');
+        runningProcessRef.current.stdin?.write(stdinBuffer + '\n');
         setStdinBuffer('');
+        setStdinCursor(0);
         return;
       }
-      if (key.backspace) {
-        runningProcessRef.current.stdin?.write('\x08');
-        setStdinBuffer((prev) => prev.slice(0, -1));
+      if (key.backspace || key.delete) {
+        if (stdinCursor > 0) {
+          setStdinBuffer(prev => prev.slice(0, stdinCursor - 1) + prev.slice(stdinCursor));
+          setStdinCursor(c => Math.max(0, c - 1));
+        }
+        return;
+      }
+      if (key.leftArrow) {
+        setStdinCursor(c => Math.max(0, c - 1));
+        return;
+      }
+      if (key.rightArrow) {
+        setStdinCursor(c => Math.min(stdinBuffer.length, c + 1));
         return;
       }
       if (input) {
-        runningProcessRef.current.stdin?.write(input);
-        setStdinBuffer((prev) => prev + input);
+        setStdinBuffer(prev => prev.slice(0, stdinCursor) + input + prev.slice(stdinCursor));
+        setStdinCursor(c => c + input.length);
       }
       return;
     }
@@ -422,6 +474,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
     if (shiftCombo('c') && viewMode === 'detail' && selectedProject) {
       setCustomMode(true);
       setCustomInput('');
+      setCustomCursor(0);
       return;
     }
     const actionKey = normalizedInput && ACTION_MAP[normalizedInput];
@@ -529,7 +582,14 @@ function Compass({rootPath, initialView = 'navigator'}) {
   }
 
   if (customMode) {
-    detailContent.push(create(Text, {key: 'custom-input', color: 'cyan'}, `Type label|cmd (Enter to save, Esc to cancel): ${customInput}`));
+    detailContent.push(
+      create(
+        Box,
+        {key: 'custom-input-box', flexDirection: 'row'},
+        create(Text, {color: 'cyan'}, 'Type label|cmd (Enter: save, Esc: cancel): '),
+        create(CursorText, {value: customInput, cursorIndex: customCursor})
+      )
+    );
   }
 
   const artTileNodes = useMemo(() => {
@@ -818,7 +878,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
           paddingX: 1
         },
         create(Text, {bold: true, color: running ? 'green' : 'white'}, running ? ' Stdin buffer ' : ' Input ready '),
-        create(Text, {dimColor: true, marginLeft: 1}, running ? (stdinBuffer || '(type to send)') : 'Start a command to feed stdin')
+        create(Box, {marginLeft: 1}, create(CursorText, {value: stdinBuffer || (running ? '' : 'Start a command to feed stdin'), cursorIndex: stdinCursor, active: running}))
       )
     ),
     helpSection,
