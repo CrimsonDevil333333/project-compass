@@ -1,4 +1,4 @@
-# Project Compass (v2.3.0)
+# Project Compass (v2.4.0)
 
 Project Compass is a futuristic CLI navigator built with [Ink](https://github.com/vadimdemedes/ink) that scans your current folder tree for familiar code projects and gives you one-keystroke access to build, test, or run them.
 
@@ -9,6 +9,7 @@ Project Compass is a futuristic CLI navigator built with [Ink](https://github.co
 - 🚀 **New Keyboard-Centric UX**: Shortcuts now use **Shift** instead of Ctrl to avoid terminal interference.
 - 💡 **Refined Output**: Improved stdin buffer with proper spacing and reliable scrolling (Shift+↑/↓).
 - 🧠 **Smart Detection**: Support for 20+ frameworks including **Spring Boot** (Maven/Gradle), **ASP.NET Core**, **Rocket/Actix** (Rust), **Laravel** (PHP), **Vite**, **Prisma**, and more.
+- ⚠️ **Runtime Health**: Automatically checks if the required language/runtime (e.g., `node`, `python`, `cargo`) is installed and warns you if it's missing.
 - 🔌 **Extensible**: Add custom commands with **Shift+C** and frameworks via `plugins.json`.
 
 ## Installation

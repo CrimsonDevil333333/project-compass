@@ -1,11 +1,22 @@
 import fs from 'fs';
 import path from 'path';
+import {execSync} from 'child_process';
 import fastGlob from 'fast-glob';
 import {ensureConfigDir, PLUGIN_FILE} from './configPaths.js';
 
 const IGNORE_PATTERNS = ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/build/**', '**/target/**'];
 
 const PYTHON_ENTRY_FILES = ['main.py', 'app.py', 'src/main.py', 'src/app.py'];
+
+function checkBinary(name) {
+  try {
+    const cmd = process.platform === 'win32' ? `where ${name}` : `which ${name}`;
+    execSync(cmd, {stdio: 'ignore'});
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function findPythonEntry(projectPath) {
   return PYTHON_ENTRY_FILES.find((file) => hasProjectFile(projectPath, file)) || null;
@@ -538,7 +549,9 @@ class SchemaRegistry {
         icon: '🟢',
         priority: 100,
         files: ['package.json'],
+        binaries: ['node', 'npm'],
         async build(projectPath, manifest) {
+          const missingBinaries = this.binaries.filter(b => !checkBinary(b));
           const pkgPath = path.join(projectPath, 'package.json');
           if (!fs.existsSync(pkgPath)) {
             return null;
@@ -587,6 +600,7 @@ class SchemaRegistry {
             metadata,
             manifest: path.basename(manifest),
             description: pkg.description || '',
+            missingBinaries,
             extra: {
               scripts: Object.keys(scripts),
               setupHints
@@ -600,7 +614,9 @@ class SchemaRegistry {
         icon: '🐍',
         priority: 95,
         files: ['pyproject.toml', 'requirements.txt', 'setup.py', 'Pipfile'],
+        binaries: [process.platform === 'win32' ? 'python' : 'python3', 'pip'],
         async build(projectPath, manifest) {
+          const missingBinaries = this.binaries.filter(b => !checkBinary(b));
           const commands = {};
           if (hasProjectFile(projectPath, 'pyproject.toml')) {
             commands.test = {label: 'Pytest', command: ['pytest']};
@@ -636,6 +652,7 @@ class SchemaRegistry {
             metadata,
             manifest: path.basename(manifest),
             description: '',
+            missingBinaries,
             extra: {
               entry,
               setupHints
@@ -649,7 +666,9 @@ class SchemaRegistry {
         icon: '🦀',
         priority: 90,
         files: ['Cargo.toml'],
+        binaries: ['cargo', 'rustc'],
         async build(projectPath, manifest) {
+          const missingBinaries = this.binaries.filter(b => !checkBinary(b));
           return {
             id: `${projectPath}::rust`,
             path: projectPath,
@@ -665,6 +684,7 @@ class SchemaRegistry {
             metadata: {},
             manifest: path.basename(manifest),
             description: '',
+            missingBinaries,
             extra: {
               setupHints: ['cargo fetch', 'Run cargo build before releasing']
             }
@@ -677,7 +697,9 @@ class SchemaRegistry {
         icon: '🐹',
         priority: 85,
         files: ['go.mod'],
+        binaries: ['go'],
         async build(projectPath, manifest) {
+          const missingBinaries = this.binaries.filter(b => !checkBinary(b));
           return {
             id: `${projectPath}::go`,
             path: projectPath,
@@ -693,6 +715,7 @@ class SchemaRegistry {
             metadata: {},
             manifest: path.basename(manifest),
             description: '',
+            missingBinaries,
             extra: {
               setupHints: ['go mod tidy', 'Ensure Go toolchain is installed']
             }
@@ -705,7 +728,9 @@ class SchemaRegistry {
         icon: '☕️',
         priority: 80,
         files: ['pom.xml', 'build.gradle', 'build.gradle.kts'],
+        binaries: ['java', 'javac'],
         async build(projectPath, manifest) {
+          const missingBinaries = this.binaries.filter(b => !checkBinary(b));
           const hasMvnw = hasProjectFile(projectPath, 'mvnw');
           const hasGradlew = hasProjectFile(projectPath, 'gradlew');
           const commands = {};
@@ -731,6 +756,7 @@ class SchemaRegistry {
             metadata: {},
             manifest: path.basename(manifest),
             description: '',
+            missingBinaries,
             extra: {
               setupHints: ['Install JDK 17+ and run ./mvnw install or ./gradlew build']
             }
@@ -743,7 +769,9 @@ class SchemaRegistry {
         icon: '🔵',
         priority: 70,
         files: ['build.sbt'],
+        binaries: ['sbt', 'scala'],
         async build(projectPath, manifest) {
+          const missingBinaries = this.binaries.filter(b => !checkBinary(b));
           return {
             id: `${projectPath}::scala`,
             path: projectPath,
@@ -759,6 +787,7 @@ class SchemaRegistry {
             metadata: {},
             manifest: path.basename(manifest),
             description: '',
+            missingBinaries,
             extra: {
               setupHints: ['Ensure sbt is installed', 'Run sbt compile before running your app']
             }
@@ -771,7 +800,9 @@ class SchemaRegistry {
         icon: '🐘',
         priority: 65,
         files: ['composer.json'],
+        binaries: ['php', 'composer'],
         async build(projectPath, manifest) {
+          const missingBinaries = this.binaries.filter(b => !checkBinary(b));
           return {
             id: `${projectPath}::php`,
             path: projectPath,
@@ -785,6 +816,7 @@ class SchemaRegistry {
             metadata: {},
             manifest: path.basename(manifest),
             description: '',
+            missingBinaries,
             extra: {
               setupHints: ['composer install to install dependencies']
             }
@@ -797,7 +829,9 @@ class SchemaRegistry {
         icon: '💎',
         priority: 65,
         files: ['Gemfile'],
+        binaries: ['ruby', 'bundle'],
         async build(projectPath, manifest) {
+          const missingBinaries = this.binaries.filter(b => !checkBinary(b));
           return {
             id: `${projectPath}::ruby`,
             path: projectPath,
@@ -812,6 +846,7 @@ class SchemaRegistry {
             metadata: {},
             manifest: path.basename(manifest),
             description: '',
+            missingBinaries,
             extra: {
               setupHints: ['bundle install to ensure gems are present']
             }
@@ -824,7 +859,9 @@ class SchemaRegistry {
         icon: '🔷',
         priority: 65,
         files: ['*.csproj'],
+        binaries: ['dotnet'],
         async build(projectPath, manifest) {
+          const missingBinaries = this.binaries.filter(b => !checkBinary(b));
           return {
             id: `${projectPath}::dotnet`,
             path: projectPath,
@@ -840,6 +877,7 @@ class SchemaRegistry {
             metadata: {},
             manifest: path.basename(manifest),
             description: '',
+            missingBinaries,
             extra: {
               setupHints: ['Install .NET SDK 8+', 'dotnet restore before running']
             }
@@ -852,7 +890,9 @@ class SchemaRegistry {
         icon: '🐚',
         priority: 50,
         files: ['Makefile', 'build.sh'],
+        binaries: ['make', 'sh'],
         async build(projectPath, manifest) {
+          const missingBinaries = this.binaries.filter(b => !checkBinary(b));
           return {
             id: `${projectPath}::shell`,
             path: projectPath,
@@ -867,6 +907,7 @@ class SchemaRegistry {
             metadata: {},
             manifest: path.basename(manifest),
             description: '',
+            missingBinaries,
             extra: {
               setupHints: ['Run make install if available', 'Ensure shell scripts are executable']
             }
@@ -879,6 +920,7 @@ class SchemaRegistry {
         icon: '🧰',
         priority: 10,
         files: ['README.md'],
+        binaries: [],
         async build(projectPath, manifest) {
           return {
             id: `${projectPath}::generic`,
@@ -891,6 +933,7 @@ class SchemaRegistry {
             metadata: {},
             manifest: path.basename(manifest),
             description: 'Detected via README or Makefile layout.',
+            missingBinaries: [],
             extra: {
               setupHints: ['Read the README for custom build instructions']
             }

@@ -363,17 +363,23 @@ const projectRows = [];
     projects.forEach((project, index) => {
       const isSelected = index === selectedIndex;
       const frameworkBadges = (project.frameworks || []).map((frame) => `${frame.icon} ${frame.name}`).join(', ');
+      const hasMissingRuntime = project.missingBinaries && project.missingBinaries.length > 0;
       projectRows.push(
         create(
           Box,
           {key: project.id, flexDirection: 'column', marginBottom: 1, padding: 1},
           create(
-            Text,
-            {
-              color: isSelected ? 'cyan' : 'white',
-              bold: isSelected
-            },
-            `${project.icon} ${project.name}`
+            Box,
+            {flexDirection: 'row'},
+            create(
+              Text,
+              {
+                color: isSelected ? 'cyan' : 'white',
+                bold: isSelected
+              },
+              `${project.icon} ${project.name}`
+            ),
+            hasMissingRuntime && create(Text, {color: 'red', bold: true}, '  ⚠️ Runtime missing')
           ),
           create(Text, {dimColor: true}, `  ${project.type} · ${path.relative(rootPath, project.path) || '.'}`),
           frameworkBadges && create(Text, {dimColor: true}, `   ${frameworkBadges}`)
@@ -385,7 +391,12 @@ const projectRows = [];
   const detailContent = [];
   if (viewMode === 'detail' && selectedProject) {
     detailContent.push(
-      create(Text, {color: 'cyan', bold: true}, `${selectedProject.icon} ${selectedProject.name}`),
+      create(
+        Box,
+        {flexDirection: 'row'},
+        create(Text, {color: 'cyan', bold: true}, `${selectedProject.icon} ${selectedProject.name}`),
+        selectedProject.missingBinaries && selectedProject.missingBinaries.length > 0 && create(Text, {color: 'red', bold: true}, '  ⚠️ MISSING RUNTIME')
+      ),
       create(Text, {dimColor: true}, `${selectedProject.type} · ${selectedProject.manifest || 'detected manifest'}`),
       create(Text, {dimColor: true}, `Location: ${path.relative(rootPath, selectedProject.path) || '.'}`)
     );
@@ -399,7 +410,16 @@ const projectRows = [];
     if (selectedProject.extra?.scripts && selectedProject.extra.scripts.length) {
       detailContent.push(create(Text, {dimColor: true}, `Scripts: ${selectedProject.extra.scripts.join(', ')}`));
     }
-    detailContent.push(create(Text, {dimColor: true}, `Custom commands stored in ${CONFIG_PATH}`));
+
+    if (selectedProject.missingBinaries && selectedProject.missingBinaries.length > 0) {
+      detailContent.push(
+        create(Text, {color: 'red', bold: true, marginTop: 1}, 'MISSING BINARIES:'),
+        create(Text, {color: 'red'}, `Please install: ${selectedProject.missingBinaries.join(', ')}`),
+        create(Text, {dimColor: true}, 'Project commands may fail until these are in your PATH.')
+      );
+    }
+
+    detailContent.push(create(Text, {dimColor: true, marginTop: 1}, `Custom commands stored in ${CONFIG_PATH}`));
     detailContent.push(create(Text, {dimColor: true, marginBottom: 1}, `Extend frameworks via ${PLUGIN_FILE}`));
     detailContent.push(create(Text, {bold: true, marginTop: 1}, 'Commands'));
     detailedIndexed.forEach((command) => {
