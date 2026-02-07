@@ -57,6 +57,11 @@ Project Compass is a high-performance, TUI (Terminal User Interface) workspace o
 | `Shift + Q` | Quit (with safe-exit confirmation) |
 | `?` | Toggle Help Overlay |
 
+### 🛡️ Safe Termination
+- **Process Protection**: Compass won't let you accidentally kill your work. If tasks are running, a dedicated confirmation dialog ensures you intended to quit.
+
+![Exit Confirmation](https://raw.githubusercontent.com/CrimsonDevil333333/project-compass/master/assets/screenshots/exit-confirm.jpg)
+
 ## 🛠️ Installation
 
 ```bash
