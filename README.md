@@ -4,7 +4,7 @@
 
 Project Compass is a high-performance, TUI (Terminal User Interface) workspace orchestrator built with Ink and React. It transforms your terminal into a command center for managing complex, multi-stack environments with a focus on speed, safety, and visual clarity.
 
-![Navigator View](./assets/screenshots/navigator.jpg)
+![Navigator View](https://raw.githubusercontent.com/CrimsonDevil333333/project-compass/master/assets/screenshots/navigator.jpg)
 
 ## 🌟 Premium Features
 
@@ -19,27 +19,27 @@ Project Compass is a high-performance, TUI (Terminal User Interface) workspace o
 - **Process Management**: Monitor status (Running, Finished, Failed, Killed) and forcefully terminate processes with `Shift+K`.
 - **Task Identity**: Rename tasks on the fly with `Shift+R` to keep your workspace organized.
 
-![Task Manager](./assets/screenshots/taskmanager.jpg)
+![Task Manager](https://raw.githubusercontent.com/CrimsonDevil333333/project-compass/master/assets/screenshots/taskmanager.jpg)
 
 ### 📦 Package Registry (`Shift+P`)
 - **Context-Aware Management**: Add or remove dependencies without leaving the app.
 - **Internal Switcher**: Quick-swap projects within the registry view using `S`.
 - **Multi-Runtime Support**: Handles `npm`, `pip`, and more based on project type.
 
-![Package Registry](./assets/screenshots/registry.jpg)
+![Package Registry](https://raw.githubusercontent.com/CrimsonDevil333333/project-compass/master/assets/screenshots/registry.jpg)
 
 ### 🏗️ Project Architect (`Shift+N`)
 - **Rapid Scaffolding**: Create new projects from scratch using industry-standard templates.
 - **Interactive Prompts**: Safe, guided setup for directory structure and initial manifests.
 
-![Project Architect](./assets/screenshots/architect.jpg)
+![Project Architect](https://raw.githubusercontent.com/CrimsonDevil333333/project-compass/master/assets/screenshots/architect.jpg)
 
 ### 🎨 Omni-Studio & Art Board
 - **Environment Health (`Shift+A`)**: Audit your system dependencies and runtime versions.
 - **Build Atlas (`Shift+B`)**: A visual, art-coded representation of your project landscape.
 
-![Omni-Studio](./assets/screenshots/studio.jpg)
-![Art Board](./assets/screenshots/artboard.jpg)
+![Omni-Studio](https://raw.githubusercontent.com/CrimsonDevil333333/project-compass/master/assets/screenshots/studio.jpg)
+![Art Board](https://raw.githubusercontent.com/CrimsonDevil333333/project-compass/master/assets/screenshots/artboard.jpg)
 
 ## ⌨️ Command Reference
 
