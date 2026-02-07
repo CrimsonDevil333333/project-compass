@@ -14,7 +14,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const CONFIG_DIR = path.join(os.homedir(), '.project-compass');
 const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
+const PLUGIN_FILE = path.join(CONFIG_DIR, 'plugins.json');
 const DEFAULT_CONFIG = {customCommands: {}};
+const DEFAULT_PLUGIN_CONFIG = {plugins: []};
 
 function ensureConfigDir() {
   if (!fs.existsSync(CONFIG_DIR)) {
@@ -51,6 +53,244 @@ function loadConfig() {
   return {...DEFAULT_CONFIG};
 }
 
+function parseCommandTokens(value) {
+  if (Array.isArray(value)) {
+    return value.map((token) => String(token));
+  }
+  if (typeof value === 'string') {
+    return value.trim().split(/\s+/).filter(Boolean);
+  }
+  return [];
+}
+
+function resolveScriptCommand(project, scriptName, fallback = null) {
+  const scripts = project.metadata?.scripts || {};
+  if (Object.prototype.hasOwnProperty.call(scripts, scriptName)) {
+    return ['npm', 'run', scriptName];
+  }
+  if (typeof fallback === 'function') {
+    return fallback();
+  }
+  return fallback;
+}
+
+function gatherNodeDependencies(pkg) {
+  const deps = new Set();
+  ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'].forEach((key) => {
+    if (pkg[key]) {
+      Object.keys(pkg[key]).forEach((name) => deps.add(name));
+    }
+  });
+  return Array.from(deps);
+}
+
+function gatherPythonDependencies(projectPath) {
+  const set = new Set();
+  const addFromFile = (filePath) => {
+    if (!fs.existsSync(filePath)) {
+      return;
+    }
+    const raw = fs.readFileSync(filePath, 'utf-8');
+    raw.split(/\r?\n/).forEach((line) => {
+      const clean = line.trim().split('#')[0].trim();
+      if (clean) {
+        const token = clean.split(/[>=<=~!]/)[0].trim().toLowerCase();
+        if (token) {
+          set.add(token);
+        }
+      }
+    });
+  };
+  addFromFile(path.join(projectPath, 'requirements.txt'));
+  const pyproject = path.join(projectPath, 'pyproject.toml');
+  if (fs.existsSync(pyproject)) {
+    const content = fs.readFileSync(pyproject, 'utf-8').toLowerCase();
+    const matches = content.match(/\b[a-z0-9-_/]+\b/g);
+    (matches || []).forEach((match) => {
+      if (match) {
+        set.add(match);
+      }
+    });
+  }
+  return Array.from(set);
+}
+
+function dependencyMatches(project, needle) {
+  const dependencies = (project.metadata?.dependencies || []).map((dep) => dep.toLowerCase());
+  const target = needle.toLowerCase();
+  return dependencies.some((value) => value === target || value.startsWith(`${target}@`) || value.includes(`/${target}`));
+}
+
+const builtInFrameworks = [
+  {
+    id: 'next',
+    name: 'Next.js',
+    icon: '🧭',
+    description: 'React + Next.js (SSR/SSG) apps',
+    languages: ['Node.js'],
+    priority: 115,
+    match(project) {
+      const hasNextConfig = fs.existsSync(path.join(project.path, 'next.config.js'));
+      return dependencyMatches(project, 'next') || hasNextConfig;
+    },
+    commands(project) {
+      const commands = {};
+      const add = (key, label, fallback) => {
+        const tokens = resolveScriptCommand(project, key, fallback);
+        if (tokens) {
+          commands[key] = {label, command: tokens, source: 'framework'};
+        }
+      };
+      const buildFallback = () => ['npx', 'next', 'build'];
+      const startFallback = () => ['npx', 'next', 'start'];
+      const devFallback = () => ['npx', 'next', 'dev'];
+      add('run', 'Next dev', devFallback);
+      add('build', 'Next build', buildFallback);
+      add('test', 'Next test', () => ['npm', 'run', 'test']);
+      add('start', 'Next start', startFallback);
+      return commands;
+    }
+  },
+  {
+    id: 'django',
+    name: 'Django',
+    icon: '🌿',
+    description: 'Django web application',
+    languages: ['Python'],
+    priority: 110,
+    match(project) {
+      return dependencyMatches(project, 'django') || fs.existsSync(path.join(project.path, 'manage.py'));
+    },
+    commands(project) {
+      const managePath = path.join(project.path, 'manage.py');
+      if (!fs.existsSync(managePath)) {
+        return {};
+      }
+      return {
+        run: {label: 'Django runserver', command: ['python', 'manage.py', 'runserver'], source: 'framework'},
+        test: {label: 'Django test', command: ['python', 'manage.py', 'test'], source: 'framework'},
+        migrate: {label: 'Django migrate', command: ['python', 'manage.py', 'migrate'], source: 'framework'}
+      };
+    }
+  }
+];
+
+function loadUserFrameworks() {
+  ensureConfigDir();
+  try {
+    if (!fs.existsSync(PLUGIN_FILE)) {
+      return [];
+    }
+    const payload = JSON.parse(fs.readFileSync(PLUGIN_FILE, 'utf-8') || '{}');
+    const plugins = payload.plugins || [];
+    return plugins.map((entry) => {
+      const normalizedId = entry.id || (entry.name ? entry.name.toLowerCase().replace(/\s+/g, '-') : `plugin-${Math.random().toString(36).slice(2, 8)}`);
+      const commands = {};
+      Object.entries(entry.commands || {}).forEach(([key, value]) => {
+        const command = parseCommandTokens(typeof value === 'object' ? value.command : value);
+        if (!command.length) {
+          return;
+        }
+        commands[key] = {
+          label: typeof value === 'object' ? value.label || key : key,
+          command,
+          source: 'plugin'
+        };
+      });
+      return {
+        id: normalizedId,
+        name: entry.name || normalizedId,
+        icon: entry.icon || '🧩',
+        description: entry.description || '',
+        languages: entry.languages || [],
+        files: entry.files || [],
+        dependencies: entry.dependencies || [],
+        scripts: entry.scripts || [],
+        priority: Number.isFinite(entry.priority) ? entry.priority : 70,
+        commands,
+        match: entry.match
+      };
+    })
+    .filter((plugin) => plugin.name && plugin.commands && Object.keys(plugin.commands).length);
+  } catch (error) {
+    console.error(`Failed to parse plugins.json: ${error.message}`);
+    return [];
+  }
+}
+
+let cachedFrameworkPlugins = null;
+
+function getFrameworkPlugins() {
+  if (cachedFrameworkPlugins) {
+    return cachedFrameworkPlugins;
+  }
+  cachedFrameworkPlugins = [...builtInFrameworks, ...loadUserFrameworks()];
+  return cachedFrameworkPlugins;
+}
+
+function matchesPlugin(project, plugin) {
+  if (plugin.languages && plugin.languages.length > 0 && !plugin.languages.includes(project.type)) {
+    return false;
+  }
+  if (plugin.files && plugin.files.length > 0) {
+    const hit = plugin.files.some((file) => fs.existsSync(path.join(project.path, file)));
+    if (!hit) {
+      return false;
+    }
+  }
+  if (plugin.dependencies && plugin.dependencies.length > 0) {
+    const hit = plugin.dependencies.some((dep) => dependencyMatches(project, dep));
+    if (!hit) {
+      return false;
+    }
+  }
+  if (plugin.scripts && plugin.scripts.length > 0) {
+    const scripts = project.metadata?.scripts || {};
+    const hit = plugin.scripts.some((name) => Object.prototype.hasOwnProperty.call(scripts, name));
+    if (!hit) {
+      return false;
+    }
+  }
+  if (typeof plugin.match === 'function') {
+    if (!plugin.match(project)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function applyFrameworkPlugins(project) {
+  const plugins = getFrameworkPlugins();
+  let commands = {...project.commands};
+  const frameworks = [];
+  let maxPriority = project.priority || 0;
+  for (const plugin of plugins) {
+    if (!matchesPlugin(project, plugin)) {
+      continue;
+    }
+    frameworks.push({id: plugin.id, name: plugin.name, icon: plugin.icon, description: plugin.description});
+    if (plugin.priority && plugin.priority > maxPriority) {
+      maxPriority = plugin.priority;
+    }
+    const pluginCommands = typeof plugin.commands === 'function' ? plugin.commands(project) : plugin.commands;
+    if (pluginCommands) {
+      Object.entries(pluginCommands).forEach(([key, command]) => {
+        if (!Array.isArray(command.command) || command.command.length === 0) {
+          return;
+        }
+        commands = {
+          ...commands,
+          [key]: {
+            ...command,
+            source: command.source || 'framework'
+          }
+        };
+      });
+    }
+  }
+  return {...project, commands, frameworks, priority: maxPriority};
+}
+
 const IGNORE_PATTERNS = ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/build/**', '**/target/**'];
 
 const SCHEMAS = [
@@ -68,28 +308,24 @@ const SCHEMAS = [
       const content = await fs.promises.readFile(pkgPath, 'utf-8');
       const pkg = JSON.parse(content);
       const scripts = pkg.scripts || {};
-      const preferScript = (names) => {
+      const commands = {};
+      const preferScript = (targetKey, names, label) => {
         for (const name of names) {
           if (Object.prototype.hasOwnProperty.call(scripts, name)) {
-            return ['npm', 'run', name];
+            commands[targetKey] = {label, command: ['npm', 'run', name]};
+            break;
           }
         }
-        return null;
       };
+      preferScript('build', ['build', 'compile', 'dist'], 'Build');
+      preferScript('test', ['test', 'check', 'spec'], 'Test');
+      preferScript('run', ['start', 'dev', 'serve', 'run'], 'Start');
 
-      const commands = {};
-      const buildCmd = preferScript(['build', 'compile', 'bundle', 'dist']);
-      if (buildCmd) {
-        commands.build = {label: 'Build', command: buildCmd};
-      }
-      const testCmd = preferScript(['test', 'check', 'spec']);
-      if (testCmd) {
-        commands.test = {label: 'Test', command: testCmd};
-      }
-      const runCmd = preferScript(['start', 'dev', 'serve', 'run']);
-      if (runCmd) {
-        commands.run = {label: 'Start', command: runCmd};
-      }
+      const metadata = {
+        dependencies: gatherNodeDependencies(pkg),
+        scripts,
+        packageJson: pkg
+      };
 
       return {
         id: `${projectPath}::node`,
@@ -99,6 +335,7 @@ const SCHEMAS = [
         icon: '🟢',
         priority: this.priority,
         commands,
+        metadata,
         manifest: path.basename(manifest),
         description: pkg.description || '',
         extra: {
@@ -126,6 +363,10 @@ const SCHEMAS = [
         commands.run = {label: 'Run', command: ['python', entry]};
       }
 
+      const metadata = {
+        dependencies: gatherPythonDependencies(projectPath)
+      };
+
       return {
         id: `${projectPath}::python`,
         path: projectPath,
@@ -134,6 +375,7 @@ const SCHEMAS = [
         icon: '🐍',
         priority: this.priority,
         commands,
+        metadata,
         manifest: path.basename(manifest),
         description: '',
         extra: {
@@ -161,6 +403,7 @@ const SCHEMAS = [
           test: {label: 'Cargo test', command: ['cargo', 'test']},
           run: {label: 'Cargo run', command: ['cargo', 'run']}
         },
+        metadata: {},
         manifest: path.basename(manifest),
         description: '',
         extra: {}
@@ -186,6 +429,7 @@ const SCHEMAS = [
           test: {label: 'Go test', command: ['go', 'test', './...']},
           run: {label: 'Go run', command: ['go', 'run', '.']}
         },
+        metadata: {},
         manifest: path.basename(manifest),
         description: '',
         extra: {}
@@ -221,6 +465,7 @@ const SCHEMAS = [
         icon: '☕️',
         priority: this.priority,
         commands,
+        metadata: {},
         manifest: path.basename(manifest),
         description: '',
         extra: {}
@@ -246,6 +491,7 @@ const SCHEMAS = [
           test: {label: 'sbt test', command: ['sbt', 'test']},
           run: {label: 'sbt run', command: ['sbt', 'run']}
         },
+        metadata: {},
         manifest: path.basename(manifest),
         description: '',
         extra: {}
@@ -286,7 +532,8 @@ async function discoverProjects(root) {
       if (!entry) {
         continue;
       }
-      projectMap.set(projectDir, entry);
+      const withFrameworks = applyFrameworkPlugins(entry);
+      projectMap.set(projectDir, withFrameworks);
     }
   }
   return Array.from(projectMap.values()).sort((a, b) => b.priority - a.priority);
@@ -327,9 +574,10 @@ function buildDetailCommands(project, config) {
   if (!project) {
     return [];
   }
-  const builtins = Object.values(project.commands || {}).map((command) => ({
-    ...command,
-    source: 'builtin'
+  const builtins = Object.entries(project.commands || {}).map(([key, command]) => ({
+    label: command.label || key,
+    command: command.command,
+    source: command.source || 'builtin'
   }));
   const custom = (config.customCommands?.[project.path] || []).map((entry) => ({
     label: entry.label,
@@ -522,19 +770,25 @@ function Compass({rootPath}) {
   }
   if (!loading) {
     projects.forEach((project, index) => {
+      const frameworkBadges = (project.frameworks || []).map((frame) => `${frame.icon} ${frame.name}`).join(', ');
       projectRows.push(
         create(
           Box,
-          {key: project.id, flexDirection: 'row'},
+          {key: project.id, flexDirection: 'column', marginBottom: 1},
           create(
-            Text,
-            {
-              color: index === selectedIndex ? 'green' : undefined,
-              bold: index === selectedIndex
-            },
-            `${project.icon} ${project.name}`
+            Box,
+            {flexDirection: 'row'},
+            create(
+              Text,
+              {
+                color: index === selectedIndex ? 'green' : undefined,
+                bold: index === selectedIndex
+              },
+              `${project.icon} ${project.name}`
+            ),
+            create(Text, {dimColor: true}, `  ${project.type} · ${path.relative(rootPath, project.path) || '.'}`)
           ),
-          create(Text, {dimColor: true}, `  ${project.type} · ${path.relative(rootPath, project.path) || '.'}`)
+          frameworkBadges && create(Text, {dimColor: true}, `   ${frameworkBadges}`)
         )
       );
     });
@@ -550,14 +804,19 @@ function Compass({rootPath}) {
     if (selectedProject.description) {
       detailContent.push(create(Text, null, selectedProject.description));
     }
+    const frameworks = (selectedProject.frameworks || []).map((lib) => `${lib.icon} ${lib.name}`).join(', ');
+    if (frameworks) {
+      detailContent.push(create(Text, {dimColor: true}, `Frameworks: ${frameworks}`));
+    }
     if (selectedProject.extra?.scripts && selectedProject.extra.scripts.length) {
       detailContent.push(create(Text, {dimColor: true}, `Scripts: ${selectedProject.extra.scripts.join(', ')}`));
     }
     detailContent.push(create(Text, {dimColor: true}, `Custom commands stored in ${CONFIG_PATH}`));
-    detailContent.push(create(Text, {bold: true, marginTop: 1}, 'Commands')); // show label
+    detailContent.push(create(Text, {dimColor: true, marginBottom: 1}, `Extend frameworks via ${PLUGIN_FILE}`));
+    detailContent.push(create(Text, {bold: true, marginTop: 1}, 'Commands'));
     detailedIndexed.forEach((command) => {
       detailContent.push(
-        create(Text, {key: `${command.shortcut}-${command.label}`}, `${command.shortcut}. ${command.label} ${command.source === 'custom' ? kleur.magenta('(custom)') : ''}`)
+        create(Text, {key: `${command.shortcut}-${command.label}`}, `${command.shortcut}. ${command.label} ${command.source === 'custom' ? kleur.magenta('(custom)') : command.source === 'framework' ? kleur.cyan('(framework)') : ''}`)
       );
       detailContent.push(create(Text, {dimColor: true}, `   ↳ ${command.command.join(' ')}`));
     });
@@ -566,7 +825,7 @@ function Compass({rootPath}) {
     }
     detailContent.push(create(Text, {dimColor: true}, 'Press C → label|cmd to save custom actions, Enter to close detail view.'));
   } else {
-    detailContent.push(create(Text, {dimColor: true}, 'Press Enter on a project to reveal details (icons, info, commands, customizations).'));
+    detailContent.push(create(Text, {dimColor: true}, 'Press Enter on a project to reveal details (icons, commands, frameworks, custom actions).'));
   }
 
   if (customMode) {
