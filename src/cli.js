@@ -248,24 +248,31 @@ function Compass({rootPath, initialView = 'navigator'}) {
     });
   }, []);
 
-  const detailedIndexed = useMemo(() => buildDetailCommands(selectedProject, config).map((command, index) => ({
-    ...command,
-    shortcut: `${index + 1}`
-  })), [selectedProject, config]);
+  const detailedIndexed = useMemo(() => buildDetailCommands(selectedProject, config).map((command, index) => {
+    const isOver9 = index >= 9;
+    const shortcut = isOver9 ? `S+${String.fromCharCode(65 + index - 9)}` : `${index + 1}`;
+    return { ...command, shortcut };
+  }), [selectedProject, config]);
 
   const detailShortcutMap = useMemo(() => {
     const map = new Map();
-    detailedIndexed.forEach((cmd) => map.set(cmd.shortcut, cmd));
+    detailedIndexed.forEach((cmd) => {
+      if (cmd.shortcut.startsWith('S+')) {
+        map.set(cmd.shortcut.slice(2).toLowerCase(), cmd);
+      } else {
+        map.set(cmd.shortcut, cmd);
+      }
+    });
     return map;
   }, [detailedIndexed]);
 
   const killAllTasks = useCallback(() => {
     runningProcessMap.current.forEach((proc) => {
       try { 
-        if (proc.pid) {
-          process.kill(-proc.pid, 'SIGKILL');
+        if (process.platform === 'win32') {
+          execa('taskkill', ['/pid', proc.pid, '/f', '/t']);
         } else {
-          proc.kill('SIGKILL');
+          process.kill(-proc.pid, 'SIGKILL');
         }
       } catch { /* ignore */ }
     });
@@ -296,7 +303,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
         cwd: project.path,
         env: process.env,
         stdin: 'pipe',
-        detached: true,
+        detached: process.platform !== 'win32',
         cleanup: true
       });
       runningProcessMap.current.set(taskId, subprocess);
@@ -325,7 +332,9 @@ function Compass({rootPath, initialView = 'navigator'}) {
     if (proc) {
       addLogToTask(taskId, kleur.yellow('! Force killing process group...'));
       try {
-        if (proc.pid) {
+        if (process.platform === 'win32') {
+          execa('taskkill', ['/pid', proc.pid, '/f', '/t']);
+        } else if (proc.pid) {
           process.kill(-proc.pid, 'SIGKILL');
         } else {
           proc.kill('SIGKILL');
@@ -609,7 +618,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
 
   const helpCards = [
     {label: 'Navigation', color: 'magenta', body: ['↑ / ↓ move focus, Enter: details', 'Shift+↑ / ↓ scroll output', 'Shift+H toggle help cards', 'Shift+D detach from task']},
-    {label: 'Commands', color: 'cyan', body: ['B / T / R build/test/run', '1-9 run detail commands', 'Shift+L rerun last command', 'Shift+X clear / Shift+E export']},
+    {label: 'Commands', color: 'cyan', body: ['B / T / R build/test/run', '1-9 / S+A-Z numbered commands', 'Shift+L rerun last command', 'Shift+X clear / Shift+E export']},
     {label: 'Orbit & Studio', color: 'yellow', body: ['Shift+T task manager', 'Shift+A studio / Shift+B art board', 'Shift+S structure / Shift+Q quit']}
   ];
 
@@ -696,7 +705,7 @@ async function main() {
     console.log('');
     console.log(kleur.bold('Execution shortcuts:'));
     console.log('  B / T / R             Quick run: Build / Test / Run');
-    console.log('  1-9                   Run numbered commands in detail view');
+    console.log('  1-9 / S+A-Z           Run numbered commands in detail view');
     console.log('  Shift+L               Rerun the last executed command');
     console.log('  Shift+C               Add a custom command (in detail view)');
     console.log('');
