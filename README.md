@@ -1,58 +1,68 @@
-# Project Compass (v3.5.1)
+# 🧭 Project Compass
 
-Project Compass is a futuristic CLI navigator and lifecycle orchestrator built with [Ink](https://github.com/vadimdemedes/ink). It scans your folder tree for code projects and provides a unified interface to install, build, test, and manage them.
+**Futuristic Project Navigator & Runner for the Modern Developer**
 
-## Highlights
+Project Compass is a high-performance, TUI (Terminal User Interface) workspace orchestrator built with Ink and React. It transforms your terminal into a command center for managing complex, multi-stack environments with a focus on speed, safety, and visual clarity.
 
-- 🔍 **Omni-Scanner**: Deep-scans directories for Node.js, Python, Rust, Go, Java, Scala, PHP, Ruby, and .NET projects.
-- 🏗️ **Project Architect (Shift+N)**: Scaffold new projects from industry-standard templates (Next.js, Vite, Rust, Go) into any target path.
-- 📦 **Package Registry (Shift+P)**: Interactively add/remove dependencies and manage environments (like Python `.venv`) without leaving the CLI.
-- 🛰️ **Orbit Task Manager (Shift+T)**: Run multiple commands in parallel, detach them to the background (**Shift+D**), and manage them (Rename/Kill).
-- 💀 **Atomic Kill (Ctrl+C)**: Forcefully wipe out entire process trees and zombie servers using kernel-level signal forwarding.
-- 💎 **Omni-Studio (Shift+A)**: Real-time environment intelligence dashboard showing all installed runtimes and versions.
-- 💾 **Global Persistence**: Remembers your UI preferences (Art Board, Help, Structure Guide) via `~/.project-compass/config.json`.
-- 🎨 **Flicker-Free UI**: Isolated rendering architecture ensures zero UI jitter even during high-velocity log streaming.
+![Navigator View](./assets/screenshots/navigator.jpg)
 
-## Installation
+## 🌟 Premium Features
+
+### 🌌 The Navigator (Main Interface)
+- **Automatic Discovery**: Instantly scans and identifies Node.js, Python, Rust, Go, Java, Scala, PHP, and Ruby projects.
+- **Deep Detail View**: Press `Enter` to reveal project manifests, detected frameworks, and available scripts.
+- **Custom Actions**: Save persistent, project-specific commands with `Shift+C` (e.g., `deploy|npm run deploy --prod`).
+- **Live Output Panel**: Stream real-time logs from active processes with dedicated scrolling (`Shift+↑/↓`).
+
+### 🛰️ Orbit Task Manager (`Shift+T`)
+- **Background Orchestration**: Keep tasks running while you navigate the rest of your workspace.
+- **Process Management**: Monitor status (Running, Finished, Failed, Killed) and forcefully terminate processes with `Shift+K`.
+- **Task Identity**: Rename tasks on the fly with `Shift+R` to keep your workspace organized.
+
+![Task Manager](./assets/screenshots/taskmanager.jpg)
+
+### 📦 Package Registry (`Shift+P`)
+- **Context-Aware Management**: Add or remove dependencies without leaving the app.
+- **Internal Switcher**: Quick-swap projects within the registry view using `S`.
+- **Multi-Runtime Support**: Handles `npm`, `pip`, and more based on project type.
+
+![Package Registry](./assets/screenshots/registry.jpg)
+
+### 🏗️ Project Architect (`Shift+N`)
+- **Rapid Scaffolding**: Create new projects from scratch using industry-standard templates.
+- **Interactive Prompts**: Safe, guided setup for directory structure and initial manifests.
+
+### 🎨 Omni-Studio & Art Board
+- **Environment Health (`Shift+A`)**: Audit your system dependencies and runtime versions.
+- **Build Atlas (`Shift+B`)**: A visual, art-coded representation of your project landscape.
+
+![Art Board](./assets/screenshots/artboard.jpg)
+
+## ⌨️ Command Reference
+
+| Shortcut | Action |
+| :--- | :--- |
+| `↑ / ↓` | Move project focus |
+| `Enter` | Toggle project Detail View |
+| `Shift + T` | **Orbit**: Task Manager |
+| `Shift + P` | **Registry**: Package Manager |
+| `Shift + N` | **Architect**: Project Creator |
+| `Shift + A` | **Studio**: Environment Health |
+| `Shift + B` | Toggle **Art Board** visibility |
+| `Shift + H` | Toggle **Help Cards** |
+| `Shift + S` | Toggle **Structure Guide** |
+| `Shift + Q` | Quit (with safe-exit confirmation) |
+| `?` | Toggle Help Overlay |
+
+## 🛠️ Installation
 
 ```bash
 npm install -g project-compass
 ```
 
-## Usage
+## 🚀 Vision
+Project Compass is designed to be the "Last Terminal Tool" you ever need to open. It bridges the gap between raw CLI commands and full IDEs, giving you a professional, reactive cockpit for all your development work.
 
-```bash
-project-compass [--dir /path/to/workspace] [--studio] [--version]
-```
-
-### Keyboard Master Guide
-
-| Key | Action |
-| --- | --- |
-| ↑ / ↓ | Move focus between projects |
-| **Enter** | Toggle Detail View / Return from Tasks |
-| **Shift+N** | Open **Project Architect** (Create new project) |
-| **Shift+P** | Open **Package Registry** (Manage dependencies) |
-| **Shift+T** | Open **Orbit Task Manager** |
-| **Shift+D** | **Detach** active task to background |
-| **Shift+A** | Open **Omni-Studio** (Environment intelligence) |
-| **Shift+B** | Toggle **Art Board** visibility |
-| **Shift+H** | Toggle **Help Cards** visibility |
-| **Shift+S** | Toggle **Structure Guide** |
-| **Shift+X** | **Clear** log buffer for active task |
-| **Shift+E** | **Export** current logs to `.txt` |
-| **Shift+L** | **Rerun** last executed command |
-| **Shift+Q** | **Quit** (Confirms if tasks are running) |
-| **Ctrl+C** | **Force Kill** all background tasks and exit |
-| Shift+↑ / ↓ | Scroll output logs (Intuitive direction) |
-| **?** | Toggle help overlay |
-
-## Framework Support
-
-Compass provides specialized intelligence for 20+ stacks including **Next.js, React, Vue, NestJS, Spring Boot, ASP.NET Core, Laravel, Rocket, Actix, Prisma, and Tailwind**.
-
-For a full list of framework-specific commands and shortcuts, see [commands.md](./commands.md).
-
-## License
-
-MIT © 2026 Satyaa & Clawdy
+---
+**Crafted with ❤️ by Satyaa & Clawdy**
+*MIT License*
