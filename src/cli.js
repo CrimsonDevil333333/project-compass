@@ -78,9 +78,7 @@ function useScanner(rootPath) {
 }
 
 function buildDetailCommands(project, config) {
-  if (!project) {
-    return [];
-  }
+  if (!project) return [];
   const builtins = Object.entries(project.commands || {}).map(([key, command]) => ({
     label: command.label || key,
     command: command.command,
@@ -177,6 +175,11 @@ function Compass({rootPath, initialView = 'navigator'}) {
   const [customMode, setCustomMode] = useState(false);
   const [customInput, setCustomInput] = useState('');
   const [customCursor, setCustomCursor] = useState(0);
+  const [renameMode, setRenameMode] = useState(false);
+  const [renameInput, setRenameInput] = useState('');
+  const [renameCursor, setRenameCursor] = useState(0);
+  const [quitConfirm, setQuitConfirm] = useState(false);
+  const [showArtBoard, setShowArtBoard] = useState(true);
   const [config, setConfig] = useState(() => loadConfig());
   const [showHelpCards, setShowHelpCards] = useState(false);
   const [showStructureGuide, setShowStructureGuide] = useState(false);
@@ -189,6 +192,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
 
   const activeTask = useMemo(() => tasks.find(t => t.id === activeTaskId), [tasks, activeTaskId]);
   const running = activeTask?.status === 'running';
+  const hasRunningTasks = useMemo(() => tasks.some(t => t.status === 'running'), [tasks]);
 
   const addLogToTask = useCallback((taskId, line) => {
     setTasks(prev => prev.map(t => {
@@ -200,11 +204,11 @@ function Compass({rootPath, initialView = 'navigator'}) {
     }));
   }, []);
 
-  const detailCommands = useMemo(() => buildDetailCommands(selectedProject, config), [selectedProject, config]);
-  const detailedIndexed = useMemo(() => detailCommands.map((command, index) => ({
+  const detailedIndexed = useMemo(() => buildDetailCommands(selectedProject, config).map((command, index) => ({
     ...command,
     shortcut: `${index + 1}`
-  })), [detailCommands]);
+  })), [selectedProject, config]);
+
   const detailShortcutMap = useMemo(() => {
     const map = new Map();
     detailedIndexed.forEach((cmd) => map.set(cmd.shortcut, cmd));
@@ -245,52 +249,27 @@ function Compass({rootPath, initialView = 'navigator'}) {
       setTasks(prev => prev.map(t => t.id === taskId ? {...t, status: 'finished'} : t));
       addLogToTask(taskId, kleur.green(`✓ ${commandLabel} finished`));
     } catch (error) {
-      setTasks(prev => prev.map(t => t.id === taskId ? {...t, status: 'failed'} : t));
-      addLogToTask(taskId, kleur.red(`✗ ${commandLabel} failed: ${error.shortMessage || error.message}`));
+      if (error.isCanceled) {
+        setTasks(prev => prev.map(t => t.id === taskId ? {...t, status: 'killed'} : t));
+        addLogToTask(taskId, kleur.yellow(`! Task killed by user`));
+      } else {
+        setTasks(prev => prev.map(t => t.id === taskId ? {...t, status: 'failed'} : t));
+        addLogToTask(taskId, kleur.red(`✗ ${commandLabel} failed: ${error.shortMessage || error.message}`));
+      }
     } finally {
       runningProcessMap.current.delete(taskId);
     }
   }, [addLogToTask, selectedProject]);
 
-  const handleAddCustomCommand = useCallback((label, commandTokens) => {
-    if (!selectedProject) return;
-    setConfig((prev) => {
-      const projectKey = selectedProject.path;
-      const existing = prev.customCommands?.[projectKey] || [];
-      const nextConfig = {
-        ...prev,
-        customCommands: {
-          ...prev.customCommands,
-          [projectKey]: [...existing, {label, command: commandTokens}]
-        }
-      };
-      saveConfig(nextConfig);
-      return nextConfig;
-    });
-  }, [selectedProject]);
-
-  const handleCustomSubmit = useCallback(() => {
-    const raw = customInput.trim();
-    if (!selectedProject || !raw) {
-      setCustomMode(false);
-      setCustomInput('');
-      setCustomCursor(0);
-      return;
+  const handleKillTask = useCallback((taskId) => {
+    const proc = runningProcessMap.current.get(taskId);
+    if (proc) {
+      proc.kill('SIGINT');
+    } else {
+      setTasks(prev => prev.filter(t => t.id !== taskId));
+      if (activeTaskId === taskId) setActiveTaskId(null);
     }
-    const [labelPart, commandPart] = raw.split('|');
-    const commandTokens = (commandPart || labelPart).trim().split(/\s+/).filter(Boolean);
-    if (!commandTokens.length) {
-      setCustomMode(false);
-      setCustomInput('');
-      setCustomCursor(0);
-      return;
-    }
-    const label = commandPart ? labelPart.trim() : `Custom ${selectedProject.name}`;
-    handleAddCustomCommand(label, commandTokens);
-    setCustomMode(false);
-    setCustomInput('');
-    setCustomCursor(0);
-  }, [customInput, selectedProject, handleAddCustomCommand]);
+  }, [activeTaskId]);
 
   const exportLogs = useCallback(() => {
     if (!activeTask || !activeTask.logs.length) return;
@@ -304,8 +283,32 @@ function Compass({rootPath, initialView = 'navigator'}) {
   }, [activeTask, activeTaskId, addLogToTask]);
 
     useInput((input, key) => {
+    if (quitConfirm) {
+      if (input?.toLowerCase() === 'y') exit();
+      if (input?.toLowerCase() === 'n' || key.escape) setQuitConfirm(false);
+      return;
+    }
+
     if (customMode) {
-      if (key.return) { handleCustomSubmit(); return; }
+      if (key.return) {
+        const raw = customInput.trim();
+        if (selectedProject && raw) {
+          const [labelPart, commandPart] = raw.split('|');
+          const commandTokens = (commandPart || labelPart).trim().split(/\s+/).filter(Boolean);
+          if (commandTokens.length) {
+            const label = commandPart ? labelPart.trim() : `Custom ${selectedProject.name}`;
+            setConfig((prev) => {
+              const projectKey = selectedProject.path;
+              const existing = prev.customCommands?.[projectKey] || [];
+              const nextConfig = { ...prev, customCommands: { ...prev.customCommands, [projectKey]: [...existing, {label, command: commandTokens}] } };
+              saveConfig(nextConfig);
+              return nextConfig;
+            });
+          }
+        }
+        setCustomMode(false); setCustomInput(''); setCustomCursor(0);
+        return;
+      }
       if (key.escape) { setCustomMode(false); setCustomInput(''); setCustomCursor(0); return; }
       if (key.backspace || key.delete) {
         if (customCursor > 0) {
@@ -323,6 +326,29 @@ function Compass({rootPath, initialView = 'navigator'}) {
       return;
     }
 
+    if (renameMode) {
+      if (key.return) {
+        setTasks(prev => prev.map(t => t.id === activeTaskId ? {...t, name: renameInput} : t));
+        setRenameMode(false); setRenameInput(''); setRenameCursor(0);
+        return;
+      }
+      if (key.escape) { setRenameMode(false); setRenameInput(''); setRenameCursor(0); return; }
+      if (key.backspace || key.delete) {
+        if (renameCursor > 0) {
+          setRenameInput((prev) => prev.slice(0, renameCursor - 1) + prev.slice(renameCursor));
+          setRenameCursor(c => Math.max(0, c - 1));
+        }
+        return;
+      }
+      if (key.leftArrow) { setRenameCursor(c => Math.max(0, c - 1)); return; }
+      if (key.rightArrow) { setRenameCursor(c => Math.min(renameInput.length, c + 1)); return; }
+      if (input) {
+        setRenameInput((prev) => prev.slice(0, renameCursor) + input + prev.slice(renameCursor));
+        setRenameCursor(c => c + input.length);
+      }
+      return;
+    }
+
     const normalizedInput = input?.toLowerCase();
     const shiftCombo = (char) => key.shift && normalizedInput === char;
     
@@ -332,6 +358,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
     if (shiftCombo('x')) { setTasks(prev => prev.map(t => t.id === activeTaskId ? {...t, logs: []} : t)); setLogOffset(0); return; }
     if (shiftCombo('e')) { exportLogs(); return; }
     if (shiftCombo('d')) { setActiveTaskId(null); return; }
+    if (shiftCombo('b')) { setShowArtBoard(prev => !prev); return; }
     
     if (shiftCombo('t')) { 
       setMainView((prev) => {
@@ -354,6 +381,11 @@ function Compass({rootPath, initialView = 'navigator'}) {
       if (tasks.length > 0) {
         if (key.upArrow) { setActiveTaskId(prev => tasks[(tasks.findIndex(t => t.id === prev) - 1 + tasks.length) % tasks.length]?.id); return; }
         if (key.downArrow) { setActiveTaskId(prev => tasks[(tasks.findIndex(t => t.id === prev) + 1) % tasks.length]?.id); return; }
+        if (shiftCombo('k') && activeTaskId) {
+          handleKillTask(activeTaskId);
+          return;
+        }
+        if (shiftCombo('r') && activeTaskId) { setRenameMode(true); setRenameInput(activeTask.name); setRenameCursor(activeTask.name.length); return; }
       }
       if (key.return) { setMainView('navigator'); return; }
       return;
@@ -392,7 +424,10 @@ function Compass({rootPath, initialView = 'navigator'}) {
       setViewMode((prev) => (prev === 'detail' ? 'list' : 'detail'));
       return;
     }
-    if (shiftCombo('q')) { exit(); return; }
+    if (shiftCombo('q')) {
+      if (hasRunningTasks) setQuitConfirm(true); else exit();
+      return;
+    }
     if (shiftCombo('c') && viewMode === 'detail' && selectedProject) { setCustomMode(true); setCustomInput(''); setCustomCursor(0); return; }
     
     const actionKey = normalizedInput && ACTION_MAP[normalizedInput];
@@ -408,6 +443,10 @@ function Compass({rootPath, initialView = 'navigator'}) {
 
   const projectCountLabel = `${projects.length} project${projects.length === 1 ? '' : 's'}`;
 
+  if (quitConfirm) {
+    return create(Box, {flexDirection: 'column', borderStyle: 'round', borderColor: 'red', padding: 1}, create(Text, {bold: true, color: 'red'}, '⚠️ Confirm Exit'), create(Text, null, `There are ${tasks.filter(t=>t.status==='running').length} tasks still running in the background.`), create(Text, null, 'Are you sure you want to quit and stop all processes?'), create(Text, {marginTop: 1}, kleur.bold('Y') + ' to Quit, ' + kleur.bold('N') + ' to Cancel'));
+  }
+
   if (mainView === 'studio') return create(Studio);
 
   if (mainView === 'tasks') {
@@ -415,14 +454,16 @@ function Compass({rootPath, initialView = 'navigator'}) {
       Box,
       {flexDirection: 'column', borderStyle: 'round', borderColor: 'yellow', padding: 1},
       create(Text, {bold: true, color: 'yellow'}, '🛰️ Task Manager | Background Processes'),
-      create(Text, {dimColor: true, marginBottom: 1}, 'Select a task to view its output logs.'),
+      create(Text, {dimColor: true, marginBottom: 1}, 'Up/Down: focus, Shift+K: Kill/Delete, Shift+R: Rename'),
       ...tasks.map(t => create(
         Box,
-        {key: t.id, marginBottom: 0},
-        create(Text, {color: t.id === activeTaskId ? 'cyan' : 'white', bold: t.id === activeTaskId}, `${t.id === activeTaskId ? '→' : ' '} [${t.status.toUpperCase()}] ${t.name}`)
+        {key: t.id, marginBottom: 0, flexDirection: 'column'},
+        t.id === activeTaskId && renameMode 
+          ? create(Box, {flexDirection: 'row'}, create(Text, {color: 'cyan'}, '→ Rename to: '), create(CursorText, {value: renameInput, cursorIndex: renameCursor}))
+          : create(Text, {color: t.id === activeTaskId ? 'cyan' : 'white', bold: t.id === activeTaskId}, `${t.id === activeTaskId ? '→' : ' '} [${t.status.toUpperCase()}] ${t.name}`)
       )),
       !tasks.length && create(Text, {dimColor: true}, 'No active or background tasks.'),
-      create(Text, {marginTop: 1, dimColor: true}, 'Press Enter or Shift+T to return to Navigator, Up/Down to switch focus.')
+      create(Text, {marginTop: 1, dimColor: true}, 'Press Enter or Shift+T to return to Navigator.')
     );
   }
 
@@ -486,10 +527,6 @@ function Compass({rootPath, initialView = 'navigator'}) {
     detailContent.push(create(Text, {key: 'e-h', dimColor: true}, 'Press Enter on a project to reveal details.'));
   }
 
-  if (customMode) {
-    detailContent.push(create(Box, {key: 'ci-box', flexDirection: 'row'}, create(Text, {color: 'cyan'}, 'Type label|cmd (Enter: save, Esc: cancel): '), create(CursorText, {value: customInput, cursorIndex: customCursor})));
-  }
-
   const artTileNodes = [
     {label: 'Pulse', detail: projectCountLabel, accent: 'magenta', icon: '●', subtext: `Workspace · ${path.basename(rootPath) || rootPath}`},
     {label: 'Focus', detail: selectedProject?.name || 'Selection', accent: 'cyan', icon: '◆', subtext: `${selectedProject?.type || 'Stack'}`},
@@ -500,11 +537,11 @@ function Compass({rootPath, initialView = 'navigator'}) {
     create(Text, {dimColor: true}, tile.subtext)
   ));
 
-  const artBoard = create(Box, {flexDirection: 'column', marginTop: 1, borderStyle: 'round', borderColor: 'gray', padding: 1},
+  const artBoard = showArtBoard ? create(Box, {flexDirection: 'column', marginTop: 1, borderStyle: 'round', borderColor: 'gray', padding: 1},
     create(Box, {flexDirection: 'row', justifyContent: 'space-between'}, create(Text, {color: 'magenta', bold: true}, 'Art-coded build atlas'), create(Text, {dimColor: true}, 'press ? for overlay help')),
     create(Box, {flexDirection: 'row', marginTop: 1}, ...ART_CHARS.map((char, i) => create(Text, {key: i, color: ART_COLORS[i % ART_COLORS.length]}, char.repeat(2)))),
     create(Box, {flexDirection: 'row', marginTop: 1}, ...artTileNodes)
-  );
+  ) : null;
 
   const logs = activeTask?.logs || [];
   const logWindowStart = Math.max(0, logs.length - OUTPUT_WINDOW_SIZE - logOffset);
@@ -515,7 +552,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
   const helpCards = [
     {label: 'Navigation', color: 'magenta', body: ['↑ / ↓ move focus, Enter: details', 'Shift+↑ / ↓ scroll output', 'Shift+H toggle help cards', 'Shift+D detach from task']},
     {label: 'Commands', color: 'cyan', body: ['B / T / R build/test/run', '1-9 run detail commands', 'Shift+L rerun last command', 'Shift+X clear / Shift+E export']},
-    {label: 'Orbit & Studio', color: 'yellow', body: ['Shift+T task manager', 'Shift+A open Omni-Studio', 'Shift+C save custom action', 'Shift+Q quit application']}
+    {label: 'Orbit & Studio', color: 'yellow', body: ['Shift+T task manager', 'Shift+A studio / Shift+B art', 'Shift+C custom / Shift+Q quit']}
   ];
 
   const toggleHint = showHelpCards ? 'Shift+H hide help' : 'Shift+H show help';
@@ -533,11 +570,11 @@ function Compass({rootPath, initialView = 'navigator'}) {
       create(Box, {flexDirection: 'row', justifyContent: 'space-between'}, create(Text, {bold: true, color: 'yellow'}, `Output: ${activeTask?.name || 'None'}`), create(Text, {dimColor: true}, logOffset ? `Scrolled ${logOffset} lines` : 'Live log view')),
       create(Box, {flexDirection: 'column', borderStyle: 'round', borderColor: 'yellow', padding: 1, minHeight: OUTPUT_WINDOW_HEIGHT, maxHeight: OUTPUT_WINDOW_HEIGHT, height: OUTPUT_WINDOW_HEIGHT, overflow: 'hidden'}, ...logNodes),
       create(Box, {marginTop: 1, flexDirection: 'row', justifyContent: 'space-between'}, create(Text, {dimColor: true}, running ? 'Type to feed stdin; Enter: submit, Ctrl+C: abort.' : 'Run a command or press Shift+T to switch tasks.'), create(Text, {dimColor: true}, `${toggleHint}, Shift+S: Structure Guide`)),
-      create(Box, {marginTop: 1, flexDirection: 'row', borderStyle: 'round', borderColor: running ? 'green' : 'gray', paddingX: 1}, create(Text, {bold: true, color: 'green'}, running ? ' Stdin buffer ' : ' Input ready '), create(Box, {marginLeft: 1}, create(CursorText, {value: stdinBuffer || (running ? '' : 'Start a command to feed stdin'), cursorIndex: stdinCursor, active: running})))
+      create(Box, {marginTop: 1, flexDirection: 'row', borderStyle: 'round', borderColor: running ? 'green' : 'gray', paddingX: 1}, create(Text, {bold: true, color: running ? 'green' : 'white'}, running ? ' Stdin buffer ' : ' Input ready '), create(Box, {marginLeft: 1}, create(CursorText, {value: stdinBuffer || (running ? '' : 'Start a command to feed stdin'), cursorIndex: stdinCursor, active: running})))
     ),
     showHelpCards && create(Box, {marginTop: 1, flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap'}, ...helpCards.map((card, idx) => create(Box, {key: card.label, flexGrow: 1, flexBasis: 0, minWidth: HELP_CARD_MIN_WIDTH, marginRight: idx < 2 ? 1 : 0, marginBottom: 1, borderStyle: 'round', borderColor: card.color, padding: 1, flexDirection: 'column'}, create(Text, {color: card.color, bold: true, marginBottom: 1}, card.label), ...card.body.map((line, lidx) => create(Text, {key: lidx, dimColor: card.color === 'yellow'}, line))))),
     showStructureGuide && create(Box, {flexDirection: 'column', borderStyle: 'round', borderColor: 'blue', marginTop: 1, padding: 1}, create(Text, {color: 'cyan', bold: true}, 'Structure guide · press Shift+S to hide'), ...SCHEMA_GUIDE.map(e => create(Text, {key: e.type, dimColor: true}, `• ${e.icon} ${e.label}: ${e.files.join(', ')}`))),
-    showHelp && create(Box, {flexDirection: 'column', borderStyle: 'double', borderColor: 'cyan', marginTop: 1, padding: 1}, create(Text, {color: 'cyan', bold: true}, 'Help overlay'), create(Text, null, 'Shift+↑/↓ scrolls logs; Shift+X clears; Shift+E exports; Shift+A Studio; Shift+T Tasks; Shift+D Detach.'))
+    showHelp && create(Box, {flexDirection: 'column', borderStyle: 'double', borderColor: 'cyan', marginTop: 1, padding: 1}, create(Text, {color: 'cyan', bold: true}, 'Help overlay'), create(Text, null, 'Shift+↑/↓ scrolls logs; Shift+X clears; Shift+E exports; Shift+A Studio; Shift+T Tasks; Shift+D Detach; Shift+B Toggle Art.'))
   );
 }
 
@@ -574,10 +611,15 @@ async function main() {
     console.log('  Shift+A               Switch to Omni-Studio (Environment Health)');
     console.log('  Shift+T               Open Orbit Task Manager (Manage background processes)');
     console.log('  Shift+D               Detach from active task (Keep it running in background)');
+    console.log('  Shift+B               Toggle Art Board visibility');
     console.log('  Shift+X               Clear active task output log');
     console.log('  Shift+E               Export current logs to a .txt file');
     console.log('  Shift+↑ / ↓           Scroll the output logs');
-    console.log('  Shift+Q               Quit application');
+    console.log('  Shift+Q               Quit application (with confirmation if tasks run)');
+    console.log('');
+    console.log(kleur.bold('Task Manager (Shift+T):'));
+    console.log('  Shift+K               Kill active/selected task');
+    console.log('  Shift+R               Rename selected task');
     console.log('');
     console.log(kleur.bold('Execution shortcuts:'));
     console.log('  B / T / R             Quick run: Build / Test / Run');
