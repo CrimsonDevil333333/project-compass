@@ -4,6 +4,16 @@
 
 Project Compass is a high-performance, TUI (Terminal User Interface) workspace orchestrator built with Ink and React. It transforms your terminal into a command center for managing complex, multi-stack environments with a focus on speed, safety, and visual clarity.
 
+## 🛠️ Installation
+
+```bash
+npm install -g project-compass
+```
+
+## 🔗 Links
+- **NPM**: [npmjs.com/package/project-compass](https://www.npmjs.com/package/project-compass)
+- **GitHub**: [github.com/CrimsonDevil333333/project-compass](https://github.com/CrimsonDevil333333/project-compass)
+
 ![Navigator View](https://raw.githubusercontent.com/CrimsonDevil333333/project-compass/master/assets/screenshots/navigator.jpg)
 
 ## 🌟 Premium Features
@@ -61,12 +71,6 @@ Project Compass is a high-performance, TUI (Terminal User Interface) workspace o
 - **Process Protection**: Compass won't let you accidentally kill your work. If tasks are running, a dedicated confirmation dialog ensures you intended to quit.
 
 ![Exit Confirmation](https://raw.githubusercontent.com/CrimsonDevil333333/project-compass/master/assets/screenshots/exit-confirm.jpg)
-
-## 🛠️ Installation
-
-```bash
-npm install -g project-compass
-```
 
 ## 🚀 Vision
 Project Compass is designed to be the "Last Terminal Tool" you ever need to open. It bridges the gap between raw CLI commands and full IDEs, giving you a professional, reactive cockpit for all your development work.
