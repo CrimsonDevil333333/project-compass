@@ -39,13 +39,15 @@ function loadConfig() {
       return {
         customCommands: {},
         showArtBoard: true,
+        showHelpCards: false,
+        showStructureGuide: false,
         ...parsed,
       };
     }
   } catch (error) {
     console.error(`Ignoring corrupt config: ${error.message}`);
   }
-  return {customCommands: {}, showArtBoard: true};
+  return {customCommands: {}, showArtBoard: true, showHelpCards: false, showStructureGuide: false};
 }
 
 function useScanner(rootPath) {
@@ -176,8 +178,6 @@ function Compass({rootPath, initialView = 'navigator'}) {
   const [renameCursor, setRenameCursor] = useState(0);
   const [quitConfirm, setQuitConfirm] = useState(false);
   const [config, setConfig] = useState(() => loadConfig());
-  const [showHelpCards, setShowHelpCards] = useState(false);
-  const [showStructureGuide, setShowStructureGuide] = useState(false);
   const [stdinBuffer, setStdinBuffer] = useState('');
   const [stdinCursor, setStdinCursor] = useState(0);
   const [showHelp, setShowHelp] = useState(false);
@@ -354,8 +354,22 @@ function Compass({rootPath, initialView = 'navigator'}) {
     const normalizedInput = input?.toLowerCase();
     const shiftCombo = (char) => key.shift && normalizedInput === char;
     
-    if (shiftCombo('h')) { setShowHelpCards((prev) => !prev); return; }
-    if (shiftCombo('s')) { setShowStructureGuide((prev) => !prev); return; }
+    if (shiftCombo('h')) { 
+      setConfig(prev => {
+        const next = {...prev, showHelpCards: !prev.showHelpCards};
+        saveConfig(next);
+        return next;
+      });
+      return; 
+    }
+    if (shiftCombo('s')) { 
+      setConfig(prev => {
+        const next = {...prev, showStructureGuide: !prev.showStructureGuide};
+        saveConfig(next);
+        return next;
+      });
+      return; 
+    }
     if (shiftCombo('a')) { setMainView((prev) => (prev === 'navigator' ? 'studio' : 'navigator')); return; }
     if (shiftCombo('x')) { setTasks(prev => prev.map(t => t.id === activeTaskId ? {...t, logs: []} : t)); setLogOffset(0); return; }
     if (shiftCombo('e')) { exportLogs(); return; }
@@ -561,10 +575,10 @@ function Compass({rootPath, initialView = 'navigator'}) {
   const helpCards = [
     {label: 'Navigation', color: 'magenta', body: ['↑ / ↓ move focus, Enter: details', 'Shift+↑ / ↓ scroll output', 'Shift+H toggle help cards', 'Shift+D detach from task']},
     {label: 'Commands', color: 'cyan', body: ['B / T / R build/test/run', '1-9 run detail commands', 'Shift+L rerun last command', 'Shift+X clear / Shift+E export']},
-    {label: 'Orbit & Studio', color: 'yellow', body: ['Shift+T task manager', 'Shift+A studio / Shift+B art', 'Shift+C custom / Shift+Q quit']}
+    {label: 'Orbit & Studio', color: 'yellow', body: ['Shift+T task manager', 'Shift+A studio / Shift+B art board', 'Shift+S structure / Shift+Q quit']}
   ];
 
-  const toggleHint = showHelpCards ? 'Shift+H hide help' : 'Shift+H show help';
+  const toggleHint = config.showHelpCards ? 'Shift+H hide help' : 'Shift+H show help';
   return create(Box, {flexDirection: 'column', padding: 1},
     create(Box, {justifyContent: 'space-between'},
       create(Box, {flexDirection: 'column'}, create(Text, {color: 'magenta', bold: true}, 'Project Compass'), create(Text, {dimColor: true}, `${projectCountLabel} detected in ${rootPath}`)),
@@ -581,8 +595,8 @@ function Compass({rootPath, initialView = 'navigator'}) {
       create(Box, {marginTop: 1, flexDirection: 'row', justifyContent: 'space-between'}, create(Text, {dimColor: true}, running ? 'Type to feed stdin; Enter: submit, Ctrl+C: abort.' : 'Run a command or press Shift+T to switch tasks.'), create(Text, {dimColor: true}, `${toggleHint}, Shift+S: Structure Guide`)),
       create(Box, {marginTop: 1, flexDirection: 'row', borderStyle: 'round', borderColor: running ? 'green' : 'gray', paddingX: 1}, create(Text, {bold: true, color: running ? 'green' : 'white'}, running ? ' Stdin buffer ' : ' Input ready '), create(Box, {marginLeft: 1}, create(CursorText, {value: stdinBuffer || (running ? '' : 'Start a command to feed stdin'), cursorIndex: stdinCursor, active: running})))
     ),
-    showHelpCards && create(Box, {marginTop: 1, flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap'}, ...helpCards.map((card, idx) => create(Box, {key: card.label, flexGrow: 1, flexBasis: 0, minWidth: HELP_CARD_MIN_WIDTH, marginRight: idx < 2 ? 1 : 0, marginBottom: 1, borderStyle: 'round', borderColor: card.color, padding: 1, flexDirection: 'column'}, create(Text, {color: card.color, bold: true, marginBottom: 1}, card.label), ...card.body.map((line, lidx) => create(Text, {key: lidx, dimColor: card.color === 'yellow'}, line))))),
-    showStructureGuide && create(Box, {flexDirection: 'column', borderStyle: 'round', borderColor: 'blue', marginTop: 1, padding: 1}, create(Text, {color: 'cyan', bold: true}, 'Structure guide · press Shift+S to hide'), ...SCHEMA_GUIDE.map(e => create(Text, {key: e.type, dimColor: true}, `• ${e.icon} ${e.label}: ${e.files.join(', ')}`))),
+    config.showHelpCards && create(Box, {marginTop: 1, flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap'}, ...helpCards.map((card, idx) => create(Box, {key: card.label, flexGrow: 1, flexBasis: 0, minWidth: HELP_CARD_MIN_WIDTH, marginRight: idx < 2 ? 1 : 0, marginBottom: 1, borderStyle: 'round', borderColor: card.color, padding: 1, flexDirection: 'column'}, create(Text, {color: card.color, bold: true, marginBottom: 1}, card.label), ...card.body.map((line, lidx) => create(Text, {key: lidx, dimColor: card.color === 'yellow'}, line))))),
+    config.showStructureGuide && create(Box, {flexDirection: 'column', borderStyle: 'round', borderColor: 'blue', marginTop: 1, padding: 1}, create(Text, {color: 'cyan', bold: true}, 'Structure guide · press Shift+S to hide'), ...SCHEMA_GUIDE.map(e => create(Text, {key: e.type, dimColor: true}, `• ${e.icon} ${e.label}: ${e.files.join(', ')}`))),
     showHelp && create(Box, {flexDirection: 'column', borderStyle: 'double', borderColor: 'cyan', marginTop: 1, padding: 1}, create(Text, {color: 'cyan', bold: true}, 'Help overlay'), create(Text, null, 'Shift+↑/↓ scrolls logs; Shift+X clears; Shift+E exports; Shift+A Studio; Shift+T Tasks; Shift+D Detach; Shift+B Toggle Art.'))
   );
 }
@@ -621,6 +635,8 @@ async function main() {
     console.log('  Shift+T               Open Orbit Task Manager (Manage background processes)');
     console.log('  Shift+D               Detach from active task (Keep it running in background)');
     console.log('  Shift+B               Toggle Art Board visibility');
+    console.log('  Shift+H               Toggle Help Cards visibility');
+    console.log('  Shift+S               Toggle Structure Guide visibility');
     console.log('  Shift+X               Clear active task output log');
     console.log('  Shift+E               Export current logs to a .txt file');
     console.log('  Shift+↑ / ↓           Scroll the output logs');
