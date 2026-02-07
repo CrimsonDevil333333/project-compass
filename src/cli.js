@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState, memo} from 'react';
 import {render, Box, Text, useApp, useInput} from 'ink';
 import path from 'path';
 import fs from 'fs';
@@ -90,7 +90,7 @@ function buildDetailCommands(project, config) {
   return [...builtins, ...custom];
 }
 
-function Studio() {
+const Studio = memo(() => {
   const [runtimes, setRuntimes] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -145,7 +145,7 @@ function Studio() {
           create(Text, {dimColor: true}, 'Press Shift+A to return to Navigator.')
         )
   );
-}
+});
 
 function CursorText({value, cursorIndex, active = true}) {
   const before = value.slice(0, cursorIndex);
@@ -160,6 +160,32 @@ function CursorText({value, cursorIndex, active = true}) {
     after
   );
 }
+
+const OutputPanel = memo(({activeTask, logOffset}) => {
+  const logs = activeTask?.logs || [];
+  const logWindowStart = Math.max(0, logs.length - OUTPUT_WINDOW_SIZE - logOffset);
+  const logWindowEnd = Math.max(0, logs.length - logOffset);
+  const visibleLogs = logs.slice(logWindowStart, logWindowEnd);
+  
+  const logNodes = visibleLogs.length 
+    ? visibleLogs.map((line, i) => create(Text, {key: i}, line)) 
+    : [create(Text, {key: 'empty', dimColor: true}, 'Select a task or run a command to see logs.')];
+
+  return create(
+    Box,
+    {
+      flexDirection: 'column',
+      borderStyle: 'round',
+      borderColor: 'yellow',
+      padding: 1,
+      minHeight: OUTPUT_WINDOW_HEIGHT,
+      maxHeight: OUTPUT_WINDOW_HEIGHT,
+      height: OUTPUT_WINDOW_HEIGHT,
+      overflow: 'hidden'
+    },
+    ...logNodes
+  );
+});
 
 function Compass({rootPath, initialView = 'navigator'}) {
   const {exit} = useApp();
@@ -494,67 +520,66 @@ function Compass({rootPath, initialView = 'navigator'}) {
     );
   }
 
-  const projectRows = [];
-  if (loading) projectRows.push(create(Text, {key: 'scanning', dimColor: true}, 'Scanning projects…'));
-  if (error) projectRows.push(create(Text, {key: 'error', color: 'red'}, `Unable to scan: ${error}`));
-  if (!loading && !error && projects.length === 0) projectRows.push(create(Text, {key: 'empty', dimColor: true}, 'No recognizable project manifests found.'));
-  
-  if (!loading) {
-    projects.forEach((project, index) => {
+  const projectRows = useMemo(() => {
+    if (loading) return [create(Text, {key: 'scanning', dimColor: true}, 'Scanning projects…')];
+    if (error) return [create(Text, {key: 'error', color: 'red'}, `Unable to scan: ${error}`)];
+    if (projects.length === 0) return [create(Text, {key: 'empty', dimColor: true}, 'No recognizable project manifests found.')];
+    
+    return projects.map((project, index) => {
       const isSelected = index === selectedIndex;
       const frameworkBadges = (project.frameworks || []).map((frame) => `${frame.icon} ${frame.name}`).join(', ');
       const hasMissingRuntime = project.missingBinaries && project.missingBinaries.length > 0;
-      projectRows.push(
+      return create(
+        Box,
+        {key: project.id, flexDirection: 'column', marginBottom: 1, padding: 1},
         create(
           Box,
-          {key: project.id, flexDirection: 'column', marginBottom: 1, padding: 1},
-          create(
-            Box,
-            {flexDirection: 'row'},
-            create(Text, {color: isSelected ? 'cyan' : 'white', bold: isSelected}, `${project.icon} ${project.name}`),
-            hasMissingRuntime && create(Text, {color: 'red', bold: true}, '  ⚠️ Runtime missing')
-          ),
-          create(Text, {dimColor: true}, `  ${project.type} · ${path.relative(rootPath, project.path) || '.'}`),
-          frameworkBadges && create(Text, {dimColor: true}, `   ${frameworkBadges}`)
-        )
+          {flexDirection: 'row'},
+          create(Text, {color: isSelected ? 'cyan' : 'white', bold: isSelected}, `${project.icon} ${project.name}`),
+          hasMissingRuntime && create(Text, {color: 'red', bold: true}, '  ⚠️ Runtime missing')
+        ),
+        create(Text, {dimColor: true}, `  ${project.type} · ${path.relative(rootPath, project.path) || '.'}`),
+        frameworkBadges && create(Text, {dimColor: true}, `   ${frameworkBadges}`)
       );
     });
-  }
+  }, [loading, error, projects, selectedIndex, rootPath]);
 
-  const detailContent = [];
-  if (viewMode === 'detail' && selectedProject) {
-    detailContent.push(
+  const detailContent = useMemo(() => {
+    if (viewMode !== 'detail' || !selectedProject) {
+      return [create(Text, {key: 'e-h', dimColor: true}, 'Press Enter on a project to reveal details.')];
+    }
+    
+    const content = [
       create(Box, {key: 'title-row', flexDirection: 'row'}, 
         create(Text, {color: 'cyan', bold: true}, `${selectedProject.icon} ${selectedProject.name}`),
         selectedProject.missingBinaries && selectedProject.missingBinaries.length > 0 && create(Text, {color: 'red', bold: true}, '  ⚠️ MISSING RUNTIME')
       ),
       create(Text, {key: 'manifest', dimColor: true}, `${selectedProject.type} · ${selectedProject.manifest || 'detected manifest'}`),
       create(Text, {key: 'loc', dimColor: true}, `Location: ${path.relative(rootPath, selectedProject.path) || '.'}`)
-    );
-    if (selectedProject.description) detailContent.push(create(Text, {key: 'desc'}, selectedProject.description));
+    ];
+    if (selectedProject.description) content.push(create(Text, {key: 'desc'}, selectedProject.description));
     const frameworks = (selectedProject.frameworks || []).map((lib) => `${lib.icon} ${lib.name}`).join(', ');
-    if (frameworks) detailContent.push(create(Text, {key: 'frames', dimColor: true}, `Frameworks: ${frameworks}`));
+    if (frameworks) content.push(create(Text, {key: 'frames', dimColor: true}, `Frameworks: ${frameworks}`));
     
     if (selectedProject.missingBinaries && selectedProject.missingBinaries.length > 0) {
-      detailContent.push(
+      content.push(
         create(Text, {key: 'm-t', color: 'red', bold: true, marginTop: 1}, 'MISSING BINARIES:'),
         create(Text, {key: 'm-l', color: 'red'}, `Please install: ${selectedProject.missingBinaries.join(', ')}`)
       );
     }
 
-    detailContent.push(create(Text, {key: 'cmd-header', bold: true, marginTop: 1}, 'Commands'));
+    content.push(create(Text, {key: 'cmd-header', bold: true, marginTop: 1}, 'Commands'));
     detailedIndexed.forEach((command) => {
-      detailContent.push(
+      content.push(
         create(Text, {key: `d-${command.shortcut}`}, `${command.shortcut}. ${command.label} ${command.source === 'custom' ? kleur.magenta('(custom)') : command.source === 'framework' ? kleur.cyan('(framework)') : ''}`),
         create(Text, {key: `dl-${command.shortcut}`, dimColor: true}, `   ↳ ${command.command.join(' ')}`)
       );
     });
-    detailContent.push(create(Text, {key: 'h-l', dimColor: true, marginTop: 1}, 'Press Shift+C → label|cmd to save custom actions, Enter to close detail view.'));
-  } else {
-    detailContent.push(create(Text, {key: 'e-h', dimColor: true}, 'Press Enter on a project to reveal details.'));
-  }
+    content.push(create(Text, {key: 'h-l', dimColor: true, marginTop: 1}, 'Press Shift+C → label|cmd to save custom actions, Enter to close detail view.'));
+    return content;
+  }, [viewMode, selectedProject, rootPath, detailedIndexed]);
 
-  const artTileNodes = [
+  const artTileNodes = useMemo(() => [
     {label: 'Pulse', detail: projectCountLabel, accent: 'magenta', icon: '●', subtext: `Workspace · ${path.basename(rootPath) || rootPath}`},
     {label: 'Focus', detail: selectedProject?.name || 'Selection', accent: 'cyan', icon: '◆', subtext: `${selectedProject?.type || 'Stack'}`},
     {label: 'Orbit', detail: `${tasks.length} active tasks`, accent: 'yellow', icon: '■', subtext: running ? 'Busy streaming...' : 'Idle'}
@@ -562,7 +587,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
     create(Text, {color: tile.accent, bold: true}, `${tile.icon} ${tile.label}`),
     create(Text, {bold: true}, tile.detail),
     create(Text, {dimColor: true}, tile.subtext)
-  ));
+  )), [projectCountLabel, rootPath, selectedProject, tasks.length, running]);
 
   const artBoard = config.showArtBoard ? create(Box, {flexDirection: 'column', marginTop: 1, borderStyle: 'round', borderColor: 'gray', padding: 1},
     create(Box, {flexDirection: 'row', justifyContent: 'space-between'}, create(Text, {color: 'magenta', bold: true}, 'Art-coded build atlas'), create(Text, {dimColor: true}, 'press ? for overlay help')),
@@ -570,16 +595,10 @@ function Compass({rootPath, initialView = 'navigator'}) {
     create(Box, {flexDirection: 'row', marginTop: 1}, ...artTileNodes)
   ) : null;
 
-  const logs = activeTask?.logs || [];
-  const logWindowStart = Math.max(0, logs.length - OUTPUT_WINDOW_SIZE - logOffset);
-  const logWindowEnd = Math.max(0, logs.length - logOffset);
-  const visibleLogs = logs.slice(logWindowStart, logWindowEnd);
-  const logNodes = visibleLogs.length ? visibleLogs.map((line, i) => create(Text, {key: i}, line)) : [create(Text, {dimColor: true}, 'Select a task or run a command to see logs.')];
-
   const helpCards = [
     {label: 'Navigation', color: 'magenta', body: ['↑ / ↓ move focus, Enter: details', 'Shift+↑ / ↓ scroll output', 'Shift+H toggle help cards', 'Shift+D detach from task']},
     {label: 'Commands', color: 'cyan', body: ['B / T / R build/test/run', '1-9 run detail commands', 'Shift+L rerun last command', 'Shift+X clear / Shift+E export']},
-    {label: 'Orbit & Studio', color: 'yellow', body: ['Shift+T task manager', 'Shift+A studio / Shift+B art board', 'Shift+S structure / Shift+Q quit']}
+    {label: 'Orbit & Studio', color: 'yellow', body: ['Shift+T task manager', 'Shift+A studio / Shift+B art board', 'Shift+C custom / Shift+Q quit']}
   ];
 
   return create(Box, {flexDirection: 'column', padding: 1},
@@ -597,7 +616,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
     ),
     create(Box, {marginTop: 1, flexDirection: 'column'},
       create(Box, {flexDirection: 'row', justifyContent: 'space-between'}, create(Text, {bold: true, color: 'yellow'}, `Output: ${activeTask?.name || 'None'}`), create(Text, {dimColor: true}, logOffset ? `Scrolled ${logOffset} lines` : 'Live log view')),
-      create(Box, {flexDirection: 'column', borderStyle: 'round', borderColor: 'yellow', padding: 1, minHeight: OUTPUT_WINDOW_HEIGHT, maxHeight: OUTPUT_WINDOW_HEIGHT, height: OUTPUT_WINDOW_HEIGHT, overflow: 'hidden'}, ...logNodes),
+      create(OutputPanel, {activeTask, logOffset}),
       create(Box, {marginTop: 1, flexDirection: 'row', justifyContent: 'space-between'}, create(Text, {dimColor: true}, running ? 'Type to feed stdin; Enter: submit, Ctrl+C: abort.' : 'Run a command or press Shift+T to switch tasks.'), create(Text, {dimColor: true}, `${toggleHint}, Shift+S: Structure Guide`)),
       create(Box, {marginTop: 1, flexDirection: 'row', borderStyle: 'round', borderColor: running ? 'green' : 'gray', paddingX: 1}, create(Text, {bold: true, color: running ? 'green' : 'white'}, running ? ' Stdin buffer ' : ' Input ready '), create(Box, {marginLeft: 1}, create(CursorText, {value: stdinBuffer || (running ? '' : 'Start a command to feed stdin'), cursorIndex: stdinCursor, active: running})))
     ),
