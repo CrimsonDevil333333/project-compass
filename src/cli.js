@@ -1,23 +1,28 @@
 #!/usr/bin/env node
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {render, Box, Text, useApp, useInput} from 'ink';
-import fastGlob from 'fast-glob';
 import path from 'path';
 import fs from 'fs';
-import os from 'os';
 import kleur from 'kleur';
 import {execa} from 'execa';
+import {discoverProjects, SCHEMA_GUIDE} from './projectDetection.js';
+import {CONFIG_PATH, PLUGIN_FILE, ensureConfigDir} from './configPaths.js';
 
 const create = React.createElement;
-const CONFIG_DIR = path.join(os.homedir(), '.project-compass');
-const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
-const PLUGIN_FILE = path.join(CONFIG_DIR, 'plugins.json');
 const DEFAULT_CONFIG = {customCommands: {}};
-function ensureConfigDir() {
-  if (!fs.existsSync(CONFIG_DIR)) {
-    fs.mkdirSync(CONFIG_DIR, {recursive: true});
-  }
-}
+const ART_CHARS = ['▁', '▃', '▄', '▅', '▇'];
+const ART_COLORS = ['magenta', 'blue', 'cyan', 'yellow', 'red'];
+const OUTPUT_WINDOW_SIZE = 8;
+const OUTPUT_WINDOW_HEIGHT = OUTPUT_WINDOW_SIZE + 2;
+const PROJECTS_MIN_WIDTH = 32;
+const DETAILS_MIN_WIDTH = 44;
+const HELP_CARD_MIN_WIDTH = 28;
+const RECENT_RUN_LIMIT = 5;
+const ACTION_MAP = {
+  b: 'build',
+  t: 'test',
+  r: 'run'
+};
 
 function saveConfig(config) {
   try {
@@ -47,730 +52,6 @@ function loadConfig() {
   }
   return {...DEFAULT_CONFIG};
 }
-
-function parseCommandTokens(value) {
-  if (Array.isArray(value)) {
-    return value.map((token) => String(token));
-  }
-  if (typeof value === 'string') {
-    return value.trim().split(/\s+/).filter(Boolean);
-  }
-  return [];
-}
-
-function resolveScriptCommand(project, scriptName, fallback = null) {
-  const scripts = project.metadata?.scripts || {};
-  if (Object.prototype.hasOwnProperty.call(scripts, scriptName)) {
-    return ['npm', 'run', scriptName];
-  }
-  if (typeof fallback === 'function') {
-    return fallback();
-  }
-  return fallback;
-}
-
-function gatherNodeDependencies(pkg) {
-  const deps = new Set();
-  ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'].forEach((key) => {
-    if (pkg[key]) {
-      Object.keys(pkg[key]).forEach((name) => deps.add(name));
-    }
-  });
-  return Array.from(deps);
-}
-
-function gatherPythonDependencies(projectPath) {
-  const set = new Set();
-  const addFromFile = (filePath) => {
-    if (!fs.existsSync(filePath)) {
-      return;
-    }
-    const raw = fs.readFileSync(filePath, 'utf-8');
-    raw.split(/\r?\n/).forEach((line) => {
-      const clean = line.trim().split('#')[0].trim();
-      if (clean) {
-        const token = clean.split(/[>=<=~!]/)[0].trim().toLowerCase();
-        if (token) {
-          set.add(token);
-        }
-      }
-    });
-  };
-  addFromFile(path.join(projectPath, 'requirements.txt'));
-  const pyproject = path.join(projectPath, 'pyproject.toml');
-  if (fs.existsSync(pyproject)) {
-    const content = fs.readFileSync(pyproject, 'utf-8').toLowerCase();
-    const matches = content.match(/\b[a-z0-9-_/]+\b/g);
-    (matches || []).forEach((match) => {
-      if (match) {
-        set.add(match);
-      }
-    });
-  }
-  return Array.from(set);
-}
-
-function dependencyMatches(project, needle) {
-  const dependencies = (project.metadata?.dependencies || []).map((dep) => dep.toLowerCase());
-  const target = needle.toLowerCase();
-  return dependencies.some((value) => value === target || value.startsWith(`${target}@`) || value.includes(`/${target}`));
-}
-
-function hasProjectFile(project, file) {
-  return fs.existsSync(path.join(project.path, file));
-}
-
-
-const builtInFrameworks = [
-  {
-    id: 'next',
-    name: 'Next.js',
-    icon: '🧭',
-    description: 'React + Next.js (SSR/SSG) apps',
-    languages: ['Node.js'],
-    priority: 115,
-    match(project) {
-      const hasNextConfig = fs.existsSync(path.join(project.path, 'next.config.js'));
-      return dependencyMatches(project, 'next') || hasNextConfig;
-    },
-    commands(project) {
-      const commands = {};
-      const add = (key, label, fallback) => {
-        const tokens = resolveScriptCommand(project, key, fallback);
-        if (tokens) {
-          commands[key] = {label, command: tokens, source: 'framework'};
-        }
-      };
-      const buildFallback = () => ['npx', 'next', 'build'];
-      const startFallback = () => ['npx', 'next', 'start'];
-      const devFallback = () => ['npx', 'next', 'dev'];
-      add('run', 'Next dev', devFallback);
-      add('build', 'Next build', buildFallback);
-      add('test', 'Next test', () => ['npm', 'run', 'test']);
-      add('start', 'Next start', startFallback);
-      return commands;
-    }
-  },
-  {
-    id: 'react',
-    name: 'React',
-    icon: '⚛️',
-    description: 'React apps (CRA, Vite React)',
-    languages: ['Node.js'],
-    priority: 112,
-    match(project) {
-      return dependencyMatches(project, 'react') && (dependencyMatches(project, 'react-scripts') || dependencyMatches(project, 'vite') || hasProjectFile(project, 'vite.config.js'));
-    },
-    commands(project) {
-      const commands = {};
-      const add = (key, label, fallback) => {
-        const tokens = resolveScriptCommand(project, key, fallback);
-        if (tokens) {
-          commands[key] = {label, command: tokens, source: 'framework'};
-        }
-      };
-      add('run', 'React dev', () => ['npm', 'run', 'dev']);
-      add('build', 'React build', () => ['npm', 'run', 'build']);
-      add('test', 'React test', () => ['npm', 'run', 'test']);
-      return commands;
-    }
-  },
-  {
-    id: 'vue',
-    name: 'Vue.js',
-    icon: '🟩',
-    description: 'Vue CLI or Vite + Vue apps',
-    languages: ['Node.js'],
-    priority: 111,
-    match(project) {
-      return dependencyMatches(project, 'vue') && (hasProjectFile(project, 'vue.config.js') || dependencyMatches(project, '@vue/cli-service') || dependencyMatches(project, 'vite'));
-    },
-    commands(project) {
-      const commands = {};
-      const add = (key, label, fallback) => {
-        const tokens = resolveScriptCommand(project, key, fallback);
-        if (tokens) {
-          commands[key] = {label, command: tokens, source: 'framework'};
-        }
-      };
-      add('run', 'Vue dev', () => ['npm', 'run', 'dev']);
-      add('build', 'Vue build', () => ['npm', 'run', 'build']);
-      add('test', 'Vue test', () => ['npm', 'run', 'test']);
-      return commands;
-    }
-  },
-  {
-    id: 'nest',
-    name: 'NestJS',
-    icon: '🛡️',
-    description: 'NestJS backend',
-    languages: ['Node.js'],
-    priority: 110,
-    match(project) {
-      return dependencyMatches(project, '@nestjs/cli') || dependencyMatches(project, '@nestjs/core');
-    },
-    commands(project) {
-      const commands = {};
-      const add = (key, label, fallback) => {
-        const tokens = resolveScriptCommand(project, key, fallback);
-        if (tokens) {
-          commands[key] = {label, command: tokens, source: 'framework'};
-        }
-      };
-      add('run', 'Nest dev', () => ['npm', 'run', 'start:dev']);
-      add('build', 'Nest build', () => ['npm', 'run', 'build']);
-      add('test', 'Nest test', () => ['npm', 'run', 'test']);
-      return commands;
-    }
-  },
-  {
-    id: 'angular',
-    name: 'Angular',
-    icon: '🅰️',
-    description: 'Angular CLI projects',
-    languages: ['Node.js'],
-    priority: 109,
-    match(project) {
-      return hasProjectFile(project, 'angular.json') || dependencyMatches(project, '@angular/cli');
-    },
-    commands(project) {
-      const commands = {};
-      const add = (key, label, fallback) => {
-        const tokens = resolveScriptCommand(project, key, fallback);
-        if (tokens) {
-          commands[key] = {label, command: tokens, source: 'framework'};
-        }
-      };
-      add('run', 'Angular serve', () => ['npm', 'run', 'start']);
-      add('build', 'Angular build', () => ['npm', 'run', 'build']);
-      add('test', 'Angular test', () => ['npm', 'run', 'test']);
-      return commands;
-    }
-  },
-  {
-    id: 'sveltekit',
-    name: 'SvelteKit',
-    icon: '🌀',
-    description: 'SvelteKit apps',
-    languages: ['Node.js'],
-    priority: 108,
-    match(project) {
-      return hasProjectFile(project, 'svelte.config.js') || dependencyMatches(project, '@sveltejs/kit');
-    },
-    commands(project) {
-      const commands = {};
-      const add = (key, label, fallback) => {
-        const tokens = resolveScriptCommand(project, key, fallback);
-        if (tokens) {
-          commands[key] = {label, command: tokens, source: 'framework'};
-        }
-      };
-      add('run', 'SvelteKit dev', () => ['npm', 'run', 'dev']);
-      add('build', 'SvelteKit build', () => ['npm', 'run', 'build']);
-      add('test', 'SvelteKit test', () => ['npm', 'run', 'test']);
-      add('preview', 'SvelteKit preview', () => ['npm', 'run', 'preview']);
-      return commands;
-    }
-  },
-  {
-    id: 'nuxt',
-    name: 'Nuxt',
-    icon: '🪄',
-    description: 'Nuxt.js / Vue SSR',
-    languages: ['Node.js'],
-    priority: 107,
-    match(project) {
-      return hasProjectFile(project, 'nuxt.config.js') || dependencyMatches(project, 'nuxt');
-    },
-    commands(project) {
-      const commands = {};
-      const add = (key, label, fallback) => {
-        const tokens = resolveScriptCommand(project, key, fallback);
-        if (tokens) {
-          commands[key] = {label, command: tokens, source: 'framework'};
-        }
-      };
-      add('run', 'Nuxt dev', () => ['npm', 'run', 'dev']);
-      add('build', 'Nuxt build', () => ['npm', 'run', 'build']);
-      add('start', 'Nuxt start', () => ['npm', 'run', 'start']);
-      return commands;
-    }
-  },
-  {
-    id: 'astro',
-    name: 'Astro',
-    icon: '✨',
-    description: 'Astro static sites',
-    languages: ['Node.js'],
-    priority: 106,
-    match(project) {
-      const matches = ['astro.config.mjs', 'astro.config.ts'].some((file) => hasProjectFile(project, file));
-      return matches || dependencyMatches(project, 'astro');
-    },
-    commands(project) {
-      const commands = {};
-      const add = (key, label, fallback) => {
-        const tokens = resolveScriptCommand(project, key, fallback);
-        if (tokens) {
-          commands[key] = {label, command: tokens, source: 'framework'};
-        }
-      };
-      add('run', 'Astro dev', () => ['npm', 'run', 'dev']);
-      add('build', 'Astro build', () => ['npm', 'run', 'build']);
-      add('preview', 'Astro preview', () => ['npm', 'run', 'preview']);
-      return commands;
-    }
-  },
-  {
-    id: 'django',
-    name: 'Django',
-    icon: '🌿',
-    description: 'Django web application',
-    languages: ['Python'],
-    priority: 110,
-    match(project) {
-      return dependencyMatches(project, 'django') || hasProjectFile(project, 'manage.py');
-    },
-    commands(project) {
-      const managePath = path.join(project.path, 'manage.py');
-      if (!fs.existsSync(managePath)) {
-        return {};
-      }
-      return {
-        run: {label: 'Django runserver', command: ['python', 'manage.py', 'runserver'], source: 'framework'},
-        test: {label: 'Django test', command: ['python', 'manage.py', 'test'], source: 'framework'},
-        migrate: {label: 'Django migrate', command: ['python', 'manage.py', 'migrate'], source: 'framework'}
-      };
-    }
-  },
-  {
-    id: 'flask',
-    name: 'Flask',
-    icon: '🍶',
-    description: 'Flask microservices',
-    languages: ['Python'],
-    priority: 105,
-    match(project) {
-      return dependencyMatches(project, 'flask') || hasProjectFile(project, 'app.py');
-    },
-    commands(project) {
-      const commands = {};
-      const entry = hasProjectFile(project, 'app.py') ? 'app.py' : 'main.py';
-      commands.run = {label: 'Flask app', command: ['python', entry], source: 'framework'};
-      commands.test = {label: 'Pytest', command: ['pytest'], source: 'framework'};
-      return commands;
-    }
-  },
-  {
-    id: 'fastapi',
-    name: 'FastAPI',
-    icon: '⚡',
-    description: 'FastAPI + Uvicorn',
-    languages: ['Python'],
-    priority: 105,
-    match(project) {
-      return dependencyMatches(project, 'fastapi');
-    },
-    commands(project) {
-      const entry = hasProjectFile(project, 'main.py') ? 'main.py' : 'app.py';
-      return {
-        run: {label: 'Uvicorn reload', command: ['uvicorn', `${entry.split('.')[0]}:app`, '--reload'], source: 'framework'},
-        test: {label: 'Pytest', command: ['pytest'], source: 'framework'}
-      };
-    }
-  },
-  {
-    id: 'spring',
-    name: 'Spring Boot',
-    icon: '🌱',
-    description: 'Spring Boot apps',
-    languages: ['Java'],
-    priority: 105,
-    match(project) {
-      return dependencyMatches(project, 'spring-boot-starter') || hasProjectFile(project, 'src/main/java');
-    },
-    commands(project) {
-      const hasMvnw = fs.existsSync(path.join(project.path, 'mvnw'));
-      const base = hasMvnw ? './mvnw' : 'mvn';
-      return {
-        run: {label: 'Spring Boot run', command: [base, 'spring-boot:run'], source: 'framework'},
-        build: {label: 'Maven package', command: [base, 'package'], source: 'framework'},
-        test: {label: 'Maven test', command: [base, 'test'], source: 'framework'}
-      };
-    }
-  }
-];
-function loadUserFrameworks() {
-  ensureConfigDir();
-  try {
-    if (!fs.existsSync(PLUGIN_FILE)) {
-      return [];
-    }
-    const payload = JSON.parse(fs.readFileSync(PLUGIN_FILE, 'utf-8') || '{}');
-    const plugins = payload.plugins || [];
-    return plugins.map((entry) => {
-      const normalizedId = entry.id || (entry.name ? entry.name.toLowerCase().replace(/\s+/g, '-') : `plugin-${Math.random().toString(36).slice(2, 8)}`);
-      const commands = {};
-      Object.entries(entry.commands || {}).forEach(([key, value]) => {
-        const command = parseCommandTokens(typeof value === 'object' ? value.command : value);
-        if (!command.length) {
-          return;
-        }
-        commands[key] = {
-          label: typeof value === 'object' ? value.label || key : key,
-          command,
-          source: 'plugin'
-        };
-      });
-      return {
-        id: normalizedId,
-        name: entry.name || normalizedId,
-        icon: entry.icon || '🧩',
-        description: entry.description || '',
-        languages: entry.languages || [],
-        files: entry.files || [],
-        dependencies: entry.dependencies || [],
-        scripts: entry.scripts || [],
-        priority: Number.isFinite(entry.priority) ? entry.priority : 70,
-        commands,
-        match: entry.match
-      };
-    })
-    .filter((plugin) => plugin.name && plugin.commands && Object.keys(plugin.commands).length);
-  } catch (error) {
-    console.error(`Failed to parse plugins.json: ${error.message}`);
-    return [];
-  }
-}
-
-let cachedFrameworkPlugins = null;
-
-function getFrameworkPlugins() {
-  if (cachedFrameworkPlugins) {
-    return cachedFrameworkPlugins;
-  }
-  cachedFrameworkPlugins = [...builtInFrameworks, ...loadUserFrameworks()];
-  return cachedFrameworkPlugins;
-}
-
-function matchesPlugin(project, plugin) {
-  if (plugin.languages && plugin.languages.length > 0 && !plugin.languages.includes(project.type)) {
-    return false;
-  }
-  if (plugin.files && plugin.files.length > 0) {
-    const hit = plugin.files.some((file) => fs.existsSync(path.join(project.path, file)));
-    if (!hit) {
-      return false;
-    }
-  }
-  if (plugin.dependencies && plugin.dependencies.length > 0) {
-    const hit = plugin.dependencies.some((dep) => dependencyMatches(project, dep));
-    if (!hit) {
-      return false;
-    }
-  }
-  if (plugin.scripts && plugin.scripts.length > 0) {
-    const scripts = project.metadata?.scripts || {};
-    const hit = plugin.scripts.some((name) => Object.prototype.hasOwnProperty.call(scripts, name));
-    if (!hit) {
-      return false;
-    }
-  }
-  if (typeof plugin.match === 'function') {
-    if (!plugin.match(project)) {
-      return false;
-    }
-  }
-  return true;
-}
-
-function applyFrameworkPlugins(project) {
-  const plugins = getFrameworkPlugins();
-  let commands = {...project.commands};
-  const frameworks = [];
-  let maxPriority = project.priority || 0;
-  for (const plugin of plugins) {
-    if (!matchesPlugin(project, plugin)) {
-      continue;
-    }
-    frameworks.push({id: plugin.id, name: plugin.name, icon: plugin.icon, description: plugin.description});
-    if (plugin.priority && plugin.priority > maxPriority) {
-      maxPriority = plugin.priority;
-    }
-    const pluginCommands = typeof plugin.commands === 'function' ? plugin.commands(project) : plugin.commands;
-    if (pluginCommands) {
-      Object.entries(pluginCommands).forEach(([key, command]) => {
-        if (!Array.isArray(command.command) || command.command.length === 0) {
-          return;
-        }
-        commands = {
-          ...commands,
-          [key]: {
-            ...command,
-            source: command.source || 'framework'
-          }
-        };
-      });
-    }
-  }
-  return {...project, commands, frameworks, priority: maxPriority};
-}
-
-const IGNORE_PATTERNS = ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/build/**', '**/target/**'];
-
-const SCHEMAS = [
-  {
-    type: 'node',
-    label: 'Node.js',
-    icon: '🟢',
-    priority: 90,
-    files: ['package.json'],
-    async build(projectPath, manifest) {
-      const pkgPath = path.join(projectPath, 'package.json');
-      if (!fs.existsSync(pkgPath)) {
-        return null;
-      }
-      const content = await fs.promises.readFile(pkgPath, 'utf-8');
-      const pkg = JSON.parse(content);
-      const scripts = pkg.scripts || {};
-      const commands = {};
-      const preferScript = (targetKey, names, label) => {
-        for (const name of names) {
-          if (Object.prototype.hasOwnProperty.call(scripts, name)) {
-            commands[targetKey] = {label, command: ['npm', 'run', name]};
-            break;
-          }
-        }
-      };
-      preferScript('build', ['build', 'compile', 'dist'], 'Build');
-      preferScript('test', ['test', 'check', 'spec'], 'Test');
-      preferScript('run', ['start', 'dev', 'serve', 'run'], 'Start');
-
-      const metadata = {
-        dependencies: gatherNodeDependencies(pkg),
-        scripts,
-        packageJson: pkg
-      };
-
-      return {
-        id: `${projectPath}::node`,
-        path: projectPath,
-        name: pkg.name || path.basename(projectPath),
-        type: 'Node.js',
-        icon: '🟢',
-        priority: this.priority,
-        commands,
-        metadata,
-        manifest: path.basename(manifest),
-        description: pkg.description || '',
-        extra: {
-          scripts: Object.keys(scripts)
-        }
-      };
-    }
-  },
-  {
-    type: 'python',
-    label: 'Python',
-    icon: '🐍',
-    priority: 80,
-    files: ['pyproject.toml', 'requirements.txt', 'setup.py'],
-    async build(projectPath, manifest) {
-      const commands = {};
-      if (fs.existsSync(path.join(projectPath, 'pyproject.toml'))) {
-        commands.test = {label: 'Pytest', command: ['pytest']};
-      } else {
-        commands.test = {label: 'Unittest', command: ['python', '-m', 'unittest', 'discover']};
-      }
-
-      const entry = await findPythonEntry(projectPath);
-      if (entry) {
-        commands.run = {label: 'Run', command: ['python', entry]};
-      }
-
-      const metadata = {
-        dependencies: gatherPythonDependencies(projectPath)
-      };
-
-      return {
-        id: `${projectPath}::python`,
-        path: projectPath,
-        name: path.basename(projectPath),
-        type: 'Python',
-        icon: '🐍',
-        priority: this.priority,
-        commands,
-        metadata,
-        manifest: path.basename(manifest),
-        description: '',
-        extra: {
-          entry
-        }
-      };
-    }
-  },
-  {
-    type: 'rust',
-    label: 'Rust',
-    icon: '🦀',
-    priority: 85,
-    files: ['Cargo.toml'],
-    async build(projectPath, manifest) {
-      return {
-        id: `${projectPath}::rust`,
-        path: projectPath,
-        name: path.basename(projectPath),
-        type: 'Rust',
-        icon: '🦀',
-        priority: this.priority,
-        commands: {
-          build: {label: 'Cargo build', command: ['cargo', 'build']},
-          test: {label: 'Cargo test', command: ['cargo', 'test']},
-          run: {label: 'Cargo run', command: ['cargo', 'run']}
-        },
-        metadata: {},
-        manifest: path.basename(manifest),
-        description: '',
-        extra: {}
-      };
-    }
-  },
-  {
-    type: 'go',
-    label: 'Go',
-    icon: '🐹',
-    priority: 80,
-    files: ['go.mod'],
-    async build(projectPath, manifest) {
-      return {
-        id: `${projectPath}::go`,
-        path: projectPath,
-        name: path.basename(projectPath),
-        type: 'Go',
-        icon: '🐹',
-        priority: this.priority,
-        commands: {
-          build: {label: 'Go build', command: ['go', 'build', './...']},
-          test: {label: 'Go test', command: ['go', 'test', './...']},
-          run: {label: 'Go run', command: ['go', 'run', '.']}
-        },
-        metadata: {},
-        manifest: path.basename(manifest),
-        description: '',
-        extra: {}
-      };
-    }
-  },
-  {
-    type: 'java',
-    label: 'Java',
-    icon: '☕️',
-    priority: 75,
-    files: ['pom.xml', 'build.gradle', 'build.gradle.kts'],
-    async build(projectPath, manifest) {
-      const hasMvnw = fs.existsSync(path.join(projectPath, 'mvnw'));
-      const hasGradlew = fs.existsSync(path.join(projectPath, 'gradlew'));
-      const commands = {};
-      if (hasGradlew) {
-        commands.build = {label: 'Gradle build', command: ['./gradlew', 'build']};
-        commands.test = {label: 'Gradle test', command: ['./gradlew', 'test']};
-      } else if (hasMvnw) {
-        commands.build = {label: 'Maven package', command: ['./mvnw', 'package']};
-        commands.test = {label: 'Maven test', command: ['./mvnw', 'test']};
-      } else {
-        commands.build = {label: 'Maven package', command: ['mvn', 'package']};
-        commands.test = {label: 'Maven test', command: ['mvn', 'test']};
-      }
-
-      return {
-        id: `${projectPath}::java`,
-        path: projectPath,
-        name: path.basename(projectPath),
-        type: 'Java',
-        icon: '☕️',
-        priority: this.priority,
-        commands,
-        metadata: {},
-        manifest: path.basename(manifest),
-        description: '',
-        extra: {}
-      };
-    }
-  },
-  {
-    type: 'scala',
-    label: 'Scala',
-    icon: '🔵',
-    priority: 70,
-    files: ['build.sbt'],
-    async build(projectPath, manifest) {
-      return {
-        id: `${projectPath}::scala`,
-        path: projectPath,
-        name: path.basename(projectPath),
-        type: 'Scala',
-        icon: '🔵',
-        priority: this.priority,
-        commands: {
-          build: {label: 'sbt compile', command: ['sbt', 'compile']},
-          test: {label: 'sbt test', command: ['sbt', 'test']},
-          run: {label: 'sbt run', command: ['sbt', 'run']}
-        },
-        metadata: {},
-        manifest: path.basename(manifest),
-        description: '',
-        extra: {}
-      };
-    }
-  }
-];
-
-async function findPythonEntry(projectPath) {
-  const candidates = ['main.py', 'app.py', 'src/main.py', 'src/app.py'];
-  for (const candidate of candidates) {
-    const candidatePath = path.join(projectPath, candidate);
-    if (fs.existsSync(candidatePath)) {
-      return candidate;
-    }
-  }
-  return null;
-}
-
-async function discoverProjects(root) {
-  const projectMap = new Map();
-  for (const schema of SCHEMAS) {
-    const patterns = schema.files.map((file) => `**/${file}`);
-    const matches = await fastGlob(patterns, {
-      cwd: root,
-      ignore: IGNORE_PATTERNS,
-      onlyFiles: true,
-      deep: 5
-    });
-
-    for (const match of matches) {
-      const projectDir = path.resolve(root, path.dirname(match));
-      const existing = projectMap.get(projectDir);
-      if (existing && existing.priority >= schema.priority) {
-        continue;
-      }
-      const entry = await schema.build(projectDir, match);
-      if (!entry) {
-        continue;
-      }
-      const withFrameworks = applyFrameworkPlugins(entry);
-      projectMap.set(projectDir, withFrameworks);
-    }
-  }
-  return Array.from(projectMap.values()).sort((a, b) => b.priority - a.priority);
-}
-
-const ACTION_MAP = {
-  b: 'build',
-  t: 'test',
-  r: 'run'
-};
-const ART_CHARS = ['▁', '▃', '▄', '▅', '▇'];
-const ART_COLORS = ['magenta', 'blue', 'cyan', 'yellow', 'red'];
 
 function useScanner(rootPath) {
   const [state, setState] = useState({projects: [], loading: true, error: null});
@@ -820,16 +101,35 @@ function Compass({rootPath}) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [viewMode, setViewMode] = useState('list');
   const [logLines, setLogLines] = useState([]);
+  const [logOffset, setLogOffset] = useState(0);
   const [running, setRunning] = useState(false);
   const [lastAction, setLastAction] = useState(null);
   const [customMode, setCustomMode] = useState(false);
   const [customInput, setCustomInput] = useState('');
   const [config, setConfig] = useState(() => loadConfig());
-
+  const [showHelpCards, setShowHelpCards] = useState(false);
+  const [showStructureGuide, setShowStructureGuide] = useState(false);
+  const [stdinBuffer, setStdinBuffer] = useState('');
+  const [showHelp, setShowHelp] = useState(false);
+  const [recentRuns, setRecentRuns] = useState([]);
   const selectedProject = projects[selectedIndex] || null;
+  const runningProcessRef = useRef(null);
+  const lastCommandRef = useRef(null);
 
   const addLog = useCallback((line) => {
-    setLogLines((prev) => [...prev.slice(-200), typeof line === 'string' ? line : JSON.stringify(line)]);
+    setLogLines((prev) => {
+      const normalized = typeof line === 'string' ? line : JSON.stringify(line);
+      const appended = [...prev, normalized];
+      const next = appended.length > 250 ? appended.slice(appended.length - 250) : appended;
+      setLogOffset((prevOffset) => {
+        const maxScroll = Math.max(0, next.length - OUTPUT_WINDOW_SIZE);
+        if (prevOffset === 0) {
+          return 0;
+        }
+        return Math.min(maxScroll, prevOffset + 1);
+      });
+      return next;
+    });
   }, []);
 
   const detailCommands = useMemo(() => buildDetailCommands(selectedProject, config), [selectedProject, config]);
@@ -843,8 +143,9 @@ function Compass({rootPath}) {
     return map;
   }, [detailedIndexed]);
 
-  const runProjectCommand = useCallback(async (commandMeta) => {
-    if (!selectedProject) {
+  const runProjectCommand = useCallback(async (commandMeta, targetProject = selectedProject) => {
+    const project = targetProject || selectedProject;
+    if (!project) {
       return;
     }
     if (!commandMeta || !Array.isArray(commandMeta.command) || commandMeta.command.length === 0) {
@@ -856,16 +157,24 @@ function Compass({rootPath}) {
       return;
     }
 
+    const commandLabel = commandMeta.label || commandMeta.command.join(' ');
+    lastCommandRef.current = {project, commandMeta};
     setRunning(true);
-    setLastAction(`${selectedProject.name} · ${commandMeta.label}`);
+    setLastAction(`${project.name} · ${commandLabel}`);
     const fullCmd = commandMeta.command;
     addLog(kleur.cyan(`> ${fullCmd.join(' ')}`));
+    setRecentRuns((prev) => {
+      const entry = {project: project.name, command: commandLabel, time: new Date().toLocaleTimeString()};
+      return [entry, ...prev].slice(0, RECENT_RUN_LIMIT);
+    });
 
     try {
       const subprocess = execa(fullCmd[0], fullCmd.slice(1), {
-        cwd: selectedProject.path,
-        env: process.env
+        cwd: project.path,
+        env: process.env,
+        stdin: 'pipe'
       });
+      runningProcessRef.current = subprocess;
 
       subprocess.stdout?.on('data', (chunk) => {
         addLog(chunk.toString().trimEnd());
@@ -875,13 +184,15 @@ function Compass({rootPath}) {
       });
 
       await subprocess;
-      addLog(kleur.green(`✓ ${commandMeta.label} finished`));
+      addLog(kleur.green(`✓ ${commandLabel} finished`));
     } catch (error) {
-      addLog(kleur.red(`✗ ${commandMeta.label} failed: ${error.shortMessage || error.message}`));
+      addLog(kleur.red(`✗ ${commandLabel} failed: ${error.shortMessage || error.message}`));
     } finally {
       setRunning(false);
+      setStdinBuffer('');
+      runningProcessRef.current = null;
     }
-  }, [selectedProject, addLog, running]);
+  }, [addLog, running, selectedProject]);
 
   const handleAddCustomCommand = useCallback((label, commandTokens) => {
     if (!selectedProject) {
@@ -930,7 +241,7 @@ function Compass({rootPath}) {
     setCustomInput('');
   }, [customInput, selectedProject, handleAddCustomCommand, addLog]);
 
-  useInput((input, key) => {
+    useInput((input, key) => {
     if (customMode) {
       if (key.return) {
         handleCustomSubmit();
@@ -951,11 +262,72 @@ function Compass({rootPath}) {
       return;
     }
 
-    if (key.upArrow && projects.length > 0) {
+    const normalizedInput = input?.toLowerCase();
+    const ctrlCombo = (char) => key.ctrl && normalizedInput === char;
+    const shiftCombo = (char) => key.shift && normalizedInput === char;
+    const toggleShortcut = (char) => shiftCombo(char);
+    if (toggleShortcut('h')) {
+      setShowHelpCards((prev) => !prev);
+      return;
+    }
+    if (toggleShortcut('s')) {
+      setShowStructureGuide((prev) => !prev);
+      return;
+    }
+
+    const scrollLogs = (delta) => {
+      setLogOffset((prev) => {
+        const maxScroll = Math.max(0, logLines.length - OUTPUT_WINDOW_SIZE);
+        return Math.max(0, Math.min(maxScroll, prev + delta));
+      });
+    };
+
+    if (running && runningProcessRef.current) {
+      if (key.ctrl && input === 'c') {
+        runningProcessRef.current.kill('SIGINT');
+        setStdinBuffer('');
+        return;
+      }
+      if (key.return) {
+        runningProcessRef.current.stdin?.write('\n');
+        setStdinBuffer('');
+        return;
+      }
+      if (key.backspace) {
+        runningProcessRef.current.stdin?.write('\x08');
+        setStdinBuffer((prev) => prev.slice(0, -1));
+        return;
+      }
+      if (input) {
+        runningProcessRef.current.stdin?.write(input);
+        setStdinBuffer((prev) => prev + input);
+      }
+      return;
+    }
+
+    if (key.shift && key.upArrow) {
+      scrollLogs(-1);
+      return;
+    }
+    if (key.shift && key.downArrow) {
+      scrollLogs(1);
+      return;
+    }
+
+    if (normalizedInput === '?') {
+      setShowHelp((prev) => !prev);
+      return;
+    }
+    if (shiftCombo('l') && lastCommandRef.current) {
+      runProjectCommand(lastCommandRef.current.commandMeta, lastCommandRef.current.project);
+      return;
+    }
+
+    if (key.upArrow && !key.shift && projects.length > 0) {
       setSelectedIndex((prev) => (prev - 1 + projects.length) % projects.length);
       return;
     }
-    if (key.downArrow && projects.length > 0) {
+    if (key.downArrow && !key.shift && projects.length > 0) {
       setSelectedIndex((prev) => (prev + 1) % projects.length);
       return;
     }
@@ -966,28 +338,28 @@ function Compass({rootPath}) {
       setViewMode((prev) => (prev === 'detail' ? 'list' : 'detail'));
       return;
     }
-    if (input === 'q') {
+    if (shiftCombo('q')) {
       exit();
       return;
     }
-    if (input === 'c' && viewMode === 'detail' && selectedProject) {
+    if (normalizedInput === 'c' && viewMode === 'detail' && selectedProject) {
       setCustomMode(true);
       setCustomInput('');
       return;
     }
-    if (ACTION_MAP[input]) {
-      const commandMeta = selectedProject?.commands?.[ACTION_MAP[input]];
-      runProjectCommand(commandMeta);
+    const actionKey = normalizedInput && ACTION_MAP[normalizedInput];
+    if (actionKey) {
+      const commandMeta = selectedProject?.commands?.[actionKey];
+      runProjectCommand(commandMeta, selectedProject);
       return;
     }
-    if (viewMode === 'detail' && detailShortcutMap.has(input)) {
-      runProjectCommand(detailShortcutMap.get(input));
+    if (viewMode === 'detail' && normalizedInput && detailShortcutMap.has(normalizedInput)) {
+      runProjectCommand(detailShortcutMap.get(normalizedInput), selectedProject);
     }
   });
-
-  const projectRows = [];
+const projectRows = [];
   if (loading) {
-    projectRows.push(create(Text, {dimColor: true}, 'Scanning for projects…'));
+    projectRows.push(create(Text, {dimColor: true}, 'Scanning projects…'));
   }
   if (error) {
     projectRows.push(create(Text, {color: 'red'}, `Unable to scan: ${error}`));
@@ -1002,21 +374,17 @@ function Compass({rootPath}) {
       projectRows.push(
         create(
           Box,
-          {key: project.id, flexDirection: 'column', marginBottom: 1},
+          {key: project.id, flexDirection: 'column', marginBottom: 1, padding: 1},
           create(
-            Box,
-            {flexDirection: 'row'},
-            create(
-              Text,
-              {
-                color: isSelected ? 'cyan' : 'white',
-                bold: isSelected
-              },
-              `${project.icon} ${project.name}`
-            ),
-            create(Text, {color: 'gray'}, `  ${project.type} · ${path.relative(rootPath, project.path) || '.'}`)
+            Text,
+            {
+              color: isSelected ? 'cyan' : 'white',
+              bold: isSelected
+            },
+            `${project.icon} ${project.name}`
           ),
-          frameworkBadges && create(Text, {color: isSelected ? 'cyan' : 'gray'}, `   ${frameworkBadges}`)
+          create(Text, {dimColor: true}, `  ${project.type} · ${path.relative(rootPath, project.path) || '.'}`),
+          frameworkBadges && create(Text, {dimColor: true}, `   ${frameworkBadges}`)
         )
       );
     });
@@ -1025,7 +393,7 @@ function Compass({rootPath}) {
   const detailContent = [];
   if (viewMode === 'detail' && selectedProject) {
     detailContent.push(
-      create(Text, {color: 'yellow', bold: true}, `${selectedProject.icon} ${selectedProject.name}`),
+      create(Text, {color: 'cyan', bold: true}, `${selectedProject.icon} ${selectedProject.name}`),
       create(Text, {dimColor: true}, `${selectedProject.type} · ${selectedProject.manifest || 'detected manifest'}`),
       create(Text, {dimColor: true}, `Location: ${path.relative(rootPath, selectedProject.path) || '.'}`)
     );
@@ -1044,12 +412,17 @@ function Compass({rootPath}) {
     detailContent.push(create(Text, {bold: true, marginTop: 1}, 'Commands'));
     detailedIndexed.forEach((command) => {
       detailContent.push(
-        create(Text, {key: `${command.shortcut}-${command.label}`}, `${command.shortcut}. ${command.label} ${command.source === 'custom' ? kleur.magenta('(custom)') : command.source === 'framework' ? kleur.cyan('(framework)') : ''}`)
+        create(Text, {key: `detail-${command.shortcut}-${command.label}`}, `${command.shortcut}. ${command.label} ${command.source === 'custom' ? kleur.magenta('(custom)') : command.source === 'framework' ? kleur.cyan('(framework)') : ''}`)
       );
       detailContent.push(create(Text, {dimColor: true}, `   ↳ ${command.command.join(' ')}`));
     });
     if (!detailedIndexed.length) {
       detailContent.push(create(Text, {dimColor: true}, 'No built-in commands yet. Add a custom command with C.'));
+    }
+    const setupHints = selectedProject.extra?.setupHints || [];
+    if (setupHints.length) {
+      detailContent.push(create(Text, {dimColor: true, marginTop: 1}, 'Setup hints:'));
+      setupHints.forEach((hint) => detailContent.push(create(Text, {dimColor: true}, `  • ${hint}`)));
     }
     detailContent.push(create(Text, {dimColor: true}, 'Press C → label|cmd to save custom actions, Enter to close detail view.'));
   } else {
@@ -1060,24 +433,20 @@ function Compass({rootPath}) {
     detailContent.push(create(Text, {color: 'cyan'}, `Type label|cmd (Enter to save, Esc to cancel): ${customInput}`));
   }
 
-  const logNodes = logLines.length
-    ? logLines.map((line, index) => create(Text, {key: `${line}-${index}`}, line))
-    : [create(Text, {dimColor: true}, 'Logs will appear here once you run a command.')];
-
   const projectCountLabel = `${projects.length} project${projects.length === 1 ? '' : 's'}`;
   const artTileNodes = useMemo(() => {
     const selectedName = selectedProject?.name || 'Awaiting selection';
     const selectedType = selectedProject?.type || 'Unknown stack';
     const selectedLocation = selectedProject?.path ? path.relative(rootPath, selectedProject.path) || '.' : '—';
-    const motionNarrative = running ? 'Executing...' : lastAction ? `Last: ${lastAction}` : 'Idle in palette';
-    const rootName = path.basename(rootPath) || rootPath;
+    const statusNarrative = running ? 'Running commands' : lastAction ? `Last: ${lastAction}` : 'Idle gallery';
+    const workspaceName = path.basename(rootPath) || rootPath;
     const tileDefinition = [
       {
         label: 'Pulse',
         detail: projectCountLabel,
         accent: 'magenta',
         icon: '●',
-        subtext: `Workspace · ${rootName}`
+        subtext: `Workspace · ${workspaceName}`
       },
       {
         label: 'Focus',
@@ -1091,7 +460,7 @@ function Compass({rootPath}) {
         detail: `${detailCommands.length} commands`,
         accent: 'yellow',
         icon: '■',
-        subtext: motionNarrative
+        subtext: statusNarrative
       }
     ];
     return tileDefinition.map((tile) =>
@@ -1104,14 +473,14 @@ function Compass({rootPath}) {
           marginRight: 1,
           borderStyle: 'single',
           borderColor: tile.accent,
-          minWidth: 22
+          minWidth: 24
         },
         create(Text, {color: tile.accent, bold: true}, `${tile.icon} ${tile.label}`),
         create(Text, {bold: true}, tile.detail),
         create(Text, {dimColor: true}, tile.subtext)
       )
     );
-  }, [projectCountLabel, rootPath, selectedProject?.name, selectedProject?.type, selectedProject?.path, detailCommands.length, running, lastAction]);
+  }, [projectCountLabel, rootPath, selectedProject, detailCommands.length, running, lastAction]);
 
   const artBoard = create(
     Box,
@@ -1119,14 +488,20 @@ function Compass({rootPath}) {
       flexDirection: 'column',
       marginTop: 1,
       borderStyle: 'round',
-      borderColor: 'white',
+      borderColor: 'gray',
       padding: 1
     },
     create(
       Box,
       {flexDirection: 'row', justifyContent: 'space-between'},
+      create(Text, {color: 'magenta', bold: true}, 'Art-coded build atlas'),
+      create(Text, {dimColor: true}, 'press ? for overlay help')
+    ),
+    create(
+      Box,
+      {flexDirection: 'row', marginTop: 1},
       ...ART_CHARS.map((char, index) =>
-        create(Text, {key: `art-char-${index}`, color: ART_COLORS[index % ART_COLORS.length]}, char.repeat(2))
+        create(Text, {key: `art-${index}`, color: ART_COLORS[index % ART_COLORS.length]}, char.repeat(2))
       )
     ),
     create(
@@ -1134,12 +509,117 @@ function Compass({rootPath}) {
       {flexDirection: 'row', marginTop: 1},
       ...artTileNodes
     ),
-    create(Text, {dimColor: true, marginTop: 1}, kleur.italic('Terminal art mosaic · vibe meets productivity'))
+    create(Text, {dimColor: true, marginTop: 1}, kleur.italic('The art board now follows your layout and stays inside the window.'))
   );
 
+  const logWindowStart = Math.max(0, logLines.length - OUTPUT_WINDOW_SIZE - logOffset);
+  const logWindowEnd = Math.max(0, logLines.length - logOffset);
+  const visibleLogs = logLines.slice(logWindowStart, logWindowEnd);
+  const logNodes = visibleLogs.length
+    ? visibleLogs.map((line, index) => create(Text, {key: index}, line))
+    : [create(Text, {dimColor: true}, 'Logs will appear here once you run a command.')];
+
+  const helpCards = [
+    {
+      label: 'Navigation',
+      color: 'magenta',
+      body: [
+        '↑ / ↓ move the project focus',
+        'Enter toggles details view',
+        'Shift+↑ / ↓ scroll output buffer',
+        'Shift+H toggles help cards'
+      ]
+    },
+    {
+      label: 'Command flow',
+      color: 'cyan',
+      body: [
+        'B / T / R run build/test/run',
+        '1-9 execute detail commands',
+        'Shift+L reruns last command',
+        'Ctrl+C aborts; type feeds stdin'
+      ]
+    },
+    {
+      label: 'Recent runs',
+      color: 'yellow',
+      body: [
+        recentRuns.length ? `${recentRuns.length} runs recorded` : 'No runs yet · start with B/T/R',
+        'Shift+S toggles structure guide',
+        'C save custom action',
+        'Shift+Q quit application'
+      ]
+    }
+  ];
+  const helpSection = showHelpCards
+    ? create(
+        Box,
+        {marginTop: 1, flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap'},
+        ...helpCards.map((card, index) =>
+          create(
+            Box,
+            {
+              key: card.label,
+              flexGrow: 1,
+              flexBasis: 0,
+              minWidth: HELP_CARD_MIN_WIDTH,
+              marginRight: index < helpCards.length - 1 ? 1 : 0,
+              marginBottom: 1,
+              borderStyle: 'round',
+              borderColor: card.color,
+              padding: 1,
+              flexDirection: 'column'
+            },
+            create(Text, {color: card.color, bold: true, marginBottom: 1}, card.label),
+            ...card.body.map((line, lineIndex) =>
+              create(Text, {key: `${card.label}-${lineIndex}`, dimColor: card.color === 'yellow'}, line)
+            )
+          )
+        )
+      )
+    : create(Text, {dimColor: true, marginTop: 1}, 'Help cards hidden · press Shift+H to show navigation, command flow, and recent runs.');
+
+  const structureGuide = showStructureGuide
+    ? create(
+        Box,
+        {
+          flexDirection: 'column',
+          borderStyle: 'round',
+          borderColor: 'blue',
+          marginTop: 1,
+          padding: 1
+        },
+        create(Text, {color: 'cyan', bold: true}, 'Project structure guide · press Shift+S to hide'),
+        ...SCHEMA_GUIDE.map((entry) =>
+          create(Text, {key: entry.type, dimColor: true}, `• ${entry.icon} ${entry.label}: ${entry.files.join(', ')}`)
+        ),
+        create(Text, {dimColor: true, marginTop: 1}, 'SCHEMAS describe the manifests that trigger each language type.')
+      )
+    : null;
+
+  const helpOverlay = showHelp
+    ? create(
+        Box,
+        {
+          flexDirection: 'column',
+          borderStyle: 'double',
+          borderColor: 'cyan',
+          marginTop: 1,
+          padding: 1
+        },
+        create(Text, {color: 'cyan', bold: true}, 'Help overlay · press ? to hide'),
+        create(Text, null, 'Shift+↑/↓ scrolls the log buffer while commands stream; type to feed stdin (Enter submits, Ctrl+C aborts).'),
+        create(Text, null, 'B/T/R run build/test/run; 1-9 executes detail commands; Ctrl+L reruns the previous command.'),
+        create(Text, null, 'Ctrl+H toggles these help cards, Ctrl+S toggles the structure guide, ? toggles this overlay, Ctrl+Q quits.'),
+        create(Text, null, 'Projects + Details stay paired while Output keeps its own full-width band.'),
+        create(Text, null, 'Structure guide lists the manifests that trigger each language detection (Ctrl+S to toggle).')
+      )
+    : null;
+
+  const toggleHint = showHelpCards ? 'Shift+H hides the help cards' : 'Shift+H shows the help cards';
   const headerHint = viewMode === 'detail'
-    ? `Detail mode · 1-${Math.max(detailedIndexed.length, 1)} to execute, C: add custom commands, Enter: back to list, q: quit`
-    : `Quick run · B/T/R to build/test/run, Enter: view details, q: quit`;
+    ? `Detail mode · 1-${Math.max(detailedIndexed.length, 1)} to execute, C: add custom commands, Enter: back to list, Shift+Q: quit · ${toggleHint}, Shift+S toggles structure guide`
+    : `Quick run · B/T/R to build/test/run, Enter: view details, Shift+Q: quit · ${toggleHint}, Shift+S toggles structure guide`;
 
   return create(
     Box,
@@ -1152,25 +632,27 @@ function Compass({rootPath}) {
         {flexDirection: 'column'},
         create(Text, {color: 'magenta', bold: true}, 'Project Compass'),
         create(Text, {dimColor: true}, loading ? 'Scanning workspaces…' : `${projectCountLabel} detected in ${rootPath}`),
-        create(Text, {color: 'cyan'}, kleur.italic('Art-coded build atlas'))
+        create(Text, {dimColor: true}, 'Use keyboard arrows to navigate, ? for help.')
       ),
       create(
         Box,
         {flexDirection: 'column', alignItems: 'flex-end'},
-        create(Text, {color: running ? 'yellow' : 'green'}, running ? 'Busy 🔁' : lastAction ? `Last: ${lastAction}` : 'Idle'),
+        create(Text, {color: running ? 'yellow' : 'green'}, running ? 'Busy streaming...' : lastAction ? `Last action · ${lastAction}` : 'Idle'),
         create(Text, {dimColor: true}, headerHint)
       )
     ),
     artBoard,
     create(
       Box,
-      {marginTop: 1},
+      {marginTop: 1, flexDirection: 'row', alignItems: 'stretch', width: '100%', flexWrap: 'wrap'},
       create(
         Box,
         {
-          flexDirection: 'column',
-          width: 60,
-          marginRight: 2,
+          flexGrow: 1,
+          flexBasis: 0,
+          flexShrink: 1,
+          minWidth: PROJECTS_MIN_WIDTH,
+          marginRight: 1,
           borderStyle: 'round',
           borderColor: 'magenta',
           padding: 1
@@ -1181,35 +663,68 @@ function Compass({rootPath}) {
       create(
         Box,
         {
-          flexDirection: 'column',
-          width: 44,
-          marginRight: 2,
+          flexGrow: 1.3,
+          flexBasis: 0,
+          flexShrink: 1,
+          minWidth: DETAILS_MIN_WIDTH,
           borderStyle: 'round',
           borderColor: 'cyan',
-          padding: 1
+          padding: 1,
+          flexDirection: 'column'
         },
         create(Text, {bold: true, color: 'cyan'}, 'Details'),
         ...detailContent
+      )
+    ),
+    create(
+      Box,
+      {marginTop: 1, flexDirection: 'column'},
+      create(
+        Box,
+        {flexDirection: 'row', justifyContent: 'space-between'},
+        create(Text, {bold: true, color: 'yellow'}, `Output ${running ? '· Running' : ''}`),
+        create(Text, {dimColor: true}, logOffset ? `Scrolled ${logOffset} lines` : 'Live log view')
       ),
       create(
         Box,
         {
           flexDirection: 'column',
-          flexGrow: 1,
           borderStyle: 'round',
           borderColor: 'yellow',
-          padding: 1
+          padding: 1,
+          minHeight: OUTPUT_WINDOW_HEIGHT,
+          maxHeight: OUTPUT_WINDOW_HEIGHT,
+          height: OUTPUT_WINDOW_HEIGHT,
+          overflow: 'hidden',
+          flexShrink: 0
         },
-        create(Text, {bold: true, color: 'yellow'}, 'Output'),
-        create(
-          Box,
-          {flexDirection: 'column', marginTop: 1, height: 12, overflow: 'hidden'},
-          ...logNodes
-        )
+        ...logNodes
+      ),
+      create(
+        Box,
+        {marginTop: 1, flexDirection: 'row', justifyContent: 'space-between'},
+        create(Text, {dimColor: true}, running ? 'Type to feed stdin; Enter submits, Ctrl+C aborts.' : 'Run a command or press ? for extra help.'),
+        create(Text, {dimColor: true}, `${toggleHint}, Shift+S toggles the structure guide`)
+      ),
+      create(
+        Box,
+        {
+          marginTop: 1,
+          flexDirection: 'row',
+          borderStyle: 'round',
+          borderColor: running ? 'green' : 'gray',
+          paddingX: 1
+        },
+        create(Text, {bold: true, color: running ? 'green' : 'white'}, running ? ' Stdin buffer ' : ' Input ready '),
+        create(Text, {dimColor: true, marginLeft: 1}, running ? (stdinBuffer || '(type to send)') : 'Start a command to feed stdin')
       )
-    )
+    ),
+    helpSection,
+    structureGuide,
+    helpOverlay
   );
 }
+
 
 function parseArgs() {
   const args = {};
