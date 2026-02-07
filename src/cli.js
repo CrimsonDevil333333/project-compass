@@ -121,6 +121,11 @@ function dependencyMatches(project, needle) {
   return dependencies.some((value) => value === target || value.startsWith(`${target}@`) || value.includes(`/${target}`));
 }
 
+function hasProjectFile(project, file) {
+  return fs.existsSync(path.join(project.path, file));
+}
+
+
 const builtInFrameworks = [
   {
     id: 'next',
@@ -152,6 +157,176 @@ const builtInFrameworks = [
     }
   },
   {
+    id: 'react',
+    name: 'React',
+    icon: '⚛️',
+    description: 'React apps (CRA, Vite React)',
+    languages: ['Node.js'],
+    priority: 112,
+    match(project) {
+      return dependencyMatches(project, 'react') && (dependencyMatches(project, 'react-scripts') || dependencyMatches(project, 'vite') || hasProjectFile(project, 'vite.config.js'));
+    },
+    commands(project) {
+      const commands = {};
+      const add = (key, label, fallback) => {
+        const tokens = resolveScriptCommand(project, key, fallback);
+        if (tokens) {
+          commands[key] = {label, command: tokens, source: 'framework'};
+        }
+      };
+      add('run', 'React dev', () => ['npm', 'run', 'dev']);
+      add('build', 'React build', () => ['npm', 'run', 'build']);
+      add('test', 'React test', () => ['npm', 'run', 'test']);
+      return commands;
+    }
+  },
+  {
+    id: 'vue',
+    name: 'Vue.js',
+    icon: '🟩',
+    description: 'Vue CLI or Vite + Vue apps',
+    languages: ['Node.js'],
+    priority: 111,
+    match(project) {
+      return dependencyMatches(project, 'vue') && (hasProjectFile(project, 'vue.config.js') || dependencyMatches(project, '@vue/cli-service') || dependencyMatches(project, 'vite'));
+    },
+    commands(project) {
+      const commands = {};
+      const add = (key, label, fallback) => {
+        const tokens = resolveScriptCommand(project, key, fallback);
+        if (tokens) {
+          commands[key] = {label, command: tokens, source: 'framework'};
+        }
+      };
+      add('run', 'Vue dev', () => ['npm', 'run', 'dev']);
+      add('build', 'Vue build', () => ['npm', 'run', 'build']);
+      add('test', 'Vue test', () => ['npm', 'run', 'test']);
+      return commands;
+    }
+  },
+  {
+    id: 'nest',
+    name: 'NestJS',
+    icon: '🛡️',
+    description: 'NestJS backend',
+    languages: ['Node.js'],
+    priority: 110,
+    match(project) {
+      return dependencyMatches(project, '@nestjs/cli') || dependencyMatches(project, '@nestjs/core');
+    },
+    commands(project) {
+      const commands = {};
+      const add = (key, label, fallback) => {
+        const tokens = resolveScriptCommand(project, key, fallback);
+        if (tokens) {
+          commands[key] = {label, command: tokens, source: 'framework'};
+        }
+      };
+      add('run', 'Nest dev', () => ['npm', 'run', 'start:dev']);
+      add('build', 'Nest build', () => ['npm', 'run', 'build']);
+      add('test', 'Nest test', () => ['npm', 'run', 'test']);
+      return commands;
+    }
+  },
+  {
+    id: 'angular',
+    name: 'Angular',
+    icon: '🅰️',
+    description: 'Angular CLI projects',
+    languages: ['Node.js'],
+    priority: 109,
+    match(project) {
+      return hasProjectFile(project, 'angular.json') || dependencyMatches(project, '@angular/cli');
+    },
+    commands(project) {
+      const commands = {};
+      const add = (key, label, fallback) => {
+        const tokens = resolveScriptCommand(project, key, fallback);
+        if (tokens) {
+          commands[key] = {label, command: tokens, source: 'framework'};
+        }
+      };
+      add('run', 'Angular serve', () => ['npm', 'run', 'start']);
+      add('build', 'Angular build', () => ['npm', 'run', 'build']);
+      add('test', 'Angular test', () => ['npm', 'run', 'test']);
+      return commands;
+    }
+  },
+  {
+    id: 'sveltekit',
+    name: 'SvelteKit',
+    icon: '🌀',
+    description: 'SvelteKit apps',
+    languages: ['Node.js'],
+    priority: 108,
+    match(project) {
+      return hasProjectFile(project, 'svelte.config.js') || dependencyMatches(project, '@sveltejs/kit');
+    },
+    commands(project) {
+      const commands = {};
+      const add = (key, label, fallback) => {
+        const tokens = resolveScriptCommand(project, key, fallback);
+        if (tokens) {
+          commands[key] = {label, command: tokens, source: 'framework'};
+        }
+      };
+      add('run', 'SvelteKit dev', () => ['npm', 'run', 'dev']);
+      add('build', 'SvelteKit build', () => ['npm', 'run', 'build']);
+      add('test', 'SvelteKit test', () => ['npm', 'run', 'test']);
+      add('preview', 'SvelteKit preview', () => ['npm', 'run', 'preview']);
+      return commands;
+    }
+  },
+  {
+    id: 'nuxt',
+    name: 'Nuxt',
+    icon: '🪄',
+    description: 'Nuxt.js / Vue SSR',
+    languages: ['Node.js'],
+    priority: 107,
+    match(project) {
+      return hasProjectFile(project, 'nuxt.config.js') || dependencyMatches(project, 'nuxt');
+    },
+    commands(project) {
+      const commands = {};
+      const add = (key, label, fallback) => {
+        const tokens = resolveScriptCommand(project, key, fallback);
+        if (tokens) {
+          commands[key] = {label, command: tokens, source: 'framework'};
+        }
+      };
+      add('run', 'Nuxt dev', () => ['npm', 'run', 'dev']);
+      add('build', 'Nuxt build', () => ['npm', 'run', 'build']);
+      add('start', 'Nuxt start', () => ['npm', 'run', 'start']);
+      return commands;
+    }
+  },
+  {
+    id: 'astro',
+    name: 'Astro',
+    icon: '✨',
+    description: 'Astro static sites',
+    languages: ['Node.js'],
+    priority: 106,
+    match(project) {
+      const matches = ['astro.config.mjs', 'astro.config.ts'].some((file) => hasProjectFile(project, file));
+      return matches || dependencyMatches(project, 'astro');
+    },
+    commands(project) {
+      const commands = {};
+      const add = (key, label, fallback) => {
+        const tokens = resolveScriptCommand(project, key, fallback);
+        if (tokens) {
+          commands[key] = {label, command: tokens, source: 'framework'};
+        }
+      };
+      add('run', 'Astro dev', () => ['npm', 'run', 'dev']);
+      add('build', 'Astro build', () => ['npm', 'run', 'build']);
+      add('preview', 'Astro preview', () => ['npm', 'run', 'preview']);
+      return commands;
+    }
+  },
+  {
     id: 'django',
     name: 'Django',
     icon: '🌿',
@@ -159,7 +334,7 @@ const builtInFrameworks = [
     languages: ['Python'],
     priority: 110,
     match(project) {
-      return dependencyMatches(project, 'django') || fs.existsSync(path.join(project.path, 'manage.py'));
+      return dependencyMatches(project, 'django') || hasProjectFile(project, 'manage.py');
     },
     commands(project) {
       const managePath = path.join(project.path, 'manage.py');
@@ -172,9 +347,64 @@ const builtInFrameworks = [
         migrate: {label: 'Django migrate', command: ['python', 'manage.py', 'migrate'], source: 'framework'}
       };
     }
+  },
+  {
+    id: 'flask',
+    name: 'Flask',
+    icon: '🍶',
+    description: 'Flask microservices',
+    languages: ['Python'],
+    priority: 105,
+    match(project) {
+      return dependencyMatches(project, 'flask') || hasProjectFile(project, 'app.py');
+    },
+    commands(project) {
+      const commands = {};
+      const entry = hasProjectFile(project, 'app.py') ? 'app.py' : 'main.py';
+      commands.run = {label: 'Flask app', command: ['python', entry], source: 'framework'};
+      commands.test = {label: 'Pytest', command: ['pytest'], source: 'framework'};
+      return commands;
+    }
+  },
+  {
+    id: 'fastapi',
+    name: 'FastAPI',
+    icon: '⚡',
+    description: 'FastAPI + Uvicorn',
+    languages: ['Python'],
+    priority: 105,
+    match(project) {
+      return dependencyMatches(project, 'fastapi');
+    },
+    commands(project) {
+      const entry = hasProjectFile(project, 'main.py') ? 'main.py' : 'app.py';
+      return {
+        run: {label: 'Uvicorn reload', command: ['uvicorn', `${entry.split('.')[0]}:app`, '--reload'], source: 'framework'},
+        test: {label: 'Pytest', command: ['pytest'], source: 'framework'}
+      };
+    }
+  },
+  {
+    id: 'spring',
+    name: 'Spring Boot',
+    icon: '🌱',
+    description: 'Spring Boot apps',
+    languages: ['Java'],
+    priority: 105,
+    match(project) {
+      return dependencyMatches(project, 'spring-boot-starter') || hasProjectFile(project, 'src/main/java');
+    },
+    commands(project) {
+      const hasMvnw = fs.existsSync(path.join(project.path, 'mvnw'));
+      const base = hasMvnw ? './mvnw' : 'mvn';
+      return {
+        run: {label: 'Spring Boot run', command: [base, 'spring-boot:run'], source: 'framework'},
+        build: {label: 'Maven package', command: [base, 'package'], source: 'framework'},
+        test: {label: 'Maven test', command: [base, 'test'], source: 'framework'}
+      };
+    }
   }
 ];
-
 function loadUserFrameworks() {
   ensureConfigDir();
   try {

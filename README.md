@@ -37,7 +37,7 @@ project-compass [--dir /path/to/workspace]
 
 ## Framework & plugin support
 
-Project Compass detects popular frameworks such as **Next.js** and **Django** (you'll see their icons in the detail view). When a framework is detected, Project Compass injects framework-specific build/run/test commands (Next dev/build, Django runserver/test/migrate, etc.).
+Project Compass detects a wide range of modern stacks—**Next.js**, **React**, **Vue**, **NestJS**, **Angular**, **SvelteKit**, **Nuxt**, **Astro**, **Django**, **Flask**, **FastAPI**, and **Spring Boot**—and shows their badges in the detail view. When a framework is recognized, it injects framework-specific build/run/test commands (e.g., Next dev/build, Django runserver/test, Spring Boot run/test).
 
 You can teach it new frameworks by adding a `plugins.json` file in your config directory (`~/.project-compass/plugins.json`). Each entry can declare the languages, files, dependencies, and commands that identify the framework. A sample plugin entry looks like this:
 
