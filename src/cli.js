@@ -152,7 +152,7 @@ const TaskManager = memo(({tasks, activeTaskId, renameMode, renameInput, renameC
     Box,
     {flexDirection: 'column', borderStyle: 'round', borderColor: 'yellow', padding: 1},
     create(Text, {bold: true, color: 'yellow'}, '🛰️ Task Manager | Background Processes'),
-    create(Text, {dimColor: true, marginBottom: 1}, 'Up/Down: focus, Shift+K: Kill/Delete, Shift+R: Rename'),
+    create(Text, {dimColor: true, marginBottom: 1}, 'Up/Down: focus, Shift+K: Force Kill, Shift+R: Rename'),
     ...tasks.map(t => create(
       Box,
       {key: t.id, marginBottom: 0, flexDirection: 'column'},
@@ -225,22 +225,27 @@ function Compass({rootPath, initialView = 'navigator'}) {
   const [stdinBuffer, setStdinBuffer] = useState('');
   const [stdinCursor, setStdinCursor] = useState(0);
   const [showHelp, setShowHelp] = useState(false);
-  const selectedProject = projects[selectedIndex] || null;
   const runningProcessMap = useRef(new Map());
   const lastCommandRef = useRef(null);
 
   const activeTask = useMemo(() => tasks.find(t => t.id === activeTaskId), [tasks, activeTaskId]);
   const running = activeTask?.status === 'running';
   const hasRunningTasks = useMemo(() => tasks.some(t => t.status === 'running'), [tasks]);
+  const selectedProject = useMemo(() => projects[selectedIndex] || null, [projects, selectedIndex]);
 
   const addLogToTask = useCallback((taskId, line) => {
-    setTasks(prev => prev.map(t => {
-      if (t.id !== taskId) return t;
+    setTasks(prev => {
+      const idx = prev.findIndex(t => t.id === taskId);
+      if (idx === -1) return prev;
+      const t = prev[idx];
       const normalized = typeof line === 'string' ? line : JSON.stringify(line);
-      const lines = normalized.split(/\r?\n/).filter(l => l.trim().length > 0);
-      const nextLogs = [...t.logs, ...lines];
-      return { ...t, logs: nextLogs.length > 500 ? nextLogs.slice(-500) : nextLogs };
-    }));
+      const newLines = normalized.split(/\r?\n/).filter(l => l.trim().length > 0);
+      const nextLogs = [...t.logs, ...newLines];
+      const updatedTask = { ...t, logs: nextLogs.length > 500 ? nextLogs.slice(-500) : nextLogs };
+      const nextTasks = [...prev];
+      nextTasks[idx] = updatedTask;
+      return nextTasks;
+    });
   }, []);
 
   const detailedIndexed = useMemo(() => buildDetailCommands(selectedProject, config).map((command, index) => ({
@@ -256,7 +261,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
 
   const killAllTasks = useCallback(() => {
     runningProcessMap.current.forEach((proc) => {
-      try { proc.kill('SIGINT'); } catch { /* ignore */ }
+      try { proc.kill('SIGKILL'); } catch { /* ignore */ }
     });
     runningProcessMap.current.clear();
   }, []);
@@ -284,7 +289,8 @@ function Compass({rootPath, initialView = 'navigator'}) {
       const subprocess = execa(commandMeta.command[0], commandMeta.command.slice(1), {
         cwd: project.path,
         env: process.env,
-        stdin: 'pipe'
+        stdin: 'pipe',
+        cleanup: true
       });
       runningProcessMap.current.set(taskId, subprocess);
 
@@ -295,9 +301,9 @@ function Compass({rootPath, initialView = 'navigator'}) {
       setTasks(prev => prev.map(t => t.id === taskId ? {...t, status: 'finished'} : t));
       addLogToTask(taskId, kleur.green(`✓ ${commandLabel} finished`));
     } catch (error) {
-      if (error.isCanceled || error.killed) {
+      if (error.isCanceled || error.killed || error.signal === 'SIGKILL' || error.signal === 'SIGINT') {
         setTasks(prev => prev.map(t => t.id === taskId ? {...t, status: 'killed'} : t));
-        addLogToTask(taskId, kleur.yellow(`! Task killed by user`));
+        addLogToTask(taskId, kleur.yellow(`! Task killed forcefully`));
       } else {
         setTasks(prev => prev.map(t => t.id === taskId ? {...t, status: 'failed'} : t));
         addLogToTask(taskId, kleur.red(`✗ ${commandLabel} failed: ${error.shortMessage || error.message}`));
@@ -310,7 +316,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
   const handleKillTask = useCallback((taskId) => {
     const proc = runningProcessMap.current.get(taskId);
     if (proc) {
-      proc.kill('SIGINT');
+      proc.kill('SIGKILL');
     } else {
       setTasks(prev => prev.filter(t => t.id !== taskId));
       if (activeTaskId === taskId) setActiveTaskId(null);
@@ -318,15 +324,16 @@ function Compass({rootPath, initialView = 'navigator'}) {
   }, [activeTaskId]);
 
   const exportLogs = useCallback(() => {
-    if (!activeTask || !activeTask.logs.length) return;
+    const taskToExport = tasks.find(t => t.id === activeTaskId);
+    if (!taskToExport || !taskToExport.logs.length) return;
     try {
-      const exportPath = path.resolve(process.cwd(), `compass-${activeTask.id}.txt`);
-      fs.writeFileSync(exportPath, activeTask.logs.join('\n'));
+      const exportPath = path.resolve(process.cwd(), `compass-${taskToExport.id}.txt`);
+      fs.writeFileSync(exportPath, taskToExport.logs.join('\n'));
       addLogToTask(activeTaskId, kleur.green(`✓ Logs exported to ${exportPath}`));
     } catch {
       addLogToTask(activeTaskId, kleur.red('✗ Export failed'));
     }
-  }, [activeTask, activeTaskId, addLogToTask]);
+  }, [tasks, activeTaskId, addLogToTask]);
 
     useInput((input, key) => {
     if (quitConfirm) {
@@ -338,13 +345,14 @@ function Compass({rootPath, initialView = 'navigator'}) {
     if (customMode) {
       if (key.return) {
         const raw = customInput.trim();
-        if (selectedProject && raw) {
+        const selProj = selectedProject;
+        if (selProj && raw) {
           const [labelPart, commandPart] = raw.split('|');
           const commandTokens = (commandPart || labelPart).trim().split(/\s+/).filter(Boolean);
           if (commandTokens.length) {
-            const label = commandPart ? labelPart.trim() : `Custom ${selectedProject.name}`;
+            const label = commandPart ? labelPart.trim() : `Custom ${selProj.name}`;
             setConfig((prev) => {
-              const projectKey = selectedProject.path;
+              const projectKey = selProj.path;
               const existing = prev.customCommands?.[projectKey] || [];
               const nextConfig = { ...prev, customCommands: { ...prev.customCommands, [projectKey]: [...existing, {label, command: commandTokens}] } };
               saveConfig(nextConfig);
@@ -448,11 +456,9 @@ function Compass({rootPath, initialView = 'navigator'}) {
       if (tasks.length > 0) {
         if (key.upArrow) { setActiveTaskId(prev => tasks[(tasks.findIndex(t => t.id === prev) - 1 + tasks.length) % tasks.length]?.id); return; }
         if (key.downArrow) { setActiveTaskId(prev => tasks[(tasks.findIndex(t => t.id === prev) + 1) % tasks.length]?.id); return; }
-        if (shiftCombo('k') && activeTaskId) {
-          handleKillTask(activeTaskId);
-          return;
-        }
+        if (shiftCombo('k') && activeTaskId) { handleKillTask(activeTaskId); return; }
         if (shiftCombo('r') && activeTaskId) { setRenameMode(true); setRenameInput(activeTask.name); setRenameCursor(activeTask.name.length); return; }
+        if (key.ctrl && input === 'c') { handleKillTask(activeTaskId); return; }
       }
       if (key.return) { setMainView('navigator'); return; }
       return;
@@ -460,7 +466,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
 
     if (running && activeTaskId && runningProcessMap.current.has(activeTaskId)) {
       const proc = runningProcessMap.current.get(activeTaskId);
-      if (key.ctrl && input === 'c') { proc.kill('SIGINT'); setStdinBuffer(''); setStdinCursor(0); return; }
+      if (key.ctrl && input === 'c') { proc.kill('SIGKILL'); setStdinBuffer(''); setStdinCursor(0); return; }
       if (key.return) { proc.stdin?.write(stdinBuffer + '\n'); setStdinBuffer(''); setStdinCursor(0); return; }
       if (key.backspace || key.delete) {
         if (stdinCursor > 0) {
