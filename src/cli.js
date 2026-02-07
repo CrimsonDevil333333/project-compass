@@ -774,6 +774,8 @@ const ACTION_MAP = {
   t: 'test',
   r: 'run'
 };
+const ART_CHARS = ['▁', '▃', '▄', '▅', '▇'];
+const ART_COLORS = ['magenta', 'blue', 'cyan', 'yellow', 'red'];
 
 function useScanner(rootPath) {
   const [state, setState] = useState({projects: [], loading: true, error: null});
@@ -1000,6 +1002,7 @@ function Compass({rootPath}) {
   }
   if (!loading) {
     projects.forEach((project, index) => {
+      const isSelected = index === selectedIndex;
       const frameworkBadges = (project.frameworks || []).map((frame) => `${frame.icon} ${frame.name}`).join(', ');
       projectRows.push(
         create(
@@ -1011,14 +1014,14 @@ function Compass({rootPath}) {
             create(
               Text,
               {
-                color: index === selectedIndex ? 'green' : undefined,
-                bold: index === selectedIndex
+                color: isSelected ? 'cyan' : 'white',
+                bold: isSelected
               },
               `${project.icon} ${project.name}`
             ),
-            create(Text, {dimColor: true}, `  ${project.type} · ${path.relative(rootPath, project.path) || '.'}`)
+            create(Text, {color: 'gray'}, `  ${project.type} · ${path.relative(rootPath, project.path) || '.'}`)
           ),
-          frameworkBadges && create(Text, {dimColor: true}, `   ${frameworkBadges}`)
+          frameworkBadges && create(Text, {color: isSelected ? 'cyan' : 'gray'}, `   ${frameworkBadges}`)
         )
       );
     });
@@ -1066,6 +1069,79 @@ function Compass({rootPath}) {
     ? logLines.map((line, index) => create(Text, {key: `${line}-${index}`}, line))
     : [create(Text, {dimColor: true}, 'Logs will appear here once you run a command.')];
 
+  const projectCountLabel = `${projects.length} project${projects.length === 1 ? '' : 's'}`;
+  const artTileNodes = useMemo(() => {
+    const selectedName = selectedProject?.name || 'Awaiting selection';
+    const selectedType = selectedProject?.type || 'Unknown stack';
+    const selectedLocation = selectedProject?.path ? path.relative(rootPath, selectedProject.path) || '.' : '—';
+    const motionNarrative = running ? 'Executing...' : lastAction ? `Last: ${lastAction}` : 'Idle in palette';
+    const rootName = path.basename(rootPath) || rootPath;
+    const tileDefinition = [
+      {
+        label: 'Pulse',
+        detail: projectCountLabel,
+        accent: 'magenta',
+        icon: '●',
+        subtext: `Workspace · ${rootName}`
+      },
+      {
+        label: 'Focus',
+        detail: selectedName,
+        accent: 'cyan',
+        icon: '◆',
+        subtext: `${selectedType} · ${selectedLocation}`
+      },
+      {
+        label: 'Rhythm',
+        detail: `${detailCommands.length} commands`,
+        accent: 'yellow',
+        icon: '■',
+        subtext: motionNarrative
+      }
+    ];
+    return tileDefinition.map((tile) =>
+      create(
+        Box,
+        {
+          key: tile.label,
+          flexDirection: 'column',
+          padding: 1,
+          marginRight: 1,
+          borderStyle: 'single',
+          borderColor: tile.accent,
+          minWidth: 22
+        },
+        create(Text, {color: tile.accent, bold: true}, `${tile.icon} ${tile.label}`),
+        create(Text, {bold: true}, tile.detail),
+        create(Text, {dimColor: true}, tile.subtext)
+      )
+    );
+  }, [projectCountLabel, rootPath, selectedProject?.name, selectedProject?.type, selectedProject?.path, detailCommands.length, running, lastAction]);
+
+  const artBoard = create(
+    Box,
+    {
+      flexDirection: 'column',
+      marginTop: 1,
+      borderStyle: 'round',
+      borderColor: 'white',
+      padding: 1
+    },
+    create(
+      Box,
+      {flexDirection: 'row', justifyContent: 'space-between'},
+      ...ART_CHARS.map((char, index) =>
+        create(Text, {key: `art-char-${index}`, color: ART_COLORS[index % ART_COLORS.length]}, char.repeat(2))
+      )
+    ),
+    create(
+      Box,
+      {flexDirection: 'row', marginTop: 1},
+      ...artTileNodes
+    ),
+    create(Text, {dimColor: true, marginTop: 1}, kleur.italic('Terminal art mosaic · vibe meets productivity'))
+  );
+
   const headerHint = viewMode === 'detail'
     ? `Detail mode · 1-${Math.max(detailedIndexed.length, 1)} to execute, C: add custom commands, Enter: back to list, q: quit`
     : `Quick run · B/T/R to build/test/run, Enter: view details, q: quit`;
@@ -1079,23 +1155,32 @@ function Compass({rootPath}) {
       create(
         Box,
         {flexDirection: 'column'},
-        create(Text, {color: 'cyan', bold: true}, 'Project Compass'),
-        create(Text, null, loading ? 'Scanning workspaces…' : `${projects.length} project(s) detected in ${rootPath}`)
+        create(Text, {color: 'magenta', bold: true}, 'Project Compass'),
+        create(Text, {dimColor: true}, loading ? 'Scanning workspaces…' : `${projectCountLabel} detected in ${rootPath}`),
+        create(Text, {color: 'cyan'}, kleur.italic('Art-coded build atlas'))
       ),
       create(
         Box,
         {flexDirection: 'column', alignItems: 'flex-end'},
-        create(Text, null, running ? 'Busy 🔁' : lastAction ? `Last: ${lastAction}` : 'Idle'),
+        create(Text, {color: running ? 'yellow' : 'green'}, running ? 'Busy 🔁' : lastAction ? `Last: ${lastAction}` : 'Idle'),
         create(Text, {dimColor: true}, headerHint)
       )
     ),
+    artBoard,
     create(
       Box,
       {marginTop: 1},
       create(
         Box,
-        {flexDirection: 'column', width: 60, marginRight: 2},
-        create(Text, {bold: true}, 'Projects'),
+        {
+          flexDirection: 'column',
+          width: 60,
+          marginRight: 2,
+          borderStyle: 'round',
+          borderColor: 'magenta',
+          padding: 1
+        },
+        create(Text, {bold: true, color: 'magenta'}, 'Projects'),
         create(Box, {flexDirection: 'column', marginTop: 1}, ...projectRows)
       ),
       create(
@@ -1105,10 +1190,10 @@ function Compass({rootPath}) {
           width: 44,
           marginRight: 2,
           borderStyle: 'round',
-          borderColor: 'gray',
+          borderColor: 'cyan',
           padding: 1
         },
-        create(Text, {bold: true}, 'Details'),
+        create(Text, {bold: true, color: 'cyan'}, 'Details'),
         ...detailContent
       ),
       create(
@@ -1117,14 +1202,18 @@ function Compass({rootPath}) {
           flexDirection: 'column',
           flexGrow: 1,
           borderStyle: 'round',
-          borderColor: 'gray'
+          borderColor: 'yellow',
+          padding: 1
         },
-        create(Text, {bold: true}, 'Output'),
-        create(Box, {flexDirection: 'column', marginTop: 1, height: 12, overflow: 'hidden'}, ...logNodes)
+        create(Text, {bold: true, color: 'yellow'}, 'Output'),
+        create(
+          Box,
+          {flexDirection: 'column', marginTop: 1, height: 12, overflow: 'hidden'},
+          ...logNodes
+        )
       )
     )
   );
-}
 
 function parseArgs() {
   const args = {};
