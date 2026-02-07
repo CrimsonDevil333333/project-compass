@@ -366,15 +366,15 @@ function Compass({rootPath, initialView = 'navigator'}) {
       setShowHelp(false);
     };
     
-    if (shiftCombo('h')) { setConfig(prev => { const next = {...prev, showHelpCards: !prev.showHelpCards}; saveConfig(next); return next; }); return; }
-    if (shiftCombo('s')) { setConfig(prev => { const next = {...prev, showStructureGuide: !prev.showStructureGuide}; saveConfig(next); return next; }); return; }
+    if (shiftCombo('h')) { console.clear(); setConfig(prev => { const next = {...prev, showHelpCards: !prev.showHelpCards}; saveConfig(next); return next; }); return; }
+    if (shiftCombo('s')) { console.clear(); setConfig(prev => { const next = {...prev, showStructureGuide: !prev.showStructureGuide}; saveConfig(next); return next; }); return; }
     if (shiftCombo('a')) { clearAndSwitch(mainView === 'navigator' ? 'studio' : 'navigator'); return; }
     if (shiftCombo('p')) { clearAndSwitch(mainView === 'navigator' ? 'registry' : 'navigator'); return; }
     if (shiftCombo('n')) { clearAndSwitch(mainView === 'navigator' ? 'architect' : 'navigator'); return; }
-    if (shiftCombo('x')) { setTasks(prev => prev.map(t => t.id === activeTaskId ? {...t, logs: []} : t)); setLogOffset(0); return; }
+    if (shiftCombo('x')) { console.clear(); setTasks(prev => prev.map(t => t.id === activeTaskId ? {...t, logs: []} : t)); setLogOffset(0); return; }
     if (shiftCombo('e')) { exportLogs(); return; }
-    if (shiftCombo('d')) { setActiveTaskId(null); return; }
-    if (shiftCombo('b')) { setConfig(prev => { const next = {...prev, showArtBoard: !prev.showArtBoard}; saveConfig(next); return next; }); return; }
+    if (shiftCombo('d')) { console.clear(); setActiveTaskId(null); return; }
+    if (shiftCombo('b')) { console.clear(); setConfig(prev => { const next = {...prev, showArtBoard: !prev.showArtBoard}; saveConfig(next); return next; }); return; }
     
     if (shiftCombo('t')) { 
       setMainView((prev) => {
@@ -444,11 +444,11 @@ function Compass({rootPath, initialView = 'navigator'}) {
     if (key.shift && key.upArrow) { scrollLogs(1); return; }
     if (key.shift && key.downArrow) { scrollLogs(-1); return; }
 
-    if (normalizedInput === '?') { setShowHelp((prev) => !prev); return; }
+    if (normalizedInput === '?') { console.clear(); setShowHelp((prev) => !prev); return; }
     if (shiftCombo('l') && lastCommandRef.current) { runProjectCommand(lastCommandRef.current.commandMeta, lastCommandRef.current.project); return; }
 
-    if (key.upArrow && !key.shift && projects.length > 0) { setSelectedIndex((prev) => (prev - 1 + projects.length) % projects.length); return; }
-    if (key.downArrow && !key.shift && projects.length > 0) { setSelectedIndex((prev) => (prev + 1) % projects.length); return; }
+    if (key.upArrow && !key.shift && projects.length > 0) { console.clear(); setSelectedIndex((prev) => (prev - 1 + projects.length) % projects.length); return; }
+    if (key.downArrow && !key.shift && projects.length > 0) { console.clear(); setSelectedIndex((prev) => (prev + 1) % projects.length); return; }
     if (key.return) {
       if (!selectedProject) return;
       console.clear();
