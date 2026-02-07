@@ -142,9 +142,9 @@ function Studio() {
           {flexDirection: 'column'},
           ...runtimes.map(r => create(
             Box,
-            {key: r.name, marginBottom: 1},
-            create(Text, {width: 15, color: r.status === 'ok' ? 'green' : 'red'}, `${r.status === 'ok' ? '✓' : '✗'} ${r.name}`),
-            create(Text, {dimColor: r.status !== 'ok'}, r.version)
+            {key: r.name, marginBottom: 0},
+            create(Text, {width: 20, color: r.status === 'ok' ? 'green' : 'red'}, `${r.status === 'ok' ? '✓' : '✗'} ${r.name}`),
+            create(Text, {dimColor: r.status !== 'ok'}, `:  ${r.version}`)
           )),
           create(Text, {marginTop: 1, color: 'yellow'}, '🛠️ Interactive Project Creator coming soon in v3.0'),
           create(Text, {dimColor: true}, 'Press Shift+A to return to Navigator.')
@@ -153,13 +153,6 @@ function Studio() {
 }
 
 function CursorText({value, cursorIndex, active = true}) {
-  const [visible, setVisible] = useState(true);
-  useEffect(() => {
-    if (!active) return;
-    const interval = setInterval(() => setVisible(v => !v), 500);
-    return () => clearInterval(interval);
-  }, [active]);
-
   const before = value.slice(0, cursorIndex);
   const charAt = value[cursorIndex] || ' ';
   const after = value.slice(cursorIndex + 1);
@@ -168,7 +161,7 @@ function CursorText({value, cursorIndex, active = true}) {
     Text,
     null,
     before,
-    active && visible ? create(Text, {backgroundColor: 'white', color: 'black'}, charAt) : charAt,
+    active ? create(Text, {backgroundColor: 'white', color: 'black'}, charAt) : charAt,
     after
   );
 }
@@ -435,11 +428,11 @@ function Compass({rootPath, initialView = 'navigator'}) {
     }
 
     if (key.shift && key.upArrow) {
-      scrollLogs(1);
+      scrollLogs(-1);
       return;
     }
     if (key.shift && key.downArrow) {
-      scrollLogs(-1);
+      scrollLogs(1);
       return;
     }
 
