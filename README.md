@@ -1,4 +1,4 @@
-# Project Compass (v2.8.0)
+# Project Compass (v2.9.2)
 
 Project Compass is a futuristic CLI navigator built with [Ink](https://github.com/vadimdemedes/ink) that scans your current folder tree for familiar code projects and gives you one-keystroke access to build, test, or run them.
 
@@ -14,6 +14,7 @@ Project Compass is a futuristic CLI navigator built with [Ink](https://github.co
 - 💎 **Omni-Studio**: A new interactive environment intelligence mode to see all installed runtimes and versions.
 - 📂 **Log Management**: Clear output with **Shift+X** or export logs to a text file with **Shift+E**.
 - 🔌 **Extensible**: Add custom commands with **Shift+C** and frameworks via `plugins.json`.
+- 💾 **Persistence**: Saves your UI preferences (Art Board, Help, Structure Guide) globally in `~/.project-compass/config.json`.
 
 ## Installation
 
@@ -37,20 +38,26 @@ project-compass [--dir /path/to/workspace] [--studio]
 | **Shift+T** | Open **Orbit Task Manager** |
 | **Shift+D** | **Detach** from active task (runs in background) |
 | **Shift+A** | Open **Omni-Studio** (Environment View) |
+| **Shift+B** | Toggle **Art Board** visibility |
+| **Shift+H** | Toggle **Help Cards** visibility |
+| **Shift+S** | Toggle **Structure Guide** visibility |
 | **Shift+C** | Add a custom command (`label|cmd`) |
 | **Shift+X** | **Clear output logs** |
 | **Shift+E** | **Export logs to .txt** |
 | **Shift ↑ / ↓** | Scroll output buffer |
 | **Shift+L** | Rerun last command |
-| **Shift+H** | Toggle help cards |
-| **Shift+S** | Toggle structure guide |
-| **Shift+Q** | Quit app |
+| **Shift+Q** | Quit app (with confirmation if tasks run) |
 | ? | Toggle help overlay |
 | Ctrl+C | Interrupt running command |
 
 ## Orbit Task Manager
 
-Project Compass v2.8 introduces background task management. You can start a build, press **Shift+D** to detach and return to the navigator, then start another task. Switch between them or view logs via the Task Manager (**Shift+T**).
+Project Compass introduces background task management. You can start a build, press **Shift+D** to detach and return to the navigator, then start another task. 
+
+Inside the Task Manager (**Shift+T**):
+- **Shift+K**: Kill a running process or remove a task from history.
+- **Shift+R**: Rename a task for better organization.
+- **Enter**: Switch back to the Navigator with the selected task's logs.
 
 ## Omni-Studio
 
