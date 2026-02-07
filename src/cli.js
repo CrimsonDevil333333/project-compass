@@ -332,7 +332,15 @@ function Compass({rootPath, initialView = 'navigator'}) {
     if (shiftCombo('x')) { setTasks(prev => prev.map(t => t.id === activeTaskId ? {...t, logs: []} : t)); setLogOffset(0); return; }
     if (shiftCombo('e')) { exportLogs(); return; }
     if (shiftCombo('d')) { setActiveTaskId(null); return; }
-    if (shiftCombo('t')) { setMainView('tasks'); return; }
+    
+    if (shiftCombo('t')) { 
+      setMainView((prev) => {
+        if (prev === 'tasks') return 'navigator';
+        if (tasks.length > 0 && !activeTaskId) setActiveTaskId(tasks[0].id);
+        return 'tasks';
+      });
+      return; 
+    }
 
     const scrollLogs = (delta) => {
       setLogOffset((prev) => {
@@ -341,6 +349,15 @@ function Compass({rootPath, initialView = 'navigator'}) {
         return Math.max(0, Math.min(maxScroll, prev + delta));
       });
     };
+
+    if (mainView === 'tasks') {
+      if (tasks.length > 0) {
+        if (key.upArrow) { setActiveTaskId(prev => tasks[(tasks.findIndex(t => t.id === prev) - 1 + tasks.length) % tasks.length]?.id); return; }
+        if (key.downArrow) { setActiveTaskId(prev => tasks[(tasks.findIndex(t => t.id === prev) + 1) % tasks.length]?.id); return; }
+      }
+      if (key.return) { setMainView('navigator'); return; }
+      return;
+    }
 
     if (running && activeTaskId && runningProcessMap.current.has(activeTaskId)) {
       const proc = runningProcessMap.current.get(activeTaskId);
@@ -367,13 +384,6 @@ function Compass({rootPath, initialView = 'navigator'}) {
 
     if (normalizedInput === '?') { setShowHelp((prev) => !prev); return; }
     if (shiftCombo('l') && lastCommandRef.current) { runProjectCommand(lastCommandRef.current.commandMeta, lastCommandRef.current.project); return; }
-
-    if (mainView === 'tasks') {
-      if (key.upArrow) { setActiveTaskId(prev => tasks[(tasks.findIndex(t => t.id === prev) - 1 + tasks.length) % tasks.length]?.id); return; }
-      if (key.downArrow) { setActiveTaskId(prev => tasks[(tasks.findIndex(t => t.id === prev) + 1) % tasks.length]?.id); return; }
-      if (key.return || shiftCombo('t')) { setMainView('navigator'); return; }
-      return;
-    }
 
     if (key.upArrow && !key.shift && projects.length > 0) { setSelectedIndex((prev) => (prev - 1 + projects.length) % projects.length); return; }
     if (key.downArrow && !key.shift && projects.length > 0) { setSelectedIndex((prev) => (prev + 1) % projects.length); return; }
@@ -412,7 +422,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
         create(Text, {color: t.id === activeTaskId ? 'cyan' : 'white', bold: t.id === activeTaskId}, `${t.id === activeTaskId ? '→' : ' '} [${t.status.toUpperCase()}] ${t.name}`)
       )),
       !tasks.length && create(Text, {dimColor: true}, 'No active or background tasks.'),
-      create(Text, {marginTop: 1, dimColor: true}, 'Press Enter/Shift+T to return to Navigator, Up/Down to switch focus.')
+      create(Text, {marginTop: 1, dimColor: true}, 'Press Enter or Shift+T to return to Navigator, Up/Down to switch focus.')
     );
   }
 
@@ -523,7 +533,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
       create(Box, {flexDirection: 'row', justifyContent: 'space-between'}, create(Text, {bold: true, color: 'yellow'}, `Output: ${activeTask?.name || 'None'}`), create(Text, {dimColor: true}, logOffset ? `Scrolled ${logOffset} lines` : 'Live log view')),
       create(Box, {flexDirection: 'column', borderStyle: 'round', borderColor: 'yellow', padding: 1, minHeight: OUTPUT_WINDOW_HEIGHT, maxHeight: OUTPUT_WINDOW_HEIGHT, height: OUTPUT_WINDOW_HEIGHT, overflow: 'hidden'}, ...logNodes),
       create(Box, {marginTop: 1, flexDirection: 'row', justifyContent: 'space-between'}, create(Text, {dimColor: true}, running ? 'Type to feed stdin; Enter: submit, Ctrl+C: abort.' : 'Run a command or press Shift+T to switch tasks.'), create(Text, {dimColor: true}, `${toggleHint}, Shift+S: Structure Guide`)),
-      create(Box, {marginTop: 1, flexDirection: 'row', borderStyle: 'round', borderColor: running ? 'green' : 'gray', paddingX: 1}, create(Text, {bold: true, color: running ? 'green' : 'white'}, running ? ' Stdin buffer ' : ' Input ready '), create(Box, {marginLeft: 1}, create(CursorText, {value: stdinBuffer || (running ? '' : 'Start a command to feed stdin'), cursorIndex: stdinCursor, active: running})))
+      create(Box, {marginTop: 1, flexDirection: 'row', borderStyle: 'round', borderColor: running ? 'green' : 'gray', paddingX: 1}, create(Text, {bold: true, color: 'green'}, running ? ' Stdin buffer ' : ' Input ready '), create(Box, {marginLeft: 1}, create(CursorText, {value: stdinBuffer || (running ? '' : 'Start a command to feed stdin'), cursorIndex: stdinCursor, active: running})))
     ),
     showHelpCards && create(Box, {marginTop: 1, flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap'}, ...helpCards.map((card, idx) => create(Box, {key: card.label, flexGrow: 1, flexBasis: 0, minWidth: HELP_CARD_MIN_WIDTH, marginRight: idx < 2 ? 1 : 0, marginBottom: 1, borderStyle: 'round', borderColor: card.color, padding: 1, flexDirection: 'column'}, create(Text, {color: card.color, bold: true, marginBottom: 1}, card.label), ...card.body.map((line, lidx) => create(Text, {key: lidx, dimColor: card.color === 'yellow'}, line))))),
     showStructureGuide && create(Box, {flexDirection: 'column', borderStyle: 'round', borderColor: 'blue', marginTop: 1, padding: 1}, create(Text, {color: 'cyan', bold: true}, 'Structure guide · press Shift+S to hide'), ...SCHEMA_GUIDE.map(e => create(Text, {key: e.type, dimColor: true}, `• ${e.icon} ${e.label}: ${e.files.join(', ')}`))),
