@@ -72,6 +72,39 @@ npm install -g project-compass
 
 ![Exit Confirmation](https://raw.githubusercontent.com/CrimsonDevil333333/project-compass/master/assets/screenshots/exit-confirm.jpg)
 
+## ⚙️ Configuration & Customization
+
+Project Compass is designed to be personalized. All settings and custom commands are stored in a local JSON file.
+
+- **Location**: `~/.project-compass/config.json` (Automatically created on first run)
+
+### 🛠️ Adding Custom Commands
+You can add your own project-specific commands directly within the app by pressing **Shift+C** in the Detail View. Use the format `Label|Command` (e.g., `Deploy|npm run deploy`).
+
+### 📁 Manual Config Structure
+If you prefer manual editing, the `config.json` follows this structure:
+
+```json
+{
+  "showArtBoard": true,
+  "showHelpCards": false,
+  "showStructureGuide": false,
+  "customCommands": {
+    "/path/to/your/project": [
+      {
+        "label": "Build Production",
+        "command": ["npm", "run", "build", "--prod"]
+      }
+    ]
+  }
+}
+```
+
+- `showArtBoard/HelpCards/Structure`: Persistence for your UI visibility preferences.
+- `customCommands`: A map of absolute project paths to arrays of command objects.
+
+---
+
 ## 🚀 Vision
 Project Compass is designed to be the "Last Terminal Tool" you ever need to open. It bridges the gap between raw CLI commands and full IDEs, giving you a professional, reactive cockpit for all your development work.
 
