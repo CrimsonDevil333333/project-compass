@@ -630,26 +630,26 @@ async function main() {
   }
   if (args.help) {
     console.clear();
-    console.log(kleur.magenta.bold('🧭 Project Compass · Premium Developer Cockpit'));
+    console.log(kleur.bold(kleur.magenta('🧭 Project Compass · Premium Developer Cockpit')));
     console.log(kleur.dim('───────────────────────────────────────────────────'));
     console.log('');
     console.log(kleur.bold('Usage:'));
     console.log('  project-compass [--dir <path>] [--studio]');
     console.log('');
-    console.log(kleur.cyan.bold('🌌 Core Views:'));
+    console.log(kleur.bold(kleur.cyan('🌌 Core Views:')));
     console.log('  Shift+T  ' + kleur.bold('Orbit Task Manager') + '  - Manage background processes & stream logs');
     console.log('  Shift+P  ' + kleur.bold('Package Registry') + '    - Direct dependency management (add/remove)');
     console.log('  Shift+N  ' + kleur.bold('Project Architect') + '   - Scaffold new projects from templates');
     console.log('  Shift+A  ' + kleur.bold('Omni-Studio') + '         - Environment & runtime health audit');
     console.log('');
-    console.log(kleur.yellow.bold('🎮 Navigation & Details:'));
+    console.log(kleur.bold(kleur.yellow('🎮 Navigation & Details:')));
     console.log('  ↑ / ↓    Move focus through discovered projects');
     console.log('  Enter    Toggle deep detail view (manifests, scripts, frameworks)');
     console.log('  Shift+C  Add a persistent custom command to the focused project');
     console.log('  1-9      Quick-run numbered scripts in detail view');
     console.log('  B/T/R    Macro run: Build / Test / Run');
     console.log('');
-    console.log(kleur.green.bold('🛠️ Workspace Tools:'));
+    console.log(kleur.bold(kleur.green('🛠️ Workspace Tools:')));
     console.log('  Shift+B  Toggle Art-coded Build Atlas');
     console.log('  Shift+S  Toggle Directory Structure Guide');
     console.log('  Shift+H  Toggle Navigation Help Cards');
@@ -657,7 +657,7 @@ async function main() {
     console.log('  Shift+X  Clear active log buffer');
     console.log('  Shift+E  Export current session logs to .txt');
     console.log('');
-    console.log(kleur.red.bold('🚪 System:'));
+    console.log(kleur.bold(kleur.red('🚪 System:')));
     console.log('  Shift+Q  Quit application (triggers confirmation if tasks are running)');
     console.log('  Esc      Global "Back" key to return to Main Navigator');
     console.log('');
