@@ -14,6 +14,9 @@ import Studio from './components/Studio.js';
 import TaskManager from './components/TaskManager.js';
 import PackageRegistry from './components/PackageRegistry.js';
 import ProjectArchitect from './components/ProjectArchitect.js';
+import Navigator from './components/Navigator.js';
+import Header from './components/Header.js';
+import Footer from './components/Footer.js';
 
 const create = React.createElement;
 const ART_CHARS = ['▁', '▃', '▄', '▅', '▇'];
@@ -49,13 +52,14 @@ function loadConfig() {
         showArtBoard: true,
         showHelpCards: false,
         showStructureGuide: false,
+        maxVisibleProjects: 8,
         ...parsed,
       };
     }
   } catch (error) {
     console.error(`Ignoring corrupt config: ${error.message}`);
   }
-  return {customCommands: {}, showArtBoard: true, showHelpCards: false, showStructureGuide: false};
+  return {customCommands: {}, showArtBoard: true, showHelpCards: false, showStructureGuide: false, maxVisibleProjects: 8};
 }
 
 function useScanner(rootPath) {
@@ -487,30 +491,6 @@ function Compass({rootPath, initialView = 'navigator'}) {
   const orbitHint = mainView === 'tasks' ? 'Tasks View' : `Orbit: ${tasks.length} tasks`;
   const artHint = config.showArtBoard ? 'Shift+B hide art' : 'Shift+B show art';
 
-  const projectRows = useMemo(() => {
-    if (loading) return [create(Text, {key: 'scanning', dimColor: true}, 'Scanning projects…')];
-    if (error) return [create(Text, {key: 'error', color: 'red'}, `Unable to scan: ${error}`)];
-    if (projects.length === 0) return [create(Text, {key: 'empty', dimColor: true}, 'No recognizable project manifests found.')];
-    
-    return projects.map((project, index) => {
-      const isSelected = index === selectedIndex;
-      const frameworkBadges = (project.frameworks || []).map((frame) => `${frame.icon} ${frame.name}`).join(', ');
-      const hasMissingRuntime = project.missingBinaries && project.missingBinaries.length > 0;
-      return create(
-        Box,
-        {key: project.id, flexDirection: 'column', marginBottom: 1, padding: 1},
-        create(
-          Box,
-          {flexDirection: 'row'},
-          create(Text, {color: isSelected ? 'cyan' : 'white', bold: isSelected}, `${project.icon} ${project.name}`),
-          hasMissingRuntime && create(Text, {color: 'red', bold: true}, '  ⚠️ Runtime missing')
-        ),
-        create(Text, {dimColor: true}, `  ${project.type} · ${path.relative(rootPath, project.path) || '.'}`),
-        frameworkBadges && create(Text, {dimColor: true}, `   ${frameworkBadges}`)
-      );
-    });
-  }, [loading, error, projects, selectedIndex, rootPath]);
-
   const detailContent = useMemo(() => {
     if (viewMode !== 'detail' || !selectedProject) {
       return [create(Text, {key: 'e-h', dimColor: true}, 'Press Enter on a project to reveal details.')];
@@ -568,27 +548,23 @@ function Compass({rootPath, initialView = 'navigator'}) {
       case 'architect': return create(ProjectArchitect, {rootPath, onRunCommand: runProjectCommand, CursorText, onReturn: () => setMainView('navigator')});
       default: {
         const navigatorBody = [
-          create(Box, {key: 'header', justifyContent: 'space-between'},
-            create(Box, {flexDirection: 'column'}, create(Text, {color: 'magenta', bold: true}, 'Project Compass'), create(Text, {dimColor: true}, `${projectCountLabel} detected in ${rootPath}`)),
-            create(Box, {flexDirection: 'column', alignItems: 'flex-end'}, 
-              create(Text, {color: running ? 'yellow' : 'green'}, statusHint), 
-              create(Text, {dimColor: true}, `${toggleHint} · ${orbitHint} · ${artHint} · Shift+Q: Quit`)
-            )
-          ),
+          create(Header, {projectCountLabel, rootPath, running, statusHint, toggleHint, orbitHint, artHint}),
           config.showArtBoard && create(Box, {key: 'artboard', flexDirection: 'column', marginTop: 1, borderStyle: 'round', borderColor: 'gray', padding: 1},
             create(Box, {flexDirection: 'row', justifyContent: 'space-between'}, create(Text, {color: 'magenta', bold: true}, 'Art-coded build atlas'), create(Text, {dimColor: true}, 'press ? for overlay help')),
             create(Box, {flexDirection: 'row', marginTop: 1}, ...ART_CHARS.map((char, i) => create(Text, {key: i, color: ART_COLORS[i % ART_COLORS.length]}, char.repeat(2)))),
             create(Box, {flexDirection: 'row', marginTop: 1}, ...artTileNodes)
           ),
           create(Box, {key: 'projects-row', marginTop: 1, flexDirection: 'row', alignItems: 'stretch', width: '100%', flexWrap: 'wrap'},
-            create(Box, {flexGrow: 1, flexBasis: 0, minWidth: PROJECTS_MIN_WIDTH, marginRight: 1, borderStyle: 'round', borderColor: 'magenta', padding: 1}, create(Text, {bold: true, color: 'magenta'}, 'Projects'), create(Box, {flexDirection: 'column', marginTop: 1}, ...projectRows)),
+            create(Box, {flexGrow: 1, flexBasis: 0, minWidth: PROJECTS_MIN_WIDTH, marginRight: 1, borderStyle: 'round', borderColor: 'magenta', padding: 1}, 
+              create(Text, {bold: true, color: 'magenta'}, 'Projects'), 
+              create(Box, {flexDirection: 'column', marginTop: 1}, create(Navigator, {projects, selectedIndex, rootPath, loading, error, maxVisibleProjects: config.maxVisibleProjects}))
+            ),
             create(Box, {flexGrow: 1.3, flexBasis: 0, minWidth: DETAILS_MIN_WIDTH, borderStyle: 'round', borderColor: 'cyan', padding: 1, flexDirection: 'column'}, create(Text, {bold: true, color: 'cyan'}, 'Details'), ...detailContent)
           ),
           create(Box, {key: 'output-row', marginTop: 1, flexDirection: 'column'},
             create(Box, {flexDirection: 'row', justifyContent: 'space-between'}, create(Text, {bold: true, color: 'yellow'}, `Output: ${activeTask?.name || 'None'}`), create(Text, {dimColor: true}, logOffset ? `Scrolled ${logOffset} lines` : 'Live log view')),
             create(OutputPanel, {activeTask, logOffset}),
-            create(Box, {marginTop: 1, flexDirection: 'row', justifyContent: 'space-between'}, create(Text, {dimColor: true}, running ? 'Type to feed stdin; Enter: submit.' : 'Run a command or press Shift+T to switch tasks.'), create(Text, {dimColor: true}, `${toggleHint}, Shift+S: Structure Guide`)),
-            create(Box, {marginTop: 1, flexDirection: 'row', borderStyle: 'round', borderColor: running ? 'green' : 'gray', paddingX: 1}, create(Text, {bold: true, color: running ? 'green' : 'white'}, running ? ' Stdin buffer ' : ' Input ready '), create(Box, {marginLeft: 1}, create(CursorText, {value: stdinBuffer || (running ? '' : 'Start a command to feed stdin'), cursorIndex: stdinCursor, active: running})))
+            create(Footer, {toggleHint, running, stdinBuffer, stdinCursor, CursorText})
           ),
           config.showHelpCards && create(Box, {key: 'help-cards', marginTop: 1, flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap'}, [
             {label: 'Navigation', color: 'magenta', body: ['↑ / ↓ move focus, Enter: details', 'Shift+↑ / ↓ scroll output', 'Shift+H toggle help cards', 'Shift+D detach from task']},
