@@ -19,9 +19,15 @@ npm install -g project-compass
 ## 🌟 Premium Features
 
 ### 🌌 The Navigator (Main Interface)
-- **Automatic Discovery**: Instantly scans and identifies Node.js, Python, Rust, Go, Java, Scala, PHP, and Ruby projects.
+- **Automatic Discovery**: Instantly identifies **Node.js (Next.js, React, Vue, NestJS, Angular, SvelteKit, Nuxt, Astro)**, **Python (Django, Flask, FastAPI)**, **Rust (Rocket, Actix)**, **Go**, **Java (Spring Boot)**, **.NET (ASP.NET Core)**, **PHP (Laravel)**, and **Ruby**.
+- **Package Manager Intelligence**: Context-aware detection of `pnpm`, `bun`, `yarn`, and `npm`. No hardcoded commands—Compass uses your project's preferred tool.
 - **Deep Detail View**: Press `Enter` to reveal project manifests, detected frameworks, and available scripts.
 - **Custom Actions**: Save persistent, project-specific commands with `Shift+C` (e.g., `deploy|npm run deploy --prod`).
+- **Macro Commands**: High-speed access to core workflows:
+    - `B`: Build
+    - `T`: Test
+    - `R`: Run / Start
+    - `I`: Install Dependencies (New!)
 - **Live Output Panel**: Stream real-time logs from active processes with dedicated scrolling (`Shift+↑/↓`).
 
 ### 🛰️ Orbit Task Manager (`Shift+T`)
@@ -35,12 +41,17 @@ npm install -g project-compass
 ### 📦 Package Registry (`Shift+P`)
 - **Context-Aware Management**: Add or remove dependencies without leaving the app.
 - **Internal Switcher**: Quick-swap projects within the registry view using `S`.
-- **Multi-Runtime Support**: Handles `npm`, `pip`, and more based on project type.
+- **Multi-Runtime Support**: Handles `npm`, `pnpm`, `bun`, `pip`, and more based on project type.
 
 ![Package Registry](https://raw.githubusercontent.com/CrimsonDevil333333/project-compass/master/assets/screenshots/registry.jpg)
 
 ### 🏗️ Project Architect (`Shift+N`)
-- **Rapid Scaffolding**: Create new projects from scratch using industry-standard templates.
+- **Rapid Scaffolding**: Create new projects from scratch using industry-standard templates:
+    - **Next.js** (Standard & Bun variants)
+    - **React/Vue** (Vite-powered with pnpm/npm support)
+    - **Rust** (Cargo binary)
+    - **Django** (Python web framework)
+    - **Go** (Module initialization)
 - **Interactive Prompts**: Safe, guided setup for directory structure and initial manifests.
 
 ![Project Architect](https://raw.githubusercontent.com/CrimsonDevil333333/project-compass/master/assets/screenshots/architect.jpg)
@@ -58,6 +69,7 @@ npm install -g project-compass
 | :--- | :--- |
 | `↑ / ↓` | Move project focus |
 | `Enter` | Toggle project Detail View |
+| `B / T / R / I`| Macro: Build, Test, Run, **Install** |
 | `Shift + T` | **Orbit**: Task Manager |
 | `Shift + P` | **Registry**: Package Manager |
 | `Shift + N` | **Architect**: Project Creator |

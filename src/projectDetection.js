@@ -18,6 +18,13 @@ function checkBinary(name) {
   }
 }
 
+function getPackageManager(projectPath) {
+  if (hasProjectFile(projectPath, 'bun.lockb') || hasProjectFile(projectPath, 'bun.lock')) return 'bun';
+  if (hasProjectFile(projectPath, 'pnpm-lock.yaml')) return 'pnpm';
+  if (hasProjectFile(projectPath, 'yarn.lock')) return 'yarn';
+  return 'npm';
+}
+
 function findPythonEntry(projectPath) {
   return PYTHON_ENTRY_FILES.find((file) => hasProjectFile(projectPath, file)) || null;
 }
@@ -28,11 +35,12 @@ function hasProjectFile(projectPath, file) {
 
 function resolveScriptCommand(project, scriptName, fallback = null) {
   const scripts = project.metadata?.scripts || {};
+  const pm = project.metadata?.packageManager || 'npm';
   if (Object.prototype.hasOwnProperty.call(scripts, scriptName)) {
-    return ['npm', 'run', scriptName];
+    return [pm, 'run', scriptName];
   }
   if (typeof fallback === 'function') {
-    return fallback();
+    return fallback(pm);
   }
   return fallback;
 }
@@ -112,7 +120,7 @@ const builtInFrameworks = [
     languages: ['Node.js'],
     priority: 115,
     match(project) {
-      const hasNextConfig = hasProjectFile(project.path, 'next.config.js');
+      const hasNextConfig = ['next.config.js', 'next.config.mjs', 'next.config.ts'].some(f => hasProjectFile(project.path, f));
       return dependencyMatches(project, 'next') || hasNextConfig;
     },
     commands(project) {
@@ -123,11 +131,11 @@ const builtInFrameworks = [
           commands[key] = {label, command: tokens, source: 'framework'};
         }
       };
-      add('install', 'Next install', () => ['npm', 'install']);
-      add('run', 'Next dev', () => ['npx', 'next', 'dev']);
-      add('build', 'Next build', () => ['npx', 'next', 'build']);
-      add('test', 'Next test', () => ['npm', 'run', 'test']);
-      add('start', 'Next start', () => ['npx', 'next', 'start']);
+      add('install', 'Next install', (pm) => [pm, 'install']);
+      add('run', 'Next dev', (pm) => pm === 'npm' ? ['npx', 'next', 'dev'] : [pm, 'next', 'dev']);
+      add('build', 'Next build', (pm) => pm === 'npm' ? ['npx', 'next', 'build'] : [pm, 'next', 'build']);
+      add('test', 'Next test', (pm) => [pm, 'run', 'test']);
+      add('start', 'Next start', (pm) => pm === 'npm' ? ['npx', 'next', 'start'] : [pm, 'next', 'start']);
       return commands;
     }
   },
@@ -139,7 +147,7 @@ const builtInFrameworks = [
     languages: ['Node.js'],
     priority: 112,
     match(project) {
-      return dependencyMatches(project, 'react') && (dependencyMatches(project, 'react-scripts') || dependencyMatches(project, 'vite') || hasProjectFile(project.path, 'vite.config.js'));
+      return dependencyMatches(project, 'react') && (dependencyMatches(project, 'react-scripts') || dependencyMatches(project, 'vite') || hasProjectFile(project.path, 'vite.config.js') || hasProjectFile(project.path, 'vite.config.ts'));
     },
     commands(project) {
       const commands = {};
@@ -149,10 +157,10 @@ const builtInFrameworks = [
           commands[key] = {label, command: tokens, source: 'framework'};
         }
       };
-      add('install', 'React install', () => ['npm', 'install']);
-      add('run', 'React dev', () => ['npm', 'run', 'dev']);
-      add('build', 'React build', () => ['npm', 'run', 'build']);
-      add('test', 'React test', () => ['npm', 'run', 'test']);
+      add('install', 'React install', (pm) => [pm, 'install']);
+      add('run', 'React dev', (pm) => [pm, 'run', 'dev']);
+      add('build', 'React build', (pm) => [pm, 'run', 'build']);
+      add('test', 'React test', (pm) => [pm, 'run', 'test']);
       return commands;
     }
   },
@@ -164,7 +172,7 @@ const builtInFrameworks = [
     languages: ['Node.js'],
     priority: 111,
     match(project) {
-      return dependencyMatches(project, 'vue') && (hasProjectFile(project.path, 'vue.config.js') || dependencyMatches(project, '@vue/cli-service') || dependencyMatches(project, 'vite'));
+      return dependencyMatches(project, 'vue') && (hasProjectFile(project.path, 'vue.config.js') || hasProjectFile(project.path, 'vue.config.ts') || dependencyMatches(project, '@vue/cli-service') || dependencyMatches(project, 'vite'));
     },
     commands(project) {
       const commands = {};
@@ -174,10 +182,10 @@ const builtInFrameworks = [
           commands[key] = {label, command: tokens, source: 'framework'};
         }
       };
-      add('install', 'Vue install', () => ['npm', 'install']);
-      add('run', 'Vue dev', () => ['npm', 'run', 'dev']);
-      add('build', 'Vue build', () => ['npm', 'run', 'build']);
-      add('test', 'Vue test', () => ['npm', 'run', 'test']);
+      add('install', 'Vue install', (pm) => [pm, 'install']);
+      add('run', 'Vue dev', (pm) => [pm, 'run', 'dev']);
+      add('build', 'Vue build', (pm) => [pm, 'run', 'build']);
+      add('test', 'Vue test', (pm) => [pm, 'run', 'test']);
       return commands;
     }
   },
@@ -189,7 +197,7 @@ const builtInFrameworks = [
     languages: ['Node.js'],
     priority: 110,
     match(project) {
-      return dependencyMatches(project, '@nestjs/cli') || dependencyMatches(project, '@nestjs/core');
+      return dependencyMatches(project, '@nestjs/cli') || dependencyMatches(project, '@nestjs/core') || hasProjectFile(project.path, 'nest-cli.json');
     },
     commands(project) {
       const commands = {};
@@ -199,10 +207,10 @@ const builtInFrameworks = [
           commands[key] = {label, command: tokens, source: 'framework'};
         }
       };
-      add('install', 'Nest install', () => ['npm', 'install']);
-      add('run', 'Nest dev', () => ['npm', 'run', 'start:dev']);
-      add('build', 'Nest build', () => ['npm', 'run', 'build']);
-      add('test', 'Nest test', () => ['npm', 'run', 'test']);
+      add('install', 'Nest install', (pm) => [pm, 'install']);
+      add('run', 'Nest dev', (pm) => [pm, 'run', 'start:dev']);
+      add('build', 'Nest build', (pm) => [pm, 'run', 'build']);
+      add('test', 'Nest test', (pm) => [pm, 'run', 'test']);
       return commands;
     }
   },
@@ -224,10 +232,10 @@ const builtInFrameworks = [
           commands[key] = {label, command: tokens, source: 'framework'};
         }
       };
-      add('install', 'Angular install', () => ['npm', 'install']);
-      add('run', 'Angular serve', () => ['npm', 'run', 'start']);
-      add('build', 'Angular build', () => ['npm', 'run', 'build']);
-      add('test', 'Angular test', () => ['npm', 'run', 'test']);
+      add('install', 'Angular install', (pm) => [pm, 'install']);
+      add('run', 'Angular serve', (pm) => [pm, 'run', 'start']);
+      add('build', 'Angular build', (pm) => [pm, 'run', 'build']);
+      add('test', 'Angular test', (pm) => [pm, 'run', 'test']);
       return commands;
     }
   },
@@ -239,7 +247,7 @@ const builtInFrameworks = [
     languages: ['Node.js'],
     priority: 108,
     match(project) {
-      return hasProjectFile(project.path, 'svelte.config.js') || dependencyMatches(project, '@sveltejs/kit');
+      return hasProjectFile(project.path, 'svelte.config.js') || hasProjectFile(project.path, 'svelte.config.ts') || dependencyMatches(project, '@sveltejs/kit');
     },
     commands(project) {
       const commands = {};
@@ -249,11 +257,11 @@ const builtInFrameworks = [
           commands[key] = {label, command: tokens, source: 'framework'};
         }
       };
-      add('install', 'SvelteKit install', () => ['npm', 'install']);
-      add('run', 'SvelteKit dev', () => ['npm', 'run', 'dev']);
-      add('build', 'SvelteKit build', () => ['npm', 'run', 'build']);
-      add('test', 'SvelteKit test', () => ['npm', 'run', 'test']);
-      add('preview', 'SvelteKit preview', () => ['npm', 'run', 'preview']);
+      add('install', 'SvelteKit install', (pm) => [pm, 'install']);
+      add('run', 'SvelteKit dev', (pm) => [pm, 'run', 'dev']);
+      add('build', 'SvelteKit build', (pm) => [pm, 'run', 'build']);
+      add('test', 'SvelteKit test', (pm) => [pm, 'run', 'test']);
+      add('preview', 'SvelteKit preview', (pm) => [pm, 'run', 'preview']);
       return commands;
     }
   },
@@ -265,7 +273,7 @@ const builtInFrameworks = [
     languages: ['Node.js'],
     priority: 107,
     match(project) {
-      return hasProjectFile(project.path, 'nuxt.config.js') || dependencyMatches(project, 'nuxt');
+      return hasProjectFile(project.path, 'nuxt.config.js') || hasProjectFile(project.path, 'nuxt.config.ts') || dependencyMatches(project, 'nuxt');
     },
     commands(project) {
       const commands = {};
@@ -275,10 +283,10 @@ const builtInFrameworks = [
           commands[key] = {label, command: tokens, source: 'framework'};
         }
       };
-      add('install', 'Nuxt install', () => ['npm', 'install']);
-      add('run', 'Nuxt dev', () => ['npm', 'run', 'dev']);
-      add('build', 'Nuxt build', () => ['npm', 'run', 'build']);
-      add('start', 'Nuxt start', () => ['npm', 'run', 'start']);
+      add('install', 'Nuxt install', (pm) => [pm, 'install']);
+      add('run', 'Nuxt dev', (pm) => [pm, 'run', 'dev']);
+      add('build', 'Nuxt build', (pm) => [pm, 'run', 'build']);
+      add('start', 'Nuxt start', (pm) => [pm, 'run', 'start']);
       return commands;
     }
   },
@@ -290,7 +298,7 @@ const builtInFrameworks = [
     languages: ['Node.js'],
     priority: 106,
     match(project) {
-      const matches = ['astro.config.mjs', 'astro.config.ts'].some((file) => hasProjectFile(project.path, file));
+      const matches = ['astro.config.mjs', 'astro.config.ts', 'astro.config.js', 'astro.config.cjs'].some((file) => hasProjectFile(project.path, file));
       return matches || dependencyMatches(project, 'astro');
     },
     commands(project) {
@@ -301,10 +309,10 @@ const builtInFrameworks = [
           commands[key] = {label, command: tokens, source: 'framework'};
         }
       };
-      add('install', 'Astro install', () => ['npm', 'install']);
-      add('run', 'Astro dev', () => ['npm', 'run', 'dev']);
-      add('build', 'Astro build', () => ['npm', 'run', 'build']);
-      add('preview', 'Astro preview', () => ['npm', 'run', 'preview']);
+      add('install', 'Astro install', (pm) => [pm, 'install']);
+      add('run', 'Astro dev', (pm) => [pm, 'run', 'dev']);
+      add('build', 'Astro build', (pm) => [pm, 'run', 'build']);
+      add('preview', 'Astro preview', (pm) => [pm, 'run', 'preview']);
       return commands;
     }
   },
@@ -399,10 +407,10 @@ const builtInFrameworks = [
           commands[key] = {label, command: tokens, source: 'framework'};
         }
       };
-      add('install', 'Vite install', () => ['npm', 'install']);
-      add('run', 'Vite dev', () => ['npx', 'vite']);
-      add('build', 'Vite build', () => ['npx', 'vite', 'build']);
-      add('preview', 'Vite preview', () => ['npx', 'vite', 'preview']);
+      add('install', 'Vite install', (pm) => [pm, 'install']);
+      add('run', 'Vite dev', (pm) => pm === 'npm' ? ['npx', 'vite'] : [pm, 'vite']);
+      add('build', 'Vite build', (pm) => pm === 'npm' ? ['npx', 'vite', 'build'] : [pm, 'vite', 'build']);
+      add('preview', 'Vite preview', (pm) => pm === 'npm' ? ['npx', 'vite', 'preview'] : [pm, 'vite', 'preview']);
       return commands;
     }
   },
@@ -416,7 +424,10 @@ const builtInFrameworks = [
     match(project) {
       return hasProjectFile(project.path, 'tailwind.config.js') || hasProjectFile(project.path, 'tailwind.config.ts') || dependencyMatches(project, 'tailwindcss');
     },
-    commands() { return { install: {label: 'Tailwind install', command: ['npm', 'install', '-D', 'tailwindcss'], source: 'framework'} }; }
+    commands(project) { 
+      const pm = project.metadata?.packageManager || 'npm';
+      return { install: {label: 'Tailwind install', command: [pm, 'install', '-D', 'tailwindcss'], source: 'framework'} }; 
+    }
   },
   {
     id: 'prisma',
@@ -428,11 +439,13 @@ const builtInFrameworks = [
     match(project) {
       return hasProjectFile(project.path, 'prisma/schema.prisma') || dependencyMatches(project, '@prisma/client');
     },
-    commands() {
+    commands(project) {
+      const pm = project.metadata?.packageManager || 'npm';
+      const npxLike = pm === 'npm' ? 'npx' : pm;
       return {
-        install: {label: 'Prisma install', command: ['npm', 'install', '@prisma/client'], source: 'framework'},
-        generate: {label: 'Prisma generate', command: ['npx', 'prisma', 'generate'], source: 'framework'},
-        studio: {label: 'Prisma studio', command: ['npx', 'prisma', 'studio'], source: 'framework'}
+        install: {label: 'Prisma install', command: [pm, 'install', '@prisma/client'], source: 'framework'},
+        generate: {label: 'Prisma generate', command: [npxLike, 'prisma', 'generate'], source: 'framework'},
+        studio: {label: 'Prisma studio', command: [npxLike, 'prisma', 'studio'], source: 'framework'}
       };
     }
   },
@@ -577,28 +590,30 @@ class SchemaRegistry {
           }
           const content = await fs.promises.readFile(pkgPath, 'utf-8');
           const pkg = JSON.parse(content);
+          const pm = getPackageManager(projectPath);
           const scripts = pkg.scripts || {};
           const commands = {};
           const preferScript = (targetKey, names, labelText) => {
             for (const name of names) {
               if (Object.prototype.hasOwnProperty.call(scripts, name)) {
-                commands[targetKey] = {label: labelText, command: ['npm', 'run', name]};
+                commands[targetKey] = {label: labelText, command: [pm, 'run', name]};
                 break;
               }
             }
           };
-          commands.install = {label: 'Install', command: ['npm', 'install']};
+          commands.install = {label: 'Install', command: [pm, 'install']};
           preferScript('build', ['build', 'compile', 'dist'], 'Build');
           preferScript('test', ['test', 'check', 'spec'], 'Test');
           preferScript('run', ['start', 'dev', 'serve', 'run'], 'Start');
           if (Object.prototype.hasOwnProperty.call(scripts, 'lint')) {
-            commands.lint = {label: 'Lint', command: ['npm', 'run', 'lint']};
+            commands.lint = {label: 'Lint', command: [pm, 'run', 'lint']};
           }
 
           const metadata = {
             dependencies: gatherNodeDependencies(pkg),
             scripts,
-            packageJson: pkg
+            packageJson: pkg,
+            packageManager: getPackageManager(projectPath)
           };
 
           const setupHints = [];

@@ -8,6 +8,7 @@ This document lists all supported languages, frameworks, and their built-in comm
 | --- | --- |
 | ↑ / ↓ | Move project focus |
 | Enter | Toggle deep detail view / Switch back from sub-views |
+| **B / T / R / I**| **Macro Launch**: Build, Test, Run, **Install** |
 | **Esc** | **Global Back**: Return to Main Navigator from any view |
 | **Shift+A** | Open **Omni-Studio** (Environment & Runtime audit) |
 | **Shift+T** | Open **Orbit Task Manager** (Manage background processes) |
@@ -30,7 +31,7 @@ This document lists all supported languages, frameworks, and their built-in comm
 
 Compass scans for the following manifests and requires their binaries in your PATH:
 
-- **Node.js** (`node`, `npm`): `package.json`
+- **Node.js** (`node`, `npm`, `pnpm`, `bun`): `package.json`
 - **Python** (`python3`, `pip`): `pyproject.toml`, `requirements.txt`, `Pipfile`, `setup.py`
 - **Rust** (`cargo`): `Cargo.toml`
 - **Go** (`go`): `go.mod`
@@ -81,6 +82,13 @@ Compass scans for the following manifests and requires their binaries in your PA
 
 ## Project Architect Shortcuts (Shift+N)
 
-- **↑ / ↓**: Select a project template (Next.js, Vite, Rust, Go, etc.).
+- **↑ / ↓**: Select a project template:
+    - Next.js (npm / Bun)
+    - React (Vite - pnpm / npm)
+    - Vue (Vite)
+    - Rust (Cargo Binary)
+    - Django (startproject)
+    - Python (Basic)
+    - Go (mod init)
 - **Enter**: Confirm selection and move to next step.
 - **Esc / Shift+N**: Exit architect mode.

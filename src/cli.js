@@ -26,7 +26,8 @@ const HELP_CARD_MIN_WIDTH = 28;
 const ACTION_MAP = {
   b: 'build',
   t: 'test',
-  r: 'run'
+  r: 'run',
+  i: 'install'
 };
 
 function saveConfig(config) {
@@ -472,7 +473,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
         runProjectCommand(detailShortcutMap.get(normalizedInput), selectedProject);
         return;
       }
-      const reserved = ['a', 'p', 'n', 'x', 'e', 'd', 'b', 't', 'q', 'h', 's', 'l', 'c'];
+      const reserved = ['a', 'p', 'n', 'x', 'e', 'd', 'b', 't', 'q', 'h', 's', 'l', 'c', 'i'];
       if (key.shift && !reserved.includes(normalizedInput)) {
         runProjectCommand(detailShortcutMap.get(normalizedInput), selectedProject);
         return;
@@ -647,7 +648,7 @@ async function main() {
     console.log('  Enter    Toggle deep detail view (manifests, scripts, frameworks)');
     console.log('  Shift+C  Add a persistent custom command to the focused project');
     console.log('  1-9      Quick-run numbered scripts in detail view');
-    console.log('  B/T/R    Macro run: Build / Test / Run');
+    console.log('  B/T/R/I  Macro run: Build / Test / Run / Install');
     console.log('');
     console.log(kleur.bold(kleur.green('🛠️ Workspace Tools:')));
     console.log('  Shift+B  Toggle Art-coded Build Atlas');

@@ -13,9 +13,12 @@ const ProjectArchitect = memo(({rootPath, onRunCommand, CursorText, onReturn}) =
 
   const frameworks = [
     {name: 'Next.js', cmd: (p, n) => ['npx', 'create-next-app@latest', path.join(p, n)]},
-    {name: 'React (Vite)', cmd: (p, n) => ['npm', 'create', 'vite@latest', path.join(p, n), '--', '--template', 'react']},
+    {name: 'Next.js (Bun)', cmd: (p, n) => ['bun', 'create', 'next-app', path.join(p, n)]},
+    {name: 'React (Vite/pnpm)', cmd: (p, n) => ['pnpm', 'create', 'vite', path.join(p, n), '--template', 'react']},
+    {name: 'React (Vite/npm)', cmd: (p, n) => ['npm', 'create', 'vite@latest', path.join(p, n), '--', '--template', 'react']},
     {name: 'Vue (Vite)', cmd: (p, n) => ['npm', 'create', 'vite@latest', path.join(p, n), '--', '--template', 'vue']},
     {name: 'Rust (Binary)', cmd: (p, n) => ['cargo', 'new', path.join(p, n)]},
+    {name: 'Django Project', cmd: (p, n) => ['django-admin', 'startproject', n, path.join(p, n)]},
     {name: 'Python (Basic)', cmd: (p, n) => ['mkdir', '-p', path.join(p, n)]},
     {name: 'Go Module', cmd: (p, n) => ['mkdir', '-p', path.join(p, n), '&&', 'cd', path.join(p, n), '&&', 'go', 'mod', 'init', n]}
   ];
