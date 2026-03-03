@@ -8,6 +8,9 @@ import pythonDetector from './detectors/python.js';
 import rustDetector from './detectors/rust.js';
 import goDetector from './detectors/go.js';
 import javaDetector from './detectors/java.js';
+import phpDetector from './detectors/php.js';
+import rubyDetector from './detectors/ruby.js';
+import dotnetDetector from './detectors/dotnet.js';
 import genericDetector from './detectors/generic.js';
 import { builtInFrameworks } from './detectors/frameworks.js';
 
@@ -19,6 +22,9 @@ const detectors = [
   rustDetector,
   goDetector,
   javaDetector,
+  phpDetector,
+  rubyDetector,
+  dotnetDetector,
   genericDetector
 ];
 

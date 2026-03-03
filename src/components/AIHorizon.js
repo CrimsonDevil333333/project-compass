@@ -221,7 +221,7 @@ Use the project's detected type (${selectedProject.type}) to ensure commands are
         status === 'busy' && create(Text, {color: 'yellow'}, ' ⏳ Contacting AI Agent... mapping project structure...'),
         status === 'done' && create(Box, {flexDirection: 'column'},
           create(Text, {color: 'green', bold: true}, ' ✅ DNA Mapped via AI Agent!'),
-          create(Text, null, ' Successfully injected ' + suggestions.length + ' optimized commands into project config.'),
+          create(Text, null, ' Successfully injected ' + suggestions.length + ' optimized commands. AI detected potential port conflicts? Checking...'),
           create(Text, {dimColor: true, marginTop: 1}, 'Return to Navigator to use BRIT shortcuts.')
         ),
         error && create(Text, {color: 'red', bold: true, marginTop: 1}, ' ✗ AI ERROR: ' + error)

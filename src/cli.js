@@ -453,9 +453,26 @@ function Compass({rootPath, initialView = 'navigator'}) {
 
     const pageLimit = config.maxVisibleProjects || 3;
     const pageStep = Math.max(1, pageLimit);
-    const clampIndex = (value) => Math.max(0, Math.min(projects.length - 1, value));
-    if (key.pageUp && projects.length > pageLimit) { console.clear(); setSelectedIndex((prev) => clampIndex(prev - pageStep)); return; }
-    if (key.pageDown && projects.length > pageLimit) { console.clear(); setSelectedIndex((prev) => clampIndex(prev + pageStep)); return; }
+    const clampIndex = (value) => {
+      const idx = Math.max(0, Math.min(projects.length - 1, value));
+      return isNaN(idx) ? 0 : idx;
+    };
+    if (key.pageUp && projects.length > pageLimit) { 
+      console.clear(); 
+      setSelectedIndex((prev) => {
+        const next = prev - pageStep;
+        return next < 0 ? 0 : next;
+      }); 
+      return; 
+    }
+    if (key.pageDown && projects.length > pageLimit) { 
+      console.clear(); 
+      setSelectedIndex((prev) => {
+        const next = prev + pageStep;
+        return next >= projects.length ? (Math.floor((projects.length - 1) / pageLimit) * pageLimit) : next;
+      }); 
+      return; 
+    }
 
     if (normalizedInput === '?') { console.clear(); setShowHelp((prev) => !prev); return; }
     if (shiftCombo('l') && lastCommandRef.current) { runProjectCommand(lastCommandRef.current.commandMeta, lastCommandRef.current.project); return; }

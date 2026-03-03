@@ -4,7 +4,7 @@ import { checkBinary, hasProjectFile } from './utils.js';
 export default {
   type: 'java',
   label: 'Java',
-  icon: '☕️',
+  icon: '☕',
   priority: 80,
   files: ['pom.xml', 'build.gradle', 'build.gradle.kts'],
   binaries: ['java', 'javac'],
@@ -31,7 +31,7 @@ export default {
       path: projectPath,
       name: path.basename(projectPath),
       type: 'Java',
-      icon: '☕️',
+      icon: '☕',
       priority: this.priority,
       commands,
       metadata: {},
