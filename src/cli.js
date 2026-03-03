@@ -294,7 +294,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
 
     useInput((input, key) => {
     if (quitConfirm) {
-      if (input?.toLowerCase() === 'y') { killAllTasks(); console.clear(); exit(); return; }
+      if (input?.toLowerCase() === 'y') { killAllTasks(); process.stdout.write('\x1b[2J\x1b[0;0H'); exit(); return; }
       if (input?.toLowerCase() === 'n' || key.escape) { setQuitConfirm(false); return; }
       return;
     }
@@ -468,7 +468,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
       return;
     }
     if (shiftCombo('q') || isCtrlC) {
-      if (hasRunningTasks) setQuitConfirm(true); else { console.clear(); exit(); }
+      if (hasRunningTasks) setQuitConfirm(true); else { process.stdout.write('\x1b[2J\x1b[0;0H'); exit(); }
       return;
     }
     
@@ -581,9 +581,9 @@ function Compass({rootPath, initialView = 'navigator'}) {
             create(Footer, {toggleHint, running, stdinBuffer, stdinCursor, CursorText})
           ),
           config.showHelpCards && create(Box, {key: 'help-cards', marginTop: 1, flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap'}, [
-            {label: 'Navigation', color: 'magenta', body: ['↑ / ↓ move focus, Enter: details', 'Shift+↑ / ↓ scroll output', 'Shift+H toggle help cards', 'Shift+D detach from task']},
+            {label: 'Navigation', color: 'magenta', body: ['↑/↓: focus, PgUp/Dn: Page, Enter: Details', 'Shift+↑ / ↓ scroll output', 'Shift+H toggle help cards', 'Shift+D detach from task']},
             {label: 'Management', color: 'cyan', body: ['Shift+P Package Registry', 'Shift+N Project Architect', 'Shift+X clear / Shift+E export']},
-            {label: 'Orbit & AI', color: 'yellow', body: ['Shift+T task manager', 'Shift+A studio / Shift+O AI Horizon', 'Shift+S structure / Shift+Q quit']}
+            {label: 'Orbit & AI', color: 'yellow', body: ['Shift+T: Tasks, Shift+O: AI, 0: Analyze', 'Shift+A studio / Shift+O AI Horizon', 'Shift+S structure / Shift+Q quit']}
           ].map((card, idx) => create(Box, {key: card.label, flexGrow: 1, flexBasis: 0, minWidth: HELP_CARD_MIN_WIDTH, marginRight: idx < 2 ? 1 : 0, marginBottom: 1, borderStyle: 'round', borderColor: card.color, padding: 1, flexDirection: 'column'}, create(Text, {color: card.color, bold: true, marginBottom: 1}, card.label), ...card.body.map((line, lidx) => create(Text, {key: lidx, dimColor: card.color === 'yellow'}, line))))),
           config.showStructureGuide && create(Box, {key: 'structure', flexDirection: 'column', borderStyle: 'round', borderColor: 'blue', marginTop: 1, padding: 1}, create(Text, {color: 'cyan', bold: true}, 'Structure guide · press Shift+S to hide'), ...SCHEMA_GUIDE.map(e => create(Text, {key: e.type, dimColor: true}, `• ${e.icon} ${e.label}: ${e.files.join(', ')}`))),
           showHelp && create(Box, {key: 'overlay', flexDirection: 'column', borderStyle: 'double', borderColor: 'cyan', marginTop: 1, padding: 1}, create(Text, {color: 'cyan', bold: true}, 'Help overlay'), create(Text, null, 'Shift+↑/↓ scrolls logs; Shift+X clears; Shift+E exports; Shift+A Studio; Shift+T Tasks; Shift+D Detach; Shift+B Toggle Art Board; Shift+P Packages; Shift+N Creator; Shift+O AI Horizon.'))
@@ -622,7 +622,6 @@ async function main() {
     return;
   }
   if (args.help) {
-    console.clear();
     console.log(kleur.bold(kleur.magenta('🧭 Project Compass · Premium Developer Cockpit')));
     console.log(kleur.dim('───────────────────────────────────────────────────'));
     console.log('');

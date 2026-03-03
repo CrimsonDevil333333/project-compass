@@ -92,3 +92,10 @@ Compass scans for the following manifests and requires their binaries in your PA
     - Go (mod init)
 - **Enter**: Confirm selection and move to next step.
 - **Esc / Shift+N**: Exit architect mode.
+
+## Advanced Configuration
+
+You can manually edit the config file to change defaults:
+- **Location**: `~/.project-compass/config.json`
+- **maxVisibleProjects**: Adjust how many projects appear per page (default: 3).
+- **aiProvider / aiModel / aiToken**: Change your AI intelligence settings.

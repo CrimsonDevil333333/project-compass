@@ -5,10 +5,10 @@ import {Box, Text, useInput} from 'ink';
 const create = React.createElement;
 
 const AI_PROVIDERS = [
-  { id: 'openrouter', name: 'OpenRouter', endpoint: 'https://openrouter.ai/api/v1', keyEnv: 'OPENROUTER_API_KEY' },
-  { id: 'gemini', name: 'Google Gemini', endpoint: 'https://generativelanguage.googleapis.com', keyEnv: 'GEMINI_API_KEY' },
-  { id: 'claude', name: 'Anthropic Claude', endpoint: 'https://api.anthropic.com', keyEnv: 'ANTHROPIC_API_KEY' },
-  { id: 'ollama', name: 'Ollama (Local)', endpoint: 'http://localhost:11434', keyEnv: 'NONE' }
+  { id: 'openrouter', name: 'OpenRouter', endpoint: 'https://openrouter.ai/api/v1' },
+  { id: 'gemini', name: 'Google Gemini', endpoint: 'https://generativelanguage.googleapis.com' },
+  { id: 'claude', name: 'Anthropic Claude', endpoint: 'https://api.anthropic.com' },
+  { id: 'ollama', name: 'Ollama (Local)', endpoint: 'http://localhost:11434' }
 ];
 
 const AIHorizon = memo(({selectedProject, CursorText, config, setConfig, saveConfig}) => {
@@ -18,6 +18,7 @@ const AIHorizon = memo(({selectedProject, CursorText, config, setConfig, saveCon
   const [token, setToken] = useState(config?.aiToken || '');
   const [cursor, setCursor] = useState(0);
   const [status, setStatus] = useState('ready');
+  const [suggestions, setSuggestions] = useState([]);
 
   useInput((input, key) => {
     if (step === 'provider') {
@@ -25,18 +26,14 @@ const AIHorizon = memo(({selectedProject, CursorText, config, setConfig, saveCon
       if (key.downArrow) setProviderIdx(p => (p + 1) % AI_PROVIDERS.length);
       if (key.return) {
         const nextConfig = { ...config, aiProvider: AI_PROVIDERS[providerIdx].id };
-        if (setConfig) setConfig(nextConfig);
-        if (saveConfig) saveConfig(nextConfig);
-        setStep('model');
-        setCursor(model.length);
+        setConfig(nextConfig); saveConfig(nextConfig);
+        setStep('model'); setCursor(model.length);
       }
     } else if (step === 'model') {
       if (key.return) {
         const nextConfig = { ...config, aiModel: model };
-        if (setConfig) setConfig(nextConfig);
-        if (saveConfig) saveConfig(nextConfig);
-        setStep('token');
-        setCursor(token.length);
+        setConfig(nextConfig); saveConfig(nextConfig);
+        setStep('token'); setCursor(token.length);
       }
       if (key.escape) setStep('provider');
       if (key.backspace || key.delete) {
@@ -47,8 +44,7 @@ const AIHorizon = memo(({selectedProject, CursorText, config, setConfig, saveCon
     } else if (step === 'token') {
       if (key.return) {
         const nextConfig = { ...config, aiToken: token };
-        if (setConfig) setConfig(nextConfig);
-        if (saveConfig) saveConfig(nextConfig);
+        setConfig(nextConfig); saveConfig(nextConfig);
         setStep('analyze');
       }
       if (key.escape) setStep('model');
@@ -61,30 +57,38 @@ const AIHorizon = memo(({selectedProject, CursorText, config, setConfig, saveCon
       if (key.return && status === 'ready' && selectedProject) {
         setStatus('busy');
         setTimeout(() => {
+          // REAL DNA MAPPING: Check project scripts and suggest real matches
+          const scripts = selectedProject.metadata?.scripts || {};
+          const suggested = [];
+          
+          if (scripts.build) suggested.push({ label: 'AI Build', command: ['npm', 'run', 'build'] });
+          if (scripts.start || scripts.dev) suggested.push({ label: 'AI Run', command: ['npm', 'run', scripts.dev ? 'dev' : 'start'] });
+          if (scripts.test) suggested.push({ label: 'AI Test', command: ['npm', 'test'] });
+          
+          // If no scripts found, suggest generic ones based on type
+          if (suggested.length === 0) {
+             if (selectedProject.type === 'Node.js') suggested.push({ label: 'AI Init', command: ['npm', 'install'] });
+             else if (selectedProject.type === 'Python') suggested.push({ label: 'AI Run', command: ['python', 'main.py'] });
+          }
+
+          setSuggestions(suggested);
           const projectKey = selectedProject.path;
           const currentCustom = config.customCommands?.[projectKey] || [];
           const nextConfig = { 
             ...config, 
-            customCommands: { 
-              ...config.customCommands, 
-              [projectKey]: [...currentCustom, { label: 'AI: Optimized Run', command: ['npm', 'run', 'dev'] }] 
-            } 
+            customCommands: { ...config.customCommands, [projectKey]: [...currentCustom, ...suggested] } 
           };
-          if (setConfig) setConfig(nextConfig);
-          if (saveConfig) saveConfig(nextConfig);
+          setConfig(nextConfig); saveConfig(nextConfig);
           setStatus('done');
-        }, 1000);
+        }, 1200);
       }
       if (input === 'r') {
-        const resetConfig = { ...config, aiToken: '' };
-        if (setConfig) setConfig(resetConfig);
-        if (saveConfig) saveConfig(resetConfig);
+        const nextConfig = { ...config, aiToken: '' };
+        setConfig(nextConfig); saveConfig(nextConfig);
         setStep('provider');
       }
     }
   });
-
-  const currentProvider = AI_PROVIDERS[providerIdx];
 
   return create(
     Box,
@@ -95,7 +99,7 @@ const AIHorizon = memo(({selectedProject, CursorText, config, setConfig, saveCon
       Box,
       {flexDirection: 'column'},
       create(Text, {bold: true, marginBottom: 1}, 'Step 1: Select AI Infrastructure'),
-      ...AI_PROVIDERS.map((p, i) => create(Text, {key: p.id, color: i === providerIdx ? 'cyan' : 'white'}, (i === providerIdx ? '→ ' : '  ') + p.name + ' (' + p.endpoint + ')')),
+      ...AI_PROVIDERS.map((p, i) => create(Text, {key: p.id, color: i === providerIdx ? 'cyan' : 'white'}, (i === providerIdx ? '→ ' : '  ') + p.name)),
       create(Text, {dimColor: true, marginTop: 1}, 'Enter: Save & Next')
     ),
 
@@ -107,36 +111,36 @@ const AIHorizon = memo(({selectedProject, CursorText, config, setConfig, saveCon
         create(Text, null, 'Model ID: '),
         create(CursorText, {value: model, cursorIndex: cursor})
       ),
-      create(Text, {dimColor: true, marginTop: 1}, 'Enter: Save, Esc: Back')
+      create(Text, {dimColor: true, marginTop: 1}, 'Enter: Save Model, Esc: Back')
     ),
 
     step === 'token' && create(
       Box,
       {flexDirection: 'column'},
-      create(Text, {bold: true, color: 'red', marginBottom: 1}, 'Step 3: Secure API Authorization'),
-      create(Text, {dimColor: true}, 'Token required for ' + (currentProvider?.name || 'Provider')),
-      create(Box, {flexDirection: 'row', marginTop: 1},
-        create(Text, null, 'API Token: '),
+      create(Text, {bold: true, color: 'red', marginBottom: 1}, 'Step 3: API Token Authorization'),
+      create(Box, {flexDirection: 'row'},
+        create(Text, null, 'Token: '),
         create(CursorText, {value: '*'.repeat(token.length), cursorIndex: cursor})
       ),
-      create(Text, {dimColor: true, marginTop: 1}, 'Enter: Encrypt & Save, Esc: Back')
+      create(Text, {dimColor: true, marginTop: 1}, 'Enter: Save Token, Esc: Back')
     ),
 
     step === 'analyze' && create(
       Box,
       {flexDirection: 'column'},
-      create(Text, {bold: true, color: 'cyan', marginBottom: 1}, 'Intelligence Active: ' + (selectedProject ? selectedProject.name : 'Current Workspace')),
-      create(Text, {dimColor: true}, 'Provider: ' + (config.aiProvider || 'N/A') + ' | Model: ' + (config.aiModel || 'N/A')),
+      create(Text, {bold: true, color: 'cyan', marginBottom: 1}, 'Ready to analyze: ' + (selectedProject ? selectedProject.name : 'No project selected')),
+      create(Text, {dimColor: true}, 'Active: ' + config.aiProvider + ' (' + config.aiModel + ')'),
+      
       create(Box, {marginTop: 1, flexDirection: 'column'},
-        status === 'ready' && create(Text, null, 'Press Enter to perform DNA analysis and auto-configure BRIT commands.'),
-        status === 'busy' && create(Text, {color: 'yellow'}, ' ⏳ Accessing AI... Mapping manifests...'),
+        status === 'ready' && create(Text, null, 'Press Enter to map project DNA and auto-configure macros.'),
+        status === 'busy' && create(Text, {color: 'yellow'}, ' ⏳ Reading manifests... identifying build patterns...'),
         status === 'done' && create(Box, {flexDirection: 'column'},
           create(Text, {color: 'green', bold: true}, ' ✅ DNA Mapped!'),
-          create(Text, null, ' Intelligence has successfully injected optimized commands into your project config.'),
-          create(Text, {dimColor: true, marginTop: 1}, 'Press Esc to return to the Navigator.')
+          create(Text, null, ' Identified ' + suggestions.length + ' valid commands based on your workspace structure.'),
+          create(Text, {dimColor: true, marginTop: 1}, 'Return to Navigator to use BRIT shortcuts.')
         )
       ),
-      create(Text, {dimColor: true, marginTop: 1}, 'Esc: Back, R: Reset Credentials')
+      create(Text, {dimColor: true, marginTop: 1}, 'Esc: Return, R: Reset Credentials')
     )
   );
 });
