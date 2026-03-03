@@ -449,6 +449,11 @@ function Compass({rootPath, initialView = 'navigator'}) {
     if (key.shift && key.upArrow) { scrollLogs(1); return; }
     if (key.shift && key.downArrow) { scrollLogs(-1); return; }
 
+    const pageStep = Math.max(1, config.maxVisibleProjects || 8);
+    const clampIndex = (value) => Math.max(0, Math.min(projects.length - 1, value));
+    if (key.pageUp && projects.length > 0) { console.clear(); setSelectedIndex((prev) => clampIndex(prev - pageStep)); return; }
+    if (key.pageDown && projects.length > 0) { console.clear(); setSelectedIndex((prev) => clampIndex(prev + pageStep)); return; }
+
     if (normalizedInput === '?') { console.clear(); setShowHelp((prev) => !prev); return; }
     if (shiftCombo('l') && lastCommandRef.current) { runProjectCommand(lastCommandRef.current.commandMeta, lastCommandRef.current.project); return; }
 

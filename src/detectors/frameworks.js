@@ -1,4 +1,3 @@
-import path from 'path';
 import { dependencyMatches, hasProjectFile, resolveScriptCommand } from './utils.js';
 
 export const builtInFrameworks = [
@@ -115,8 +114,7 @@ export const builtInFrameworks = [
       return dependencyMatches(project, 'django') || hasProjectFile(project.path, 'manage.py');
     },
     commands(project) {
-      const managePath = path.join(project.path, 'manage.py');
-      const commands = {};
+            const commands = {};
       if (hasProjectFile(project.path, 'requirements.txt')) {
         commands.install = { label: 'Pip install', command: ['pip', 'install', '-r', 'requirements.txt'], source: 'framework' };
       }

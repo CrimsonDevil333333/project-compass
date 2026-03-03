@@ -2,6 +2,42 @@ import React, {useState, memo} from 'react';
 import {Box, Text, useInput} from 'ink';
 
 const create = React.createElement;
+const NODE_PACKAGE_COMMANDS = {
+  npm: { add: ['npm', 'install'], remove: ['npm', 'uninstall'] },
+  pnpm: { add: ['pnpm', 'add'], remove: ['pnpm', 'remove'] },
+  yarn: { add: ['yarn', 'add'], remove: ['yarn', 'remove'] },
+  bun: { add: ['bun', 'add'], remove: ['bun', 'remove'] }
+};
+
+const resolveNodePackageCommand = (project, pkg, action) => {
+  if (!project || !pkg) return null;
+  const manager = (project.metadata?.packageManager || 'npm').toLowerCase();
+  const template = (NODE_PACKAGE_COMMANDS[manager] || NODE_PACKAGE_COMMANDS.npm)[action];
+  return template ? [...template, pkg] : null;
+};
+
+const getAddCmd = (project, pkg) => {
+  if (!project || !pkg) return null;
+  const type = project.type;
+  if (type === 'Node.js') return resolveNodePackageCommand(project, pkg, 'add');
+  if (type === 'Python') return ['pip', 'install', pkg];
+  if (type === 'Rust') return ['cargo', 'add', pkg];
+  if (type === '.NET') return ['dotnet', 'add', 'package', pkg];
+  if (type === 'PHP') return ['composer', 'require', pkg];
+  return null;
+};
+
+const getRemoveCmd = (project, pkg) => {
+  if (!project || !pkg) return null;
+  const type = project.type;
+  if (type === 'Node.js') return resolveNodePackageCommand(project, pkg, 'remove');
+  if (type === 'Python') return ['pip', 'uninstall', '-y', pkg];
+  if (type === 'Rust') return ['cargo', 'remove', pkg];
+  if (type === '.NET') return ['dotnet', 'remove', 'package', pkg];
+  if (type === 'PHP') return ['composer', 'remove', pkg];
+  return null;
+};
+
 
 const PackageRegistry = memo(({selectedProject, projects = [], onRunCommand, CursorText, onSelectProject}) => {
   const [view, setView] = useState(selectedProject ? 'manage' : 'select'); // select | manage
@@ -29,7 +65,7 @@ const PackageRegistry = memo(({selectedProject, projects = [], onRunCommand, Cur
     if (mode === 'add' || mode === 'remove') {
       if (key.return) {
         if (input.trim()) {
-          const cmd = mode === 'add' ? getAddCmd(projectType, input.trim()) : getRemoveCmd(projectType, input.trim());
+          const cmd = mode === 'add' ? getAddCmd(activeProject, input.trim()) : getRemoveCmd(activeProject, input.trim());
           if (cmd) onRunCommand({label: `${mode === 'add' ? 'Add' : 'Remove'} ${input}`, command: cmd}, activeProject);
         }
         setMode('list'); setInput(''); setCursor(0);
@@ -60,23 +96,7 @@ const PackageRegistry = memo(({selectedProject, projects = [], onRunCommand, Cur
     }
   });
 
-  const getAddCmd = (type, pkg) => {
-    if (type === 'Node.js') return ['npm', 'install', pkg];
-    if (type === 'Python') return ['pip', 'install', pkg];
-    if (type === 'Rust') return ['cargo', 'add', pkg];
-    if (type === '.NET') return ['dotnet', 'add', 'package', pkg];
-    if (type === 'PHP') return ['composer', 'require', pkg];
-    return null;
-  };
 
-  const getRemoveCmd = (type, pkg) => {
-    if (type === 'Node.js') return ['npm', 'uninstall', pkg];
-    if (type === 'Python') return ['pip', 'uninstall', '-y', pkg];
-    if (type === 'Rust') return ['cargo', 'remove', pkg];
-    if (type === '.NET') return ['dotnet', 'remove', 'package', pkg];
-    if (type === 'PHP') return ['composer', 'remove', pkg];
-    return null;
-  };
 
   if (view === 'select') {
     return create(
