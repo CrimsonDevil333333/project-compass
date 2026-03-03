@@ -1,14 +1,14 @@
-/* global setTimeout */
+/* global setTimeout, fetch */
 import React, {useState, memo} from 'react';
 import {Box, Text, useInput} from 'ink';
 
 const create = React.createElement;
 
 const AI_PROVIDERS = [
-  { id: 'openrouter', name: 'OpenRouter', endpoint: 'https://openrouter.ai/api/v1' },
-  { id: 'gemini', name: 'Google Gemini', endpoint: 'https://generativelanguage.googleapis.com' },
-  { id: 'claude', name: 'Anthropic Claude', endpoint: 'https://api.anthropic.com' },
-  { id: 'ollama', name: 'Ollama (Local)', endpoint: 'http://localhost:11434' }
+  { id: 'openrouter', name: 'OpenRouter', endpoint: 'https://openrouter.ai/api/v1/chat/completions' },
+  { id: 'gemini', name: 'Google Gemini', endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent' },
+  { id: 'claude', name: 'Anthropic Claude', endpoint: 'https://api.anthropic.com/v1/messages' },
+  { id: 'ollama', name: 'Ollama (Local)', endpoint: 'http://localhost:11434/api/generate' }
 ];
 
 const AIHorizon = memo(({selectedProject, CursorText, config, setConfig, saveConfig}) => {
@@ -18,7 +18,83 @@ const AIHorizon = memo(({selectedProject, CursorText, config, setConfig, saveCon
   const [token, setToken] = useState(config?.aiToken || '');
   const [cursor, setCursor] = useState(0);
   const [status, setStatus] = useState('ready');
+  const [error, setError] = useState(null);
   const [suggestions, setSuggestions] = useState([]);
+
+  const runRealAnalysis = async () => {
+    setStatus('busy');
+    setError(null);
+    const provider = AI_PROVIDERS[providerIdx];
+    
+    try {
+      const projectData = JSON.stringify({
+        name: selectedProject.name,
+        type: selectedProject.type,
+        manifest: selectedProject.manifest,
+        scripts: selectedProject.metadata?.scripts || {},
+        dependencies: selectedProject.metadata?.dependencies || []
+      });
+
+      const prompt = `Analyze this project structure and suggest valid CLI commands for:
+1. Build
+2. Run
+3. Install
+4. Test
+
+Project Data: ${projectData}
+
+Return ONLY a JSON object with this structure: {"build": "cmd", "run": "cmd", "install": "cmd", "test": "cmd"}. 
+Use the project's detected type (${selectedProject.type}) to ensure commands are correct (e.g., npm, pip, cargo).`;
+
+      let response;
+      if (provider.id === 'openrouter') {
+        response = await fetch(provider.endpoint, {
+          method: 'POST',
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://github.com/CrimsonDevil333333/project-compass',
+            'X-Title': 'Project Compass'
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: [{ role: 'user', content: prompt }]
+          })
+        });
+      } else {
+        // Fallback for others or throw unimplemented for now to avoid "fake" results
+        throw new Error(`Real-time agentic analysis for ${provider.name} is arriving in the next patch. Use OpenRouter for live testing now.`);
+      }
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error?.message || 'Authentication failed. Check your token.');
+
+      const aiText = data.choices[0].message.content;
+      const jsonMatch = aiText.match(/{.*?}/s);
+      if (!jsonMatch) throw new Error("AI returned invalid DNA mapping. Try a different model.");
+      
+      const parsed = JSON.parse(jsonMatch[0]);
+      const mapped = [
+        { label: 'AI Build', command: parsed.build.split(' ') },
+        { label: 'AI Run', command: parsed.run.split(' ') },
+        { label: 'AI Install', command: parsed.install.split(' ') },
+        { label: 'AI Test', command: parsed.test.split(' ') }
+      ];
+
+      setSuggestions(mapped);
+      const projectKey = selectedProject.path;
+      const currentCustom = config.customCommands?.[projectKey] || [];
+      const nextConfig = { 
+        ...config, 
+        customCommands: { ...config.customCommands, [projectKey]: [...currentCustom, ...mapped] } 
+      };
+      setConfig(nextConfig); saveConfig(nextConfig);
+      setStatus('done');
+    } catch (err) {
+      setError(err.message);
+      setStatus('ready');
+    }
+  };
 
   useInput((input, key) => {
     if (step === 'provider') {
@@ -55,32 +131,7 @@ const AIHorizon = memo(({selectedProject, CursorText, config, setConfig, saveCon
       }
     } else if (step === 'analyze') {
       if (key.return && status === 'ready' && selectedProject) {
-        setStatus('busy');
-        setTimeout(() => {
-          // REAL DNA MAPPING: Check project scripts and suggest real matches
-          const scripts = selectedProject.metadata?.scripts || {};
-          const suggested = [];
-          
-          if (scripts.build) suggested.push({ label: 'AI Build', command: ['npm', 'run', 'build'] });
-          if (scripts.start || scripts.dev) suggested.push({ label: 'AI Run', command: ['npm', 'run', scripts.dev ? 'dev' : 'start'] });
-          if (scripts.test) suggested.push({ label: 'AI Test', command: ['npm', 'test'] });
-          
-          // If no scripts found, suggest generic ones based on type
-          if (suggested.length === 0) {
-             if (selectedProject.type === 'Node.js') suggested.push({ label: 'AI Init', command: ['npm', 'install'] });
-             else if (selectedProject.type === 'Python') suggested.push({ label: 'AI Run', command: ['python', 'main.py'] });
-          }
-
-          setSuggestions(suggested);
-          const projectKey = selectedProject.path;
-          const currentCustom = config.customCommands?.[projectKey] || [];
-          const nextConfig = { 
-            ...config, 
-            customCommands: { ...config.customCommands, [projectKey]: [...currentCustom, ...suggested] } 
-          };
-          setConfig(nextConfig); saveConfig(nextConfig);
-          setStatus('done');
-        }, 1200);
+        runRealAnalysis();
       }
       if (input === 'r') {
         const nextConfig = { ...config, aiToken: '' };
@@ -132,13 +183,14 @@ const AIHorizon = memo(({selectedProject, CursorText, config, setConfig, saveCon
       create(Text, {dimColor: true}, 'Active: ' + config.aiProvider + ' (' + config.aiModel + ')'),
       
       create(Box, {marginTop: 1, flexDirection: 'column'},
-        status === 'ready' && create(Text, null, 'Press Enter to map project DNA and auto-configure macros.'),
-        status === 'busy' && create(Text, {color: 'yellow'}, ' ⏳ Reading manifests... identifying build patterns...'),
+        status === 'ready' && create(Text, null, 'Press Enter to perform real agentic analysis and auto-configure macros.'),
+        status === 'busy' && create(Text, {color: 'yellow'}, ' ⏳ Contacting AI Agent... mapping project structure...'),
         status === 'done' && create(Box, {flexDirection: 'column'},
-          create(Text, {color: 'green', bold: true}, ' ✅ DNA Mapped!'),
-          create(Text, null, ' Identified ' + suggestions.length + ' valid commands based on your workspace structure.'),
+          create(Text, {color: 'green', bold: true}, ' ✅ DNA Mapped via AI Agent!'),
+          create(Text, null, ' Successfully injected ' + suggestions.length + ' optimized commands into project config.'),
           create(Text, {dimColor: true, marginTop: 1}, 'Return to Navigator to use BRIT shortcuts.')
-        )
+        ),
+        error && create(Text, {color: 'red', bold: true, marginTop: 1}, ' ✗ AI ERROR: ' + error)
       ),
       create(Text, {dimColor: true, marginTop: 1}, 'Esc: Return, R: Reset Credentials')
     )
