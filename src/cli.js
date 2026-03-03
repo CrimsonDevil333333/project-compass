@@ -52,14 +52,14 @@ function loadConfig() {
         showArtBoard: true,
         showHelpCards: false,
         showStructureGuide: false,
-        maxVisibleProjects: 4,
+        maxVisibleProjects: 3,
         ...parsed,
       };
     }
   } catch (error) {
     console.error(`Ignoring corrupt config: ${error.message}`);
   }
-  return {customCommands: {}, showArtBoard: true, showHelpCards: false, showStructureGuide: false, maxVisibleProjects: 4};
+  return {customCommands: {}, showArtBoard: true, showHelpCards: false, showStructureGuide: false, maxVisibleProjects: 3};
 }
 
 function useScanner(rootPath) {
