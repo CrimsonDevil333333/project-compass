@@ -153,6 +153,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
   const [activeTaskId, setActiveTaskId] = useState(null);
   const [logOffset, setLogOffset] = useState(0);
   const [customMode, setCustomMode] = useState(false);
+  const [portConfigMode, setPortConfigMode] = useState(false);
   const [customInput, setCustomInput] = useState('');
   const [customCursor, setCustomCursor] = useState(0);
   const [renameMode, setRenameMode] = useState(false);
@@ -301,7 +302,37 @@ function Compass({rootPath, initialView = 'navigator'}) {
 
     const isCtrlC = (key.ctrl && input === 'c') || input === '\u0003';
 
-    if (customMode) {
+    
+    if (portConfigMode) {
+      if (key.return) {
+        const portVal = customInput.trim();
+        if (selectedProject && portVal) {
+          setConfig((prev) => {
+            const projectKey = selectedProject.path;
+            const existingMeta = prev.projectMeta?.[projectKey] || {};
+            const nextConfig = { ...prev, projectMeta: { ...prev.projectMeta, [projectKey]: { ...existingMeta, port: portVal } } };
+            saveConfig(nextConfig);
+            return nextConfig;
+          });
+        }
+        setPortConfigMode(false); setCustomInput(''); setCustomCursor(0);
+        return;
+      }
+      if (key.escape) { setPortConfigMode(false); setCustomInput(''); setCustomCursor(0); return; }
+      if (key.backspace || key.delete) {
+        if (customCursor > 0) {
+          setCustomInput((prev) => prev.slice(0, customCursor - 1) + prev.slice(customCursor));
+          setCustomCursor(c => Math.max(0, c - 1));
+        }
+        return;
+      }
+      if (input && /[0-9]/.test(input)) {
+        setCustomInput((prev) => prev.slice(0, customCursor) + input + prev.slice(customCursor));
+        setCustomCursor(c => c + input.length);
+      }
+      return;
+    }
+        if (customMode) {
       if (key.return) {
         const raw = customInput.trim();
         const selProj = selectedProject;
@@ -495,7 +526,12 @@ function Compass({rootPath, initialView = 'navigator'}) {
       return;
     }
 
-    if (shiftCombo('c') && viewMode === 'detail' && selectedProject) { setCustomMode(true); setCustomInput(''); setCustomCursor(0); return; }
+    
+    if (shiftCombo('r') && viewMode === 'detail' && selectedProject) {
+      setPortConfigMode(true); setCustomInput(selectedProject.metadata?.port || '3000'); setCustomCursor(String(selectedProject.metadata?.port || '3000').length);
+      return;
+    }
+        if (shiftCombo('c') && viewMode === 'detail' && selectedProject) { setCustomMode(true); setCustomInput(''); setCustomCursor(0); return; }
     
     const actionKey = normalizedInput && ACTION_MAP[normalizedInput];
     if (actionKey) {
