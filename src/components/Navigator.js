@@ -8,7 +8,7 @@ export default function Navigator({
   rootPath, 
   loading, 
   error, 
-  maxVisibleProjects = 8 
+  maxVisibleProjects = 4 
 }) {
   const page = Math.floor(selectedIndex / maxVisibleProjects);
   const start = page * maxVisibleProjects;
