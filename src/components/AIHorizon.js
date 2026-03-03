@@ -1,3 +1,4 @@
+/* global setTimeout */
 import React, {useState, memo} from 'react';
 import {Box, Text, useInput} from 'ink';
 
@@ -10,7 +11,7 @@ const AI_PROVIDERS = [
   { id: 'ollama', name: 'Ollama (Local)', endpoint: 'http://localhost:11434', keyEnv: 'NONE' }
 ];
 
-const AIHorizon = memo(({rootPath, selectedProject, onRunCommand, CursorText, config, setConfig, saveConfig}) => {
+const AIHorizon = memo(({selectedProject, CursorText, config, setConfig, saveConfig}) => {
   const [step, setStep] = useState(config?.aiToken ? 'analyze' : 'provider');
   const [providerIdx, setProviderIdx] = useState(AI_PROVIDERS.findIndex(p => p.id === (config?.aiProvider || 'openrouter')) || 0);
   const [model, setModel] = useState(config?.aiModel || 'deepseek/deepseek-r1');
