@@ -30,42 +30,13 @@ npm install -g project-compass
 ### 🏗️ Project Architect (`Shift+N`)
 - **Modern Templates**: Scaffold high-performance projects with built-in support for **Bun, Next.js, Vite, Rust, and Django**.
 
-### 🤖 AI Horizon (`Shift+O`) - [BETA]
-- **Coming Soon**: Connect to **Ollama, Gemini, or Claude** to analyze custom projects and generate intelligent build/deploy commands automatically.
-### 🛰️ Orbit Task Manager (`Shift+T`)
-- **Background Orchestration**: Keep tasks running while you navigate the rest of your workspace.
-- **Process Management**: Monitor status (Running, Finished, Failed, Killed) and forcefully terminate processes with `Shift+K`.
-- **Task Identity**: Rename tasks on the fly with `Shift+R` to keep your workspace organized.
-- **Cross-Platform Safety**: Automatically handles process signaling for both Unix (SIGKILL) and Windows (taskkill) to ensure clean exits.
+### 🤖 AI Horizon (`Shift+O` or `0`)
+- **Intelligence Persistence**: Configure your provider (**OpenRouter, Gemini, Claude, Ollama**) once; Compass remembers your settings.
+- **Deep DNA Analysis**: Press `0` on any project to analyze its structure.
+- **Auto-Config (BRIT)**: AI automatically detects and configures missing **Build, Run, Install, and Test** commands, saving them directly to your `config.json`.
+- **Direct Access**: Launch straight into intelligence mode with `project-compass --ai`.
 
-![Task Manager](https://raw.githubusercontent.com/CrimsonDevil333333/project-compass/master/assets/screenshots/taskmanager.jpg)
-
-### 📦 Package Registry (`Shift+P`)
-- **Context-Aware Management**: Add or remove dependencies without leaving the app.
-- **Internal Switcher**: Quick-swap projects within the registry view using `S`.
-- **Multi-Runtime Support**: Handles `npm`, `pnpm`, `bun`, `pip`, and more based on project type.
-
-![Package Registry](https://raw.githubusercontent.com/CrimsonDevil333333/project-compass/master/assets/screenshots/registry.jpg)
-
-### 🏗️ Project Architect (`Shift+N`)
-- **Rapid Scaffolding**: Create new projects from scratch using industry-standard templates:
-    - **Next.js** (Standard & Bun variants)
-    - **React/Vue** (Vite-powered with pnpm/npm support)
-    - **Rust** (Cargo binary)
-    - **Django** (Python web framework)
-    - **Go** (Module initialization)
-- **Interactive Prompts**: Safe, guided setup for directory structure and initial manifests.
-
-![Project Architect](https://raw.githubusercontent.com/CrimsonDevil333333/project-compass/master/assets/screenshots/architect.jpg)
-
-### 🎨 Omni-Studio & Art Board
-- **Environment Health (`Shift+A`)**: Audit your system dependencies and runtime versions.
-- **Build Atlas (`Shift+B`)**: A visual, art-coded representation of your project landscape.
-
-![Omni-Studio](https://raw.githubusercontent.com/CrimsonDevil333333/project-compass/master/assets/screenshots/studio.jpg)
-![Art Board](https://raw.githubusercontent.com/CrimsonDevil333333/project-compass/master/assets/screenshots/artboard.jpg)
-
-## ⌨️ Command Reference
+## Command Reference
 
 | Shortcut | Action |
 | :--- | :--- |

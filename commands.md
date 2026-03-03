@@ -7,7 +7,7 @@ This document lists all supported languages, frameworks, and their built-in comm
 | Key | Action |
 | --- | --- |
 | ↑ / ↓ | Move project focus |
-| Enter | Toggle deep detail view / Switch back from sub-views |
+| Enter | Toggle deep detail view / Switch back from sub-views |\n| **0** | **Quick AI Analysis** (Detail View only) |
 | **B / T / R / I**| **Macro Launch**: Build, Test, Run, **Install** |
 | **Esc** | **Global Back**: Return to Main Navigator from any view |
 | **Shift+A** | Open **Omni-Studio** (Environment & Runtime audit) |

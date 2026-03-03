@@ -294,7 +294,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
 
     useInput((input, key) => {
     if (quitConfirm) {
-      if (input?.toLowerCase() === 'y') { killAllTasks(); console.clear(); exit(); return; }
+      if (input?.toLowerCase() === 'y') { killAllTasks(); console.clear();  { console.clear(); exit(); } return; }
       if (input?.toLowerCase() === 'n' || key.escape) { setQuitConfirm(false); return; }
       return;
     }
@@ -313,7 +313,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
             setConfig((prev) => {
               const projectKey = selProj.path;
               const existing = prev.customCommands?.[projectKey] || [];
-              const nextConfig = { ...prev, customCommands: { ...prev.customCommands, [projectKey]: [...existing, {label, command: commandTokens}] } };
+              const nextConfig = { ...prev, customCommands: { ...prev.customCommands, [projectKey]: [...existing, {label, command: commandTokens}] };
               saveConfig(nextConfig);
               return nextConfig;
             });
@@ -468,11 +468,16 @@ function Compass({rootPath, initialView = 'navigator'}) {
       return;
     }
     if (shiftCombo('q') || isCtrlC) {
-      if (hasRunningTasks) setQuitConfirm(true); else { console.clear(); exit(); }
+      if (hasRunningTasks) setQuitConfirm(true); else { console.clear();  { console.clear(); exit(); }
       return;
     }
     if (shiftCombo('c') && viewMode === 'detail' && selectedProject) { setCustomMode(true); setCustomInput(''); setCustomCursor(0); return; }
     
+    
+    if (normalizedInput === '0' && viewMode === 'detail' && selectedProject) {
+      clearAndSwitch('ai');
+      return;
+    }
     const actionKey = normalizedInput && ACTION_MAP[normalizedInput];
     if (actionKey) {
       const commandMeta = selectedProject?.commands?.[actionKey];
@@ -601,6 +606,8 @@ function parseArgs() {
     else if (token === '--help' || token === '-h') args.help = true;
     else if (token === '--version' || token === '-v') args.version = true;
     else if (token === '--studio') args.view = 'studio';
+    else if (token === '--ai') args.view = 'ai';
+    else if (token === '--task' || token === '--tasks') args.view = 'tasks';
   }
   return args;
 }
