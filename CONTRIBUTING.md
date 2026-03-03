@@ -13,7 +13,7 @@ This repository is "AI-First." Always update `AGENTS.md` after making structural
 ## Workflow
 1.  **Fork and Branch:** Create a branch for your feature or fix.
 2.  **Code Style:** Follow the existing ESM pattern.
-3.  **Testing:** Run `npm start` in a large workspace (like a multi-repo folder) to ensure the UI remains performant.
+3.  **Testing:** Run `npm start` and verify AI Horizon (`Shift+O`) and Port Config (`Shift+R`) functionality. (like a multi-repo folder) to ensure the UI remains performant.
 4.  **Commits:** Use conventional commits (`feat:`, `fix:`, `docs:`, `refactor:`).
 
 ## Deployment

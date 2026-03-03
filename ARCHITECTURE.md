@@ -4,9 +4,9 @@ This document describes the high-level architecture of Project Compass.
 
 ## Data Flow
 1.  **Initialization:** `cli.js` resolves the working directory (defaults to current folder).
-2.  **Discovery:** `projectDetection.js` performs a high-speed glob search for common manifest files (`package.json`, `cargo.toml`, `go.mod`, etc.).
+2.  **Discovery:** `projectDetection.js` orchestrates modular detectors in `src/detectors/` to perform a high-speed glob search for common manifest files (`package.json`, `cargo.toml`, `go.mod`, etc.).
 3.  **State Management:** The discovered projects and their metadata (frameworks, scripts, dependencies) are passed into an Ink React tree.
-4.  **Rendering:** Components in `src/components` handle specific views (Task Manager, Architect, etc.) based on user keypresses.
+4.  **Rendering:** Components in `src/components` handle specific views (Task Manager, Architect, AI Horizon, etc.) based on user keypresses.
 5.  **Execution:** User-triggered scripts (like running `npm test`) are managed by `TaskManager.js` using `execa` with streaming logs.
 
 ## Design Patterns
