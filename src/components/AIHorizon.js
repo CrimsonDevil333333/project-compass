@@ -47,6 +47,8 @@ Return ONLY a JSON object with this structure: {"build": "cmd", "run": "cmd", "i
 Use the project's detected type (${selectedProject.type}) to ensure commands are correct (e.g., npm, pip, cargo).`;
 
       let response;
+      let aiText = '';
+
       if (provider.id === 'openrouter') {
         response = await fetch(provider.endpoint, {
           method: 'POST',
@@ -61,17 +63,49 @@ Use the project's detected type (${selectedProject.type}) to ensure commands are
             messages: [{ role: 'user', content: prompt }]
           })
         });
-      } else {
-        // Fallback for others or throw unimplemented for now to avoid "fake" results
-        throw new Error(`Real-time agentic analysis for ${provider.name} is arriving in the next patch. Use OpenRouter for live testing now.`);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error?.message || 'OpenRouter Error');
+        aiText = data.choices[0].message.content;
+      } else if (provider.id === 'gemini') {
+        const url = provider.endpoint.replace('{model}', model) + `?key=${token}`;
+        response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error?.message || 'Gemini Error');
+        aiText = data.candidates[0].content.parts[0].text;
+      } else if (provider.id === 'claude') {
+        response = await fetch(provider.endpoint, {
+          method: 'POST',
+          headers: { 
+            'x-api-key': token,
+            'anthropic-version': '2023-06-01',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: model,
+            max_tokens: 1024,
+            messages: [{ role: 'user', content: prompt }]
+          })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error?.message || 'Claude Error');
+        aiText = data.content[0].text;
+      } else if (provider.id === 'ollama') {
+        response = await fetch(provider.endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: model, prompt: prompt, stream: false })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Ollama Error');
+        aiText = data.response;
       }
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error?.message || 'Authentication failed. Check your token.');
-
-      const aiText = data.choices[0].message.content;
       const jsonMatch = aiText.match(/{.*?}/s);
-      if (!jsonMatch) throw new Error("AI returned invalid DNA mapping. Try a different model.");
+      if (!jsonMatch) throw new Error("AI returned invalid DNA mapping format.");
       
       const parsed = JSON.parse(jsonMatch[0]);
       const mapped = [
