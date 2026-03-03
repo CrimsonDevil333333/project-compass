@@ -482,25 +482,33 @@ function Compass({rootPath, initialView = 'navigator'}) {
     if (key.shift && key.upArrow) { scrollLogs(1); return; }
     if (key.shift && key.downArrow) { scrollLogs(-1); return; }
 
-    const pageLimit = config.maxVisibleProjects || 3;
-    const pageStep = Math.max(1, pageLimit);
     
-    if (key.pageUp && projects.length > pageLimit) { 
-      console.clear(); 
+    const pageLimit = config.maxVisibleProjects || 3;
+    const totalProjects = projects.length;
+    
+    if (key.pageUp && totalProjects > pageLimit) {
       setSelectedIndex((prev) => {
-        const next = prev - pageStep;
+        const next = prev - pageLimit;
         return next < 0 ? 0 : next;
-      }); 
-      return; 
+      });
+      console.clear();
+      return;
     }
-    if (key.pageDown && projects.length > pageLimit) { 
-      console.clear(); 
+    
+    if (key.pageDown && totalProjects > pageLimit) {
       setSelectedIndex((prev) => {
-        const next = prev + pageStep;
-        return next >= projects.length ? (Math.floor((projects.length - 1) / pageLimit) * pageLimit) : next;
-      }); 
-      return; 
+        const next = prev + pageLimit;
+        // If next jump exceeds project list, stay at the start of the last page
+        if (next >= totalProjects) {
+           const lastPageStart = Math.floor((totalProjects - 1) / pageLimit) * pageLimit;
+           return lastPageStart;
+        }
+        return next;
+      });
+      console.clear();
+      return;
     }
+    
 
     if (normalizedInput === '?') { console.clear(); setShowHelp((prev) => !prev); return; }
     if (shiftCombo('l') && lastCommandRef.current) { runProjectCommand(lastCommandRef.current.commandMeta, lastCommandRef.current.project); return; }

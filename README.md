@@ -20,84 +20,48 @@ npm install -g project-compass
 
 ### 🌌 The Navigator (Main Interface)
 - **Automatic Discovery**: Instantly identifies **Node.js, Python, Rust, Go, Java, PHP, Ruby, .NET, and Shell/Make**.
-- **Paginated Control**: Optimized for massive workspaces. View projects in clean, manageable pages with **Page Up / Page Down** support.
-- **Configurable UI**: Customize your view with `maxVisibleProjects` and toggleable Art Boards and Help Cards.
-
-### 📦 Package Registry (`Shift+P`)
-- **Native Logic**: Automatically uses your project's preferred package manager (**npm, pnpm, yarn, bun, pip, cargo, composer, dotnet**). No more "command not found" errors.
-- **Internal Switcher**: Quick-swap between detected projects directly inside the registry.
-
-### 🏗️ Project Architect (`Shift+N`)
-- **Modern Templates**: Scaffold high-performance projects with built-in support for **Bun, Next.js, Vite, Rust, and Django**.
-
-### 🔌 Manual Infrastructure
-- **Port Mapping**: Hit `Shift + R` in details to manually assign ports to projects. Settings are saved persistently.
+- **Paginated Control**: Optimized for massive workspaces. Jump through project pages with **Page Up / Page Down**.
+- **Configurable UI**: Customize your view with `maxVisibleProjects` (set to 2 or 3 for tight terminals).
 
 ### 🤖 AI Horizon (`Shift+O` or `0`)
-- **Intelligence Persistence**: Configure your provider (**OpenRouter, Gemini, Claude, Ollama**) once; Compass remembers your settings.
-- **Deep DNA Analysis**: Press `0` on any project to analyze its structure.
-- **Auto-Config (BRIT)**: AI automatically detects and configures missing **Build, Run, Install, and Test** commands, saving them directly to your `config.json`.
-- **Direct Access**: Launch straight into intelligence mode with `project-compass --ai`.
+- **Agentic Intelligence**: Real-world integration with **OpenRouter, Gemini, Claude, and Ollama**.
+- **DNA Mapping**: Automatically analyzes your project structure and **injects optimized BRIT commands** (Build, Run, Install, Test) into your config.
+- **Persistent Auth**: Save your API tokens once; Compass handles the secure handshake thereafter.
 
-## Command Reference
+### 🔌 Infrastructure Control (`Shift+R`)
+- **Manual Port Mapping**: Directly assign specific ports to projects. Config is saved persistently to prevent conflicts.
+- **Metadata Awareness**: AI Horizon uses your manual port settings to suggest smarter deployment scripts.
+
+### 🛰️ Orbit Task Manager (`Shift+T`)
+- **Background Orchestration**: Keep tasks running while you navigate.
+- **Process Management**: Kill (`Shift+K`) or Rename (`Shift+R`) background tasks on the fly.
+
+### 📦 Package Registry (`Shift+P`)
+- **Context-Aware Management**: Automatically detects **npm, pnpm, yarn, bun, pip, cargo, composer, and dotnet**.
+
+### 🏗️ Project Architect (`Shift+N`)
+- **Rapid Scaffolding**: Create new projects from scratch using industry-standard templates.
+
+## ⌨️ Command Reference
 
 | Shortcut | Action |
 | :--- | :--- |
 | `↑ / ↓` | Move project focus |
+| `PgUp / PgDn`| Jump full project page |
 | `Enter` | Toggle project Detail View |
-| `B / T / R / I`| Macro: Build, Test, Run, **Install** |
+| `0` | Trigger **AI DNA Analysis** (Inside Details) |
+| `B / T / R / I`| Macro: Build, Test, Run, Install |
+| `Shift + R` | **Configure Port** (Inside Details) |
+| `Shift + O` | **AI Horizon** Dashboard |
 | `Shift + T` | **Orbit**: Task Manager |
 | `Shift + P` | **Registry**: Package Manager |
-| `Shift + N` | **Architect**: Project Creator |
-| `Shift + A` | **Studio**: Environment Health |
-| `Shift + B` | Toggle **Art Board** visibility |
-| `Shift + H` | Toggle **Help Cards** |
-| `Shift + S` | Toggle **Structure Guide** |
-| `Shift + Q` | Quit (with safe-exit confirmation) |
-| `?` | Toggle Help Overlay |
+| `Shift + Q` | **Quit** (with terminal clear) |
 
-### 🛡️ Safe Termination
-- **Process Protection**: Compass won't let you accidentally kill your work. If tasks are running, a dedicated confirmation dialog ensures you intended to quit.
+## ⚙️ Configuration
 
-![Exit Confirmation](https://raw.githubusercontent.com/CrimsonDevil333333/project-compass/master/assets/screenshots/exit-confirm.jpg)
-
-## ⚙️ Configuration & Customization
-
-Project Compass is designed to be personalized. All settings and custom commands are stored in a local JSON file.
-
-- **Linux/macOS**: `~/.project-compass/config.json`
-- **Windows**: `C:\Users\<YourUser>\.project-compass\config.json`
-
-### 🛠️ Adding Custom Commands
-You can add your own project-specific commands directly within the app by pressing **Shift+C** in the Detail View. Use the format `Label|Command` (e.g., `Deploy|npm run deploy`).
-
-### 📁 Manual Config Structure
-If you prefer manual editing, the `config.json` follows this structure:
-
-```json
-{
-  "showArtBoard": true,
-  "showHelpCards": false,
-  "showStructureGuide": false,
-  "customCommands": {
-    "/path/to/your/project": [
-      {
-        "label": "Build Production",
-        "command": ["npm", "run", "build", "--prod"]
-      }
-    ]
-  }
-}
-```
-
-- `showArtBoard/HelpCards/Structure`: Persistence for your UI visibility preferences.
-- `customCommands`: A map of absolute project paths to arrays of command objects.
-
----
-
-## 🚀 Vision
-Project Compass is designed to be the "Last Terminal Tool" you ever need to open. It bridges the gap between raw CLI commands and full IDEs, giving you a professional, reactive cockpit for all your development work.
+Edit `~/.project-compass/config.json` to customize:
+- `maxVisibleProjects`: How many rows per page.
+- `aiToken / aiModel`: Your intelligence credentials.
 
 ---
 **Crafted with ❤️ by Satyaa & Clawdy**
-*MIT License*
