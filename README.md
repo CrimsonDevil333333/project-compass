@@ -19,17 +19,19 @@ npm install -g project-compass
 ## 🌟 Premium Features
 
 ### 🌌 The Navigator (Main Interface)
-- **Automatic Discovery**: Instantly identifies **Node.js (Next.js, React, Vue, NestJS, Angular, SvelteKit, Nuxt, Astro)**, **Python (Django, Flask, FastAPI)**, **Rust (Rocket, Actix)**, **Go**, **Java (Spring Boot)**, **.NET (ASP.NET Core)**, **PHP (Laravel)**, and **Ruby**.
-- **Package Manager Intelligence**: Context-aware detection of `pnpm`, `bun`, `yarn`, and `npm`. No hardcoded commands—Compass uses your project's preferred tool.
-- **Deep Detail View**: Press `Enter` to reveal project manifests, detected frameworks, and available scripts.
-- **Custom Actions**: Save persistent, project-specific commands with `Shift+C` (e.g., `deploy|npm run deploy --prod`).
-- **Macro Commands**: High-speed access to core workflows:
-    - `B`: Build
-    - `T`: Test
-    - `R`: Run / Start
-    - `I`: Install Dependencies (New!)
-- **Live Output Panel**: Stream real-time logs from active processes with dedicated scrolling (`Shift+↑/↓`).
+- **Automatic Discovery**: Instantly identifies **Node.js, Python, Rust, Go, Java, PHP, Ruby, .NET, and Shell/Make**.
+- **Paginated Control**: Optimized for massive workspaces. View projects in clean, manageable pages with **Page Up / Page Down** support.
+- **Configurable UI**: Customize your view with `maxVisibleProjects` and toggleable Art Boards and Help Cards.
 
+### 📦 Package Registry (`Shift+P`)
+- **Native Logic**: Automatically uses your project's preferred package manager (**npm, pnpm, yarn, bun, pip, cargo, composer, dotnet**). No more "command not found" errors.
+- **Internal Switcher**: Quick-swap between detected projects directly inside the registry.
+
+### 🏗️ Project Architect (`Shift+N`)
+- **Modern Templates**: Scaffold high-performance projects with built-in support for **Bun, Next.js, Vite, Rust, and Django**.
+
+### 🤖 AI Horizon (`Shift+O`) - [BETA]
+- **Coming Soon**: Connect to **Ollama, Gemini, or Claude** to analyze custom projects and generate intelligent build/deploy commands automatically.
 ### 🛰️ Orbit Task Manager (`Shift+T`)
 - **Background Orchestration**: Keep tasks running while you navigate the rest of your workspace.
 - **Process Management**: Monitor status (Running, Finished, Failed, Killed) and forcefully terminate processes with `Shift+K`.

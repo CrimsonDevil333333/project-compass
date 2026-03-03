@@ -375,7 +375,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
     if (shiftCombo('s')) { console.clear(); setConfig(prev => { const next = {...prev, showStructureGuide: !prev.showStructureGuide}; saveConfig(next); return next; }); return; }
     if (shiftCombo('a')) { clearAndSwitch(mainView === 'navigator' ? 'studio' : 'navigator'); return; }
     if (shiftCombo('p')) { clearAndSwitch(mainView === 'navigator' ? 'registry' : 'navigator'); return; }
-    if (shiftCombo('n')) { clearAndSwitch(mainView === 'navigator' ? 'architect' : 'navigator'); return; }
+    if (shiftCombo('n')) { clearAndSwitch(mainView === 'navigator' ? 'architect' : 'navigator'); return; }\n    if (shiftCombo('o')) { clearAndSwitch(mainView === 'navigator' ? 'ai' : 'navigator'); return; }
     if (shiftCombo('x')) { console.clear(); setTasks(prev => prev.map(t => t.id === activeTaskId ? {...t, logs: []} : t)); setLogOffset(0); return; }
     if (shiftCombo('e')) { exportLogs(); return; }
     if (shiftCombo('d')) { console.clear(); setActiveTaskId(null); return; }
