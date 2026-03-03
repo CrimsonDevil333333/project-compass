@@ -294,6 +294,17 @@ function Compass({rootPath, initialView = 'navigator'}) {
   }, [tasks, activeTaskId, addLogToTask]);
 
     useInput((input, key) => {
+
+    if (key.shift && (input === 'R' || input === 'r')) {
+      if (viewMode === 'detail' && selectedProject) {
+        setPortConfigMode(true);
+        const currentPort = config.projectMeta?.[selectedProject.path]?.port || '3000';
+        setCustomInput(String(currentPort));
+        setCustomCursor(String(currentPort).length);
+        return;
+      }
+    }
+    
     if (quitConfirm) {
       if (input?.toLowerCase() === 'y') { killAllTasks(); process.stdout.write('\x1b[2J\x1b[0;0H'); exit(); return; }
       if (input?.toLowerCase() === 'n' || key.escape) { setQuitConfirm(false); return; }
