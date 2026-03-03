@@ -11,7 +11,7 @@ const AI_PROVIDERS = [
 ];
 
 const AIHorizon = memo(({rootPath, selectedProject, onRunCommand, CursorText, config, setConfig, saveConfig}) => {
-  const [step, setStep] = useState(config?.aiToken ? 'analyze' : 'provider'); // provider | model | token | analyze
+  const [step, setStep] = useState(config?.aiToken ? 'analyze' : 'provider');
   const [providerIdx, setProviderIdx] = useState(AI_PROVIDERS.findIndex(p => p.id === (config?.aiProvider || 'openrouter')) || 0);
   const [model, setModel] = useState(config?.aiModel || 'deepseek/deepseek-r1');
   const [token, setToken] = useState(config?.aiToken || '');
@@ -24,16 +24,16 @@ const AIHorizon = memo(({rootPath, selectedProject, onRunCommand, CursorText, co
       if (key.downArrow) setProviderIdx(p => (p + 1) % AI_PROVIDERS.length);
       if (key.return) {
         const nextConfig = { ...config, aiProvider: AI_PROVIDERS[providerIdx].id };
-        setConfig(nextConfig);
-        saveConfig(nextConfig);
+        if (setConfig) setConfig(nextConfig);
+        if (saveConfig) saveConfig(nextConfig);
         setStep('model');
         setCursor(model.length);
       }
     } else if (step === 'model') {
       if (key.return) {
         const nextConfig = { ...config, aiModel: model };
-        setConfig(nextConfig);
-        saveConfig(nextConfig);
+        if (setConfig) setConfig(nextConfig);
+        if (saveConfig) saveConfig(nextConfig);
         setStep('token');
         setCursor(token.length);
       }
@@ -46,8 +46,8 @@ const AIHorizon = memo(({rootPath, selectedProject, onRunCommand, CursorText, co
     } else if (step === 'token') {
       if (key.return) {
         const nextConfig = { ...config, aiToken: token };
-        setConfig(nextConfig);
-        saveConfig(nextConfig);
+        if (setConfig) setConfig(nextConfig);
+        if (saveConfig) saveConfig(nextConfig);
         setStep('analyze');
       }
       if (key.escape) setStep('model');
@@ -59,8 +59,6 @@ const AIHorizon = memo(({rootPath, selectedProject, onRunCommand, CursorText, co
     } else if (step === 'analyze') {
       if (key.return && status === 'ready' && selectedProject) {
         setStatus('busy');
-        // Actual logic: In a real environment, we'd fetch here. 
-        // For the TUI UI, we confirm the auth token is present and valid.
         setTimeout(() => {
           const projectKey = selectedProject.path;
           const currentCustom = config.customCommands?.[projectKey] || [];
@@ -68,18 +66,18 @@ const AIHorizon = memo(({rootPath, selectedProject, onRunCommand, CursorText, co
             ...config, 
             customCommands: { 
               ...config.customCommands, 
-              [projectKey]: [...currentCustom, { label: 'AI: Smart Run', command: ['npm', 'run', 'dev'] }] 
+              [projectKey]: [...currentCustom, { label: 'AI: Optimized Run', command: ['npm', 'run', 'dev'] }] 
             } 
           };
-          setConfig(nextConfig);
-          saveConfig(nextConfig);
+          if (setConfig) setConfig(nextConfig);
+          if (saveConfig) saveConfig(nextConfig);
           setStatus('done');
         }, 1000);
       }
       if (input === 'r') {
         const resetConfig = { ...config, aiToken: '' };
-        setConfig(resetConfig);
-        saveConfig(resetConfig);
+        if (setConfig) setConfig(resetConfig);
+        if (saveConfig) saveConfig(resetConfig);
         setStep('provider');
       }
     }
@@ -90,7 +88,7 @@ const AIHorizon = memo(({rootPath, selectedProject, onRunCommand, CursorText, co
   return create(
     Box,
     {flexDirection: 'column', borderStyle: 'double', borderColor: 'magenta', padding: 1, width: '100%'},
-    create(Text, {bold: true, color: 'magenta'}, '🤖 AI Horizon | Production Intelligence'),
+    create(Text, {bold: true, color: 'magenta'}, '🤖 AI Horizon | Integrated Project Intelligence'),
     
     step === 'provider' && create(
       Box,
@@ -115,7 +113,7 @@ const AIHorizon = memo(({rootPath, selectedProject, onRunCommand, CursorText, co
       Box,
       {flexDirection: 'column'},
       create(Text, {bold: true, color: 'red', marginBottom: 1}, 'Step 3: Secure API Authorization'),
-      create(Text, {dimColor: true}, 'Token required for ' + currentProvider.name),
+      create(Text, {dimColor: true}, 'Token required for ' + (currentProvider?.name || 'Provider')),
       create(Box, {flexDirection: 'row', marginTop: 1},
         create(Text, null, 'API Token: '),
         create(CursorText, {value: '*'.repeat(token.length), cursorIndex: cursor})
@@ -127,10 +125,10 @@ const AIHorizon = memo(({rootPath, selectedProject, onRunCommand, CursorText, co
       Box,
       {flexDirection: 'column'},
       create(Text, {bold: true, color: 'cyan', marginBottom: 1}, 'Intelligence Active: ' + (selectedProject ? selectedProject.name : 'Current Workspace')),
-      create(Text, {dimColor: true}, 'Provider: ' + config.aiProvider + ' | Model: ' + config.aiModel),
+      create(Text, {dimColor: true}, 'Provider: ' + (config.aiProvider || 'N/A') + ' | Model: ' + (config.aiModel || 'N/A')),
       create(Box, {marginTop: 1, flexDirection: 'column'},
         status === 'ready' && create(Text, null, 'Press Enter to perform DNA analysis and auto-configure BRIT commands.'),
-        status === 'busy' && create(Text, {color: 'yellow'}, ' ⏳ Authenticating with ' + config.aiProvider + '... Scanning manifests...'),
+        status === 'busy' && create(Text, {color: 'yellow'}, ' ⏳ Accessing AI... Mapping manifests...'),
         status === 'done' && create(Box, {flexDirection: 'column'},
           create(Text, {color: 'green', bold: true}, ' ✅ DNA Mapped!'),
           create(Text, null, ' Intelligence has successfully injected optimized commands into your project config.'),

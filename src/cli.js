@@ -53,14 +53,14 @@ function loadConfig() {
         showArtBoard: true,
         showHelpCards: false,
         showStructureGuide: false,
-        maxVisibleProjects: config.maxVisibleProjects,
+        maxVisibleProjects: 3,
         ...parsed,
       };
     }
   } catch (error) {
     console.error(`Ignoring corrupt config: ${error.message}`);
   }
-  return {customCommands: {}, showArtBoard: true, showHelpCards: false, showStructureGuide: false, maxVisibleProjects: config.maxVisibleProjects};
+  return {customCommands: {}, showArtBoard: true, showHelpCards: false, showStructureGuide: false, maxVisibleProjects: 3};
 }
 
 function useScanner(rootPath) {
@@ -270,7 +270,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
     } catch (error) {
       if (error.isCanceled || error.killed || error.signal === 'SIGKILL' || error.signal === 'SIGINT') {
         setTasks(prev => prev.map(t => t.id === taskId ? {...t, status: 'killed'} : t));
-        addLogToTask(taskId, kleur.yellow(`! Task killed forcefully`));
+        addLogToTask(taskId, kleur.yellow('! Task killed forcefully'));
       } else {
         setTasks(prev => prev.map(t => t.id === taskId ? {...t, status: 'failed'} : t));
         addLogToTask(taskId, kleur.red(`✗ ${commandLabel} failed: ${error.shortMessage || error.message}`));
@@ -294,7 +294,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
 
     useInput((input, key) => {
     if (quitConfirm) {
-      if (input?.toLowerCase() === 'y') { killAllTasks(); console.clear();  { console.clear(); exit(); } return; }
+      if (input?.toLowerCase() === 'y') { killAllTasks(); console.clear(); exit(); return; }
       if (input?.toLowerCase() === 'n' || key.escape) { setQuitConfirm(false); return; }
       return;
     }
@@ -313,7 +313,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
             setConfig((prev) => {
               const projectKey = selProj.path;
               const existing = prev.customCommands?.[projectKey] || [];
-              const nextConfig = { ...prev, customCommands: { ...prev.customCommands, [projectKey]: [...existing, {label, command: commandTokens}] };
+              const nextConfig = { ...prev, customCommands: { ...prev.customCommands, [projectKey]: [...existing, {label, command: commandTokens}] } };
               saveConfig(nextConfig);
               return nextConfig;
             });
@@ -468,16 +468,17 @@ function Compass({rootPath, initialView = 'navigator'}) {
       return;
     }
     if (shiftCombo('q') || isCtrlC) {
-      if (hasRunningTasks) setQuitConfirm(true); else { console.clear();  { console.clear(); exit(); }
+      if (hasRunningTasks) setQuitConfirm(true); else { console.clear(); exit(); }
       return;
     }
-    if (shiftCombo('c') && viewMode === 'detail' && selectedProject) { setCustomMode(true); setCustomInput(''); setCustomCursor(0); return; }
-    
     
     if (normalizedInput === '0' && viewMode === 'detail' && selectedProject) {
       clearAndSwitch('ai');
       return;
     }
+
+    if (shiftCombo('c') && viewMode === 'detail' && selectedProject) { setCustomMode(true); setCustomInput(''); setCustomCursor(0); return; }
+    
     const actionKey = normalizedInput && ACTION_MAP[normalizedInput];
     if (actionKey) {
       const commandMeta = selectedProject?.commands?.[actionKey];
@@ -497,10 +498,10 @@ function Compass({rootPath, initialView = 'navigator'}) {
     }
   });
 
-  const projectCountLabel = useMemo(() => `${projects.length} project${projects.length === 1 ? '' : 's'}`, [projects.length]);
+  const projectCountLabel = useMemo(() => `${projects.length} project\${projects.length === 1 ? '' : 's'}`, [projects.length]);
   const toggleHint = config.showHelpCards ? 'Shift+H hide help' : 'Shift+H show help';
-  const statusHint = activeTask ? `[${activeTask.status.toUpperCase()}] ${activeTask.name}` : 'Idle Navigator';
-  const orbitHint = mainView === 'tasks' ? 'Tasks View' : `Orbit: ${tasks.length} tasks`;
+  const statusHint = activeTask ? `[\${activeTask.status.toUpperCase()}] \${activeTask.name}` : 'Idle Navigator';
+  const orbitHint = mainView === 'tasks' ? 'Tasks View' : `Orbit: \${tasks.length} tasks`;
   const artHint = config.showArtBoard ? 'Shift+B hide art' : 'Shift+B show art';
 
   const detailContent = useMemo(() => {
@@ -510,28 +511,28 @@ function Compass({rootPath, initialView = 'navigator'}) {
     
     const content = [
       create(Box, {key: 'title-row', flexDirection: 'row'}, 
-        create(Text, {color: 'cyan', bold: true}, `${selectedProject.icon} ${selectedProject.name}`),
+        create(Text, {color: 'cyan', bold: true}, `\${selectedProject.icon} \${selectedProject.name}`),
         selectedProject.missingBinaries && selectedProject.missingBinaries.length > 0 && create(Text, {color: 'red', bold: true}, '  ⚠️ MISSING RUNTIME')
       ),
-      create(Text, {key: 'manifest', dimColor: true}, `${selectedProject.type} · ${selectedProject.manifest || 'detected manifest'}`),
-      create(Text, {key: 'loc', dimColor: true}, `Location: ${path.relative(rootPath, selectedProject.path) || '.'}`)
+      create(Text, {key: 'manifest', dimColor: true}, `\${selectedProject.type} · \${selectedProject.manifest || 'detected manifest'}`),
+      create(Text, {key: 'loc', dimColor: true}, `Location: \${path.relative(rootPath, selectedProject.path) || '.'}`)
     ];
     if (selectedProject.description) content.push(create(Text, {key: 'desc'}, selectedProject.description));
-    const frameworks = (selectedProject.frameworks || []).map((lib) => `${lib.icon} ${lib.name}`).join(', ');
-    if (frameworks) content.push(create(Text, {key: 'frames', dimColor: true}, `Frameworks: ${frameworks}`));
+    const frameworks = (selectedProject.frameworks || []).map((lib) => `\${lib.icon} \${lib.name}`).join(', ');
+    if (frameworks) content.push(create(Text, {key: 'frames', dimColor: true}, `Frameworks: \${frameworks}`));
     
     if (selectedProject.missingBinaries && selectedProject.missingBinaries.length > 0) {
       content.push(
         create(Text, {key: 'm-t', color: 'red', bold: true, marginTop: 1}, 'MISSING BINARIES:'),
-        create(Text, {key: 'm-l', color: 'red'}, `Please install: ${selectedProject.missingBinaries.join(', ')}`)
+        create(Text, {key: 'm-l', color: 'red'}, `Please install: \${selectedProject.missingBinaries.join(', ')}`)
       );
     }
 
     content.push(create(Text, {key: 'cmd-header', bold: true, marginTop: 1}, 'Commands'));
     detailedIndexed.forEach((command) => {
       content.push(
-        create(Text, {key: `d-${command.shortcut}`}, `${command.shortcut}. ${command.label} ${command.source === 'custom' ? kleur.magenta('(custom)') : command.source === 'framework' ? kleur.cyan('(framework)') : ''}`),
-        create(Text, {key: `dl-${command.shortcut}`, dimColor: true}, `   ↳ ${command.command.join(' ')}`)
+        create(Text, {key: `d-\${command.shortcut}`}, `\${command.shortcut}. \${command.label} \${command.source === 'custom' ? kleur.magenta('(custom)') : command.source === 'framework' ? kleur.cyan('(framework)') : ''}`),
+        create(Text, {key: `dl-\${command.shortcut}`, dimColor: true}, `   ↳ \${command.command.join(' ')}`)
       );
     });
     content.push(create(Text, {key: 'h-l', dimColor: true, marginTop: 1}, 'Press Shift+C → label|cmd to save custom actions, Enter to close detail view.'));
@@ -539,17 +540,17 @@ function Compass({rootPath, initialView = 'navigator'}) {
   }, [viewMode, selectedProject, rootPath, detailedIndexed]);
 
   const artTileNodes = useMemo(() => [
-    {label: 'Pulse', detail: projectCountLabel, accent: 'magenta', icon: '●', subtext: `Workspace · ${path.basename(rootPath) || rootPath}`},
-    {label: 'Focus', detail: selectedProject?.name || 'Selection', accent: 'cyan', icon: '◆', subtext: `${selectedProject?.type || 'Stack'}`},
-    {label: 'Orbit', detail: `${tasks.length} tasks`, accent: 'yellow', icon: '■', subtext: running ? 'Busy streaming...' : 'Idle'}
+    {label: 'Pulse', detail: projectCountLabel, accent: 'magenta', icon: '●', subtext: `Workspace · \${path.basename(rootPath) || rootPath}`},
+    {label: 'Focus', detail: selectedProject?.name || 'Selection', accent: 'cyan', icon: '◆', subtext: `\${selectedProject?.type || 'Stack'}`},
+    {label: 'Orbit', detail: `\${tasks.length} tasks`, accent: 'yellow', icon: '■', subtext: running ? 'Busy streaming...' : 'Idle'}
   ].map(tile => create(Box, {key: tile.label, flexDirection: 'column', padding: 1, marginRight: 1, borderStyle: 'single', borderColor: tile.accent, minWidth: 24},
-    create(Text, {color: tile.accent, bold: true}, `${tile.icon} ${tile.label}`),
+    create(Text, {color: tile.accent, bold: true}, `\${tile.icon} \${tile.label}`),
     create(Text, {bold: true}, tile.detail),
     create(Text, {dimColor: true}, tile.subtext)
   )), [projectCountLabel, rootPath, selectedProject, tasks.length, running]);
 
   if (quitConfirm) {
-    return create(Box, {flexDirection: 'column', borderStyle: 'round', borderColor: 'red', padding: 1}, create(Text, {bold: true, color: 'red'}, '⚠️ Confirm Exit'), create(Text, null, `There are ${tasks.filter(t=>t.status==='running').length} tasks still running in the background.`), create(Text, null, 'Are you sure you want to quit and stop all processes?'), create(Text, {marginTop: 1}, kleur.bold('Y') + ' to Quit, ' + kleur.bold('N') + ' to Cancel'));
+    return create(Box, {flexDirection: 'column', borderStyle: 'round', borderColor: 'red', padding: 1}, create(Text, {bold: true, color: 'red'}, '⚠️ Confirm Exit'), create(Text, null, `There are \${tasks.filter(t=>t.status==='running').length} tasks still running in the background.`), create(Text, null, 'Are you sure you want to quit and stop all processes?'), create(Text, {marginTop: 1}, kleur.bold('Y') + ' to Quit, ' + kleur.bold('N') + ' to Cancel'));
   }
 
   const renderView = () => {
@@ -558,7 +559,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
       case 'tasks': return create(TaskManager, {tasks, activeTaskId, renameMode, renameInput, renameCursor, CursorText});
       case 'registry': return create(PackageRegistry, {selectedProject, projects, onRunCommand: runProjectCommand, CursorText, onSelectProject: (idx) => setSelectedIndex(idx)});
       case 'architect': return create(ProjectArchitect, {rootPath, onRunCommand: runProjectCommand, CursorText, onReturn: () => setMainView('navigator')});
-      case 'ai': return create(AIHorizon, {rootPath, selectedProject, onRunCommand: runProjectCommand, CursorText});
+      case 'ai': return create(AIHorizon, {rootPath, selectedProject, onRunCommand: runProjectCommand, CursorText, config, setConfig, saveConfig});
       default: {
         const navigatorBody = [
           create(Header, {projectCountLabel, rootPath, running, statusHint, toggleHint, orbitHint, artHint}),
@@ -575,7 +576,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
             create(Box, {flexGrow: 1.3, flexBasis: 0, minWidth: DETAILS_MIN_WIDTH, borderStyle: 'round', borderColor: 'cyan', padding: 1, flexDirection: 'column'}, create(Text, {bold: true, color: 'cyan'}, 'Details'), ...detailContent)
           ),
           create(Box, {key: 'output-row', marginTop: 1, flexDirection: 'column'},
-            create(Box, {flexDirection: 'row', justifyContent: 'space-between'}, create(Text, {bold: true, color: 'yellow'}, `Output: ${activeTask?.name || 'None'}`), create(Text, {dimColor: true}, logOffset ? `Scrolled ${logOffset} lines` : 'Live log view')),
+            create(Box, {flexDirection: 'row', justifyContent: 'space-between'}, create(Text, {bold: true, color: 'yellow'}, `Output: \${activeTask?.name || 'None'}`), create(Text, {dimColor: true}, logOffset ? `Scrolled \${logOffset} lines` : 'Live log view')),
             create(OutputPanel, {activeTask, logOffset}),
             create(Footer, {toggleHint, running, stdinBuffer, stdinCursor, CursorText})
           ),
@@ -584,7 +585,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
             {label: 'Management', color: 'cyan', body: ['Shift+P Package Registry', 'Shift+N Project Architect', 'Shift+X clear / Shift+E export']},
             {label: 'Orbit & AI', color: 'yellow', body: ['Shift+T task manager', 'Shift+A studio / Shift+O AI Horizon', 'Shift+S structure / Shift+Q quit']}
           ].map((card, idx) => create(Box, {key: card.label, flexGrow: 1, flexBasis: 0, minWidth: HELP_CARD_MIN_WIDTH, marginRight: idx < 2 ? 1 : 0, marginBottom: 1, borderStyle: 'round', borderColor: card.color, padding: 1, flexDirection: 'column'}, create(Text, {color: card.color, bold: true, marginBottom: 1}, card.label), ...card.body.map((line, lidx) => create(Text, {key: lidx, dimColor: card.color === 'yellow'}, line))))),
-          config.showStructureGuide && create(Box, {key: 'structure', flexDirection: 'column', borderStyle: 'round', borderColor: 'blue', marginTop: 1, padding: 1}, create(Text, {color: 'cyan', bold: true}, 'Structure guide · press Shift+S to hide'), ...SCHEMA_GUIDE.map(e => create(Text, {key: e.type, dimColor: true}, `• ${e.icon} ${e.label}: ${e.files.join(', ')}`))),
+          config.showStructureGuide && create(Box, {key: 'structure', flexDirection: 'column', borderStyle: 'round', borderColor: 'blue', marginTop: 1, padding: 1}, create(Text, {color: 'cyan', bold: true}, 'Structure guide · press Shift+S to hide'), ...SCHEMA_GUIDE.map(e => create(Text, {key: e.type, dimColor: true}, `• \${e.icon} \${e.label}: \${e.files.join(', ')}`))),
           showHelp && create(Box, {key: 'overlay', flexDirection: 'column', borderStyle: 'double', borderColor: 'cyan', marginTop: 1, padding: 1}, create(Text, {color: 'cyan', bold: true}, 'Help overlay'), create(Text, null, 'Shift+↑/↓ scrolls logs; Shift+X clears; Shift+E exports; Shift+A Studio; Shift+T Tasks; Shift+D Detach; Shift+B Toggle Art Board; Shift+P Packages; Shift+N Creator; Shift+O AI Horizon.'))
         ];
         return create(Box, {flexDirection: 'column'}, ...navigatorBody);
@@ -617,7 +618,7 @@ async function main() {
   if (args.version) {
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
     const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf-8'));
-    console.log(`v${pkg.version}`);
+    console.log(`v\${pkg.version}`);
     return;
   }
   if (args.help) {
@@ -626,7 +627,7 @@ async function main() {
     console.log(kleur.dim('───────────────────────────────────────────────────'));
     console.log('');
     console.log(kleur.bold('Usage:'));
-    console.log('  project-compass [--dir <path>] [--studio]');
+    console.log('  project-compass [--dir <path>] [--studio] [--ai] [--task]');
     console.log('');
     console.log(kleur.bold(kleur.cyan('🌌 Core Views:')));
     console.log('  Shift+T  ' + kleur.bold('Orbit Task Manager') + '  - Manage background processes & stream logs');
@@ -639,6 +640,7 @@ async function main() {
     console.log('  ↑ / ↓    Move focus through discovered projects');
     console.log('  PgUp/Dn  Jump a full page of projects');
     console.log('  Enter    Toggle deep detail view (manifests, scripts, frameworks)');
+    console.log('  0        Quick AI Analysis (inside Detail View)');
     console.log('  Shift+C  Add a persistent custom command to the focused project');
     console.log('  1-9      Quick-run numbered scripts in detail view');
     console.log('  B/T/R/I  Macro run: Build / Test / Run / Install');
@@ -662,8 +664,8 @@ async function main() {
   const rootPath = args.root ? path.resolve(args.root) : process.cwd();
   if (args.mode === 'test') {
     const projects = await discoverProjects(rootPath);
-    console.log(`Detected ${projects.length} project(s) under ${rootPath}`);
-    projects.forEach((project) => { console.log(` • [${project.type}] ${project.name} (${project.path})`); });
+    console.log(`Detected \${projects.length} project(s) under \${rootPath}`);
+    projects.forEach((project) => { console.log(` • [\${project.type}] \${project.name} (\${project.path})`); });
     return;
   }
 
