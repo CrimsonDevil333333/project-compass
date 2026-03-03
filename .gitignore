@@ -8,3 +8,5 @@ yarn-error.log*
 .npm/
 dist/
 build/
+
+memory/
