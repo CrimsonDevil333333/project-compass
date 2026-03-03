@@ -30,7 +30,10 @@ npm install -g project-compass
 ### 🏗️ Project Architect (`Shift+N`)
 - **Modern Templates**: Scaffold high-performance projects with built-in support for **Bun, Next.js, Vite, Rust, and Django**.
 
-### 🔌 Manual Infrastructure\n- **Port Mapping**: Hit `Shift + R` in details to manually assign ports to projects. Settings are saved persistently.\n\n### 🤖 AI Horizon (`Shift+O` or `0`)
+### 🔌 Manual Infrastructure
+- **Port Mapping**: Hit `Shift + R` in details to manually assign ports to projects. Settings are saved persistently.
+
+### 🤖 AI Horizon (`Shift+O` or `0`)
 - **Intelligence Persistence**: Configure your provider (**OpenRouter, Gemini, Claude, Ollama**) once; Compass remembers your settings.
 - **Deep DNA Analysis**: Press `0` on any project to analyze its structure.
 - **Auto-Config (BRIT)**: AI automatically detects and configures missing **Build, Run, Install, and Test** commands, saving them directly to your `config.json`.
