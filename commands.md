@@ -20,7 +20,7 @@ This document lists all supported languages, frameworks, and their built-in comm
 | **Shift+S** | Toggle **Structure Guide** (Saved to config) |
 | **Shift+X** | **Clear** active task output logs |
 | **Shift+E** | **Export** logs to a timestamped `.txt` file |
-| **Shift+L** | **Rerun** the last executed command |
+| **Shift+L** | **Rerun** the last executed command |\n| PgUp / PgDn | Jump full project page |
 | **Shift+C** | Add a **Custom Command** (`label|cmd`) in detail view |
 | **Shift+Q** | **Quit** application (Confirms if tasks are running) |
 | Shift+↑ / ↓ | Scroll output logs |
