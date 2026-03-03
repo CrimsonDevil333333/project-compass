@@ -484,10 +484,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
 
     const pageLimit = config.maxVisibleProjects || 3;
     const pageStep = Math.max(1, pageLimit);
-    const clampIndex = (value) => {
-      const idx = Math.max(0, Math.min(projects.length - 1, value));
-      return isNaN(idx) ? 0 : idx;
-    };
+    
     if (key.pageUp && projects.length > pageLimit) { 
       console.clear(); 
       setSelectedIndex((prev) => {

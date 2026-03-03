@@ -1,4 +1,4 @@
-/* global setTimeout, fetch */
+/* global fetch */
 import React, {useState, memo} from 'react';
 import {Box, Text, useInput} from 'ink';
 
