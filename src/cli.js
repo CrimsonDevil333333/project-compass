@@ -53,14 +53,14 @@ function loadConfig() {
         showArtBoard: true,
         showHelpCards: false,
         showStructureGuide: false,
-        maxVisibleProjects: 3,
+        maxVisibleProjects: config.maxVisibleProjects,
         ...parsed,
       };
     }
   } catch (error) {
     console.error(`Ignoring corrupt config: ${error.message}`);
   }
-  return {customCommands: {}, showArtBoard: true, showHelpCards: false, showStructureGuide: false, maxVisibleProjects: 3};
+  return {customCommands: {}, showArtBoard: true, showHelpCards: false, showStructureGuide: false, maxVisibleProjects: config.maxVisibleProjects};
 }
 
 function useScanner(rootPath) {
@@ -570,7 +570,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
           create(Box, {key: 'projects-row', marginTop: 1, flexDirection: 'row', alignItems: 'stretch', width: '100%', flexWrap: 'wrap'},
             create(Box, {flexGrow: 1, flexBasis: 0, minWidth: PROJECTS_MIN_WIDTH, marginRight: 1, borderStyle: 'round', borderColor: 'magenta', padding: 1}, 
               create(Text, {bold: true, color: 'magenta'}, 'Projects'), 
-              create(Box, {flexDirection: 'column', marginTop: 1}, create(Navigator, {projects, selectedIndex, rootPath, loading, error, maxVisibleProjects: 3}))
+              create(Box, {flexDirection: 'column', marginTop: 1}, create(Navigator, {projects, selectedIndex, rootPath, loading, error, maxVisibleProjects: config.maxVisibleProjects}))
             ),
             create(Box, {flexGrow: 1.3, flexBasis: 0, minWidth: DETAILS_MIN_WIDTH, borderStyle: 'round', borderColor: 'cyan', padding: 1, flexDirection: 'column'}, create(Text, {bold: true, color: 'cyan'}, 'Details'), ...detailContent)
           ),

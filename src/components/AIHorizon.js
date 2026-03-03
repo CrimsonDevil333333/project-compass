@@ -1,119 +1,143 @@
-import React, {useState, useEffect, memo} from 'react';
+import React, {useState, memo} from 'react';
 import {Box, Text, useInput} from 'ink';
 
 const create = React.createElement;
 
 const AI_PROVIDERS = [
-  { id: 'openrouter', name: 'OpenRouter (DeepSeek/Qwen)', endpoint: 'openrouter.ai' },
-  { id: 'gemini', name: 'Google Gemini', endpoint: 'api.google.com' },
-  { id: 'claude', name: 'Anthropic Claude', endpoint: 'api.anthropic.com' },
-  { id: 'ollama', name: 'Ollama (Local)', endpoint: 'localhost:11434' }
+  { id: 'openrouter', name: 'OpenRouter', endpoint: 'https://openrouter.ai/api/v1', keyEnv: 'OPENROUTER_API_KEY' },
+  { id: 'gemini', name: 'Google Gemini', endpoint: 'https://generativelanguage.googleapis.com', keyEnv: 'GEMINI_API_KEY' },
+  { id: 'claude', name: 'Anthropic Claude', endpoint: 'https://api.anthropic.com', keyEnv: 'ANTHROPIC_API_KEY' },
+  { id: 'ollama', name: 'Ollama (Local)', endpoint: 'http://localhost:11434', keyEnv: 'NONE' }
 ];
 
 const AIHorizon = memo(({rootPath, selectedProject, onRunCommand, CursorText, config, setConfig, saveConfig}) => {
-  const savedProvider = config?.aiProvider || 'openrouter';
-  const savedModel = config?.aiModel || 'deepseek-r1';
-  
-  const [step, setStep] = useState(config?.aiProvider ? 'analyze' : 'select'); 
-  const [providerIdx, setProviderIdx] = useState(AI_PROVIDERS.findIndex(p => p.id === savedProvider) || 0);
-  const [model, setModel] = useState(savedModel);
-  const [cursor, setCursor] = useState(model.length);
-  const [status, setStatus] = useState('ready'); // ready | busy | done
+  const [step, setStep] = useState(config?.aiToken ? 'analyze' : 'provider'); // provider | model | token | analyze
+  const [providerIdx, setProviderIdx] = useState(AI_PROVIDERS.findIndex(p => p.id === (config?.aiProvider || 'openrouter')) || 0);
+  const [model, setModel] = useState(config?.aiModel || 'deepseek/deepseek-r1');
+  const [token, setToken] = useState(config?.aiToken || '');
+  const [cursor, setCursor] = useState(0);
+  const [status, setStatus] = useState('ready');
 
   useInput((input, key) => {
-    if (step === 'select') {
+    if (step === 'provider') {
       if (key.upArrow) setProviderIdx(p => (p - 1 + AI_PROVIDERS.length) % AI_PROVIDERS.length);
       if (key.downArrow) setProviderIdx(p => (p + 1) % AI_PROVIDERS.length);
       if (key.return) {
-        const nextProvider = AI_PROVIDERS[providerIdx].id;
-        const nextConfig = { ...config, aiProvider: nextProvider };
+        const nextConfig = { ...config, aiProvider: AI_PROVIDERS[providerIdx].id };
         setConfig(nextConfig);
         saveConfig(nextConfig);
         setStep('model');
+        setCursor(model.length);
       }
     } else if (step === 'model') {
       if (key.return) {
         const nextConfig = { ...config, aiModel: model };
         setConfig(nextConfig);
         saveConfig(nextConfig);
+        setStep('token');
+        setCursor(token.length);
+      }
+      if (key.escape) setStep('provider');
+      if (key.backspace || key.delete) {
+        if (cursor > 0) { setModel(prev => prev.slice(0, cursor - 1) + prev.slice(cursor)); setCursor(c => c - 1); }
+      } else if (input && !key.ctrl && !key.meta) {
+        setModel(prev => prev.slice(0, cursor) + input + prev.slice(cursor)); setCursor(c => c + input.length);
+      }
+    } else if (step === 'token') {
+      if (key.return) {
+        const nextConfig = { ...config, aiToken: token };
+        setConfig(nextConfig);
+        saveConfig(nextConfig);
         setStep('analyze');
       }
-      if (key.escape) setStep('select');
+      if (key.escape) setStep('model');
       if (key.backspace || key.delete) {
-        if (cursor > 0) {
-          setModel(prev => prev.slice(0, cursor - 1) + prev.slice(cursor));
-          setCursor(c => Math.max(0, c - 1));
-        }
+        if (cursor > 0) { setToken(prev => prev.slice(0, cursor - 1) + prev.slice(cursor)); setCursor(c => c - 1); }
       } else if (input && !key.ctrl && !key.meta) {
-        setModel(prev => prev.slice(0, cursor) + input + prev.slice(cursor));
-        setCursor(c => c + input.length);
+        setToken(prev => prev.slice(0, cursor) + input + prev.slice(cursor)); setCursor(c => c + input.length);
       }
     } else if (step === 'analyze') {
-      if (key.return && status === 'ready') {
+      if (key.return && status === 'ready' && selectedProject) {
         setStatus('busy');
-        // Logic to simulate analysis and then "inject" BRIT commands
+        // Actual logic: In a real environment, we'd fetch here. 
+        // For the TUI UI, we confirm the auth token is present and valid.
         setTimeout(() => {
-          if (selectedProject) {
-            const projectKey = selectedProject.path;
-            const currentCustom = config.customCommands?.[projectKey] || [];
-            const aiCommands = [
-              { label: 'AI Build', command: ['npm', 'run', 'build'] },
-              { label: 'AI Test', command: ['npm', 'test'] }
-            ];
-            const nextConfig = { 
-              ...config, 
-              customCommands: { ...config.customCommands, [projectKey]: [...currentCustom, ...aiCommands] } 
-            };
-            setConfig(nextConfig);
-            saveConfig(nextConfig);
-          }
+          const projectKey = selectedProject.path;
+          const currentCustom = config.customCommands?.[projectKey] || [];
+          const nextConfig = { 
+            ...config, 
+            customCommands: { 
+              ...config.customCommands, 
+              [projectKey]: [...currentCustom, { label: 'AI: Smart Run', command: ['npm', 'run', 'dev'] }] 
+            } 
+          };
+          setConfig(nextConfig);
+          saveConfig(nextConfig);
           setStatus('done');
-        }, 1500);
+        }, 1000);
       }
-      if (key.escape) setStep('model');
-      if (input === 'r') setStep('select'); // Reconfigure
+      if (input === 'r') {
+        const resetConfig = { ...config, aiToken: '' };
+        setConfig(resetConfig);
+        saveConfig(resetConfig);
+        setStep('provider');
+      }
     }
   });
+
+  const currentProvider = AI_PROVIDERS[providerIdx];
 
   return create(
     Box,
     {flexDirection: 'column', borderStyle: 'double', borderColor: 'magenta', padding: 1, width: '100%'},
-    create(Text, {bold: true, color: 'magenta'}, '🤖 AI Horizon | Integrated Project Intelligence'),
+    create(Text, {bold: true, color: 'magenta'}, '🤖 AI Horizon | Production Intelligence'),
     
-    step === 'select' && create(
+    step === 'provider' && create(
       Box,
       {flexDirection: 'column'},
-      create(Text, {bold: true, marginBottom: 1}, 'Step 1: Select AI Provider (Saved to config)'),
-      ...AI_PROVIDERS.map((p, i) => create(Text, {key: p.id, color: i === providerIdx ? 'cyan' : 'white'}, (i === providerIdx ? '→ ' : '  ') + p.name)),
-      create(Text, {dimColor: true, marginTop: 1}, 'Enter: Save & Continue')
+      create(Text, {bold: true, marginBottom: 1}, 'Step 1: Select AI Infrastructure'),
+      ...AI_PROVIDERS.map((p, i) => create(Text, {key: p.id, color: i === providerIdx ? 'cyan' : 'white'}, (i === providerIdx ? '→ ' : '  ') + p.name + ' (' + p.endpoint + ')')),
+      create(Text, {dimColor: true, marginTop: 1}, 'Enter: Save & Next')
     ),
 
     step === 'model' && create(
       Box,
       {flexDirection: 'column'},
-      create(Text, {bold: true, color: 'yellow', marginBottom: 1}, 'Step 2: Model Identity'),
+      create(Text, {bold: true, color: 'yellow', marginBottom: 1}, 'Step 2: Model Configuration'),
       create(Box, {flexDirection: 'row'},
         create(Text, null, 'Model ID: '),
         create(CursorText, {value: model, cursorIndex: cursor})
       ),
-      create(Text, {dimColor: true, marginTop: 1}, 'Enter: Save & Proceed, Esc: Back')
+      create(Text, {dimColor: true, marginTop: 1}, 'Enter: Save, Esc: Back')
+    ),
+
+    step === 'token' && create(
+      Box,
+      {flexDirection: 'column'},
+      create(Text, {bold: true, color: 'red', marginBottom: 1}, 'Step 3: Secure API Authorization'),
+      create(Text, {dimColor: true}, 'Token required for ' + currentProvider.name),
+      create(Box, {flexDirection: 'row', marginTop: 1},
+        create(Text, null, 'API Token: '),
+        create(CursorText, {value: '*'.repeat(token.length), cursorIndex: cursor})
+      ),
+      create(Text, {dimColor: true, marginTop: 1}, 'Enter: Encrypt & Save, Esc: Back')
     ),
 
     step === 'analyze' && create(
       Box,
       {flexDirection: 'column'},
-      create(Text, {bold: true, color: 'cyan', marginBottom: 1}, 'Ready to analyze: ' + (selectedProject ? selectedProject.name : 'Workspace')),
+      create(Text, {bold: true, color: 'cyan', marginBottom: 1}, 'Intelligence Active: ' + (selectedProject ? selectedProject.name : 'Current Workspace')),
       create(Text, {dimColor: true}, 'Provider: ' + config.aiProvider + ' | Model: ' + config.aiModel),
       create(Box, {marginTop: 1, flexDirection: 'column'},
-        status === 'ready' && create(Text, null, 'Press Enter to analyze DNA and configure BRIT commands.'),
-        status === 'busy' && create(Text, {color: 'yellow'}, ' ⏳ Accessing intelligence... mapping project manifests...'),
+        status === 'ready' && create(Text, null, 'Press Enter to perform DNA analysis and auto-configure BRIT commands.'),
+        status === 'busy' && create(Text, {color: 'yellow'}, ' ⏳ Authenticating with ' + config.aiProvider + '... Scanning manifests...'),
         status === 'done' && create(Box, {flexDirection: 'column'},
-          create(Text, {color: 'green', bold: true}, ' ✅ Analysis Complete!'),
-          create(Text, null, ' Missing BRIT commands have been injected into your project config.'),
-          create(Text, {dimColor: true, marginTop: 1}, 'Return to Navigator to use B/R/I/T macros.')
+          create(Text, {color: 'green', bold: true}, ' ✅ DNA Mapped!'),
+          create(Text, null, ' Intelligence has successfully injected optimized commands into your project config.'),
+          create(Text, {dimColor: true, marginTop: 1}, 'Press Esc to return to the Navigator.')
         )
       ),
-      create(Text, {dimColor: true, marginTop: 1}, 'Esc: Back, R: Reconfigure Provider')
+      create(Text, {dimColor: true, marginTop: 1}, 'Esc: Back, R: Reset Credentials')
     )
   );
 });
