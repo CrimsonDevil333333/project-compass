@@ -163,7 +163,8 @@ export const builtInFrameworks = [
     },
     commands(project) {
       const pm = project.metadata?.packageManager || 'npm';
-      return { install: { label: 'Tailwind install', command: [pm, 'install', '-D', 'tailwindcss'], source: 'framework' } };
+      // Moved to 'setup' to avoid hijacking the primary 'install' (I) macro
+      return { setup: { label: 'Tailwind Init', command: [pm, 'install', '-D', 'tailwindcss'], source: 'framework' } };
     }
   },
   {

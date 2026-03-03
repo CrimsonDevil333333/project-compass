@@ -293,7 +293,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
 
     useInput((input, key) => {
     if (quitConfirm) {
-      if (input?.toLowerCase() === 'y') { killAllTasks(); exit(); return; }
+      if (input?.toLowerCase() === 'y') { killAllTasks(); console.clear(); exit(); return; }
       if (input?.toLowerCase() === 'n' || key.escape) { setQuitConfirm(false); return; }
       return;
     }
@@ -466,7 +466,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
       return;
     }
     if (shiftCombo('q') || isCtrlC) {
-      if (hasRunningTasks) setQuitConfirm(true); else exit();
+      if (hasRunningTasks) setQuitConfirm(true); else { console.clear(); exit(); }
       return;
     }
     if (shiftCombo('c') && viewMode === 'detail' && selectedProject) { setCustomMode(true); setCustomInput(''); setCustomCursor(0); return; }
