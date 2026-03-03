@@ -2,12 +2,17 @@
 
 This document lists all supported languages, frameworks, and their built-in commands and keyboard shortcuts.
 
-## Keyboard Guide (Navigator)\n\n| Key | Action |\n| --- | --- |\n| **Shift+O** | Open **AI Horizon** (Workspace Intelligence) |
+## Keyboard Guide (Navigator)
+
+| Key | Action |
+| --- | --- |
+| **Shift+O** | Open **AI Horizon** (Workspace Intelligence) |
 
 | Key | Action |
 | --- | --- |
 | ↑ / ↓ | Move project focus |
-| Enter | Toggle deep detail view / Switch back from sub-views |\n| **0** | **Quick AI Analysis** (Detail View only) |
+| Enter | Toggle deep detail view / Switch back from sub-views |
+| **0** | **Quick AI Analysis** (Detail View only) |
 | **B / T / R / I**| **Macro Launch**: Build, Test, Run, **Install** |
 | **Esc** | **Global Back**: Return to Main Navigator from any view |
 | **Shift+A** | Open **Omni-Studio** (Environment & Runtime audit) |
@@ -20,7 +25,8 @@ This document lists all supported languages, frameworks, and their built-in comm
 | **Shift+S** | Toggle **Structure Guide** (Saved to config) |
 | **Shift+X** | **Clear** active task output logs |
 | **Shift+E** | **Export** logs to a timestamped `.txt` file |
-| **Shift+L** | **Rerun** the last executed command |\n| PgUp / PgDn | Jump full project page |
+| **Shift+L** | **Rerun** the last executed command |
+| PgUp / PgDn | Jump full project page |
 | **Shift+C** | Add a **Custom Command** (`label|cmd`) in detail view |
 | **Shift+Q** | **Quit** application (Confirms if tasks are running) |
 | Shift+↑ / ↓ | Scroll output logs |
