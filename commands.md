@@ -2,7 +2,7 @@
 
 This document lists all supported languages, frameworks, and their built-in commands and keyboard shortcuts.
 
-## Keyboard Guide (Navigator)
+## Keyboard Guide (Navigator)\n\n| Key | Action |\n| --- | --- |\n| **Shift+O** | Open **AI Horizon** (Workspace Intelligence) |
 
 | Key | Action |
 | --- | --- |

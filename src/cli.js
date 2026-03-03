@@ -14,6 +14,7 @@ import Studio from './components/Studio.js';
 import TaskManager from './components/TaskManager.js';
 import PackageRegistry from './components/PackageRegistry.js';
 import ProjectArchitect from './components/ProjectArchitect.js';
+import AIHorizon from './components/AIHorizon.js';
 import Navigator from './components/Navigator.js';
 import Header from './components/Header.js';
 import Footer from './components/Footer.js';
@@ -421,7 +422,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
       return;
     }
 
-    if (mainView === 'registry' || mainView === 'architect') {
+    if (mainView === 'registry' || mainView === 'architect' || mainView === 'ai') {
       return;
     }
 
@@ -450,7 +451,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
     if (key.shift && key.upArrow) { scrollLogs(1); return; }
     if (key.shift && key.downArrow) { scrollLogs(-1); return; }
 
-    const pageStep = Math.max(1, config.maxVisibleProjects || 8);
+    const pageStep = Math.max(1, config.maxVisibleProjects || 3);
     const clampIndex = (value) => Math.max(0, Math.min(projects.length - 1, value));
     if (key.pageUp && projects.length > 0) { console.clear(); setSelectedIndex((prev) => clampIndex(prev - pageStep)); return; }
     if (key.pageDown && projects.length > 0) { console.clear(); setSelectedIndex((prev) => clampIndex(prev + pageStep)); return; }
@@ -483,7 +484,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
         runProjectCommand(detailShortcutMap.get(normalizedInput), selectedProject);
         return;
       }
-      const reserved = ['a', 'p', 'n', 'x', 'e', 'd', 'b', 't', 'q', 'h', 's', 'l', 'c', 'i'];
+      const reserved = ['a', 'p', 'n', 'x', 'e', 'd', 'b', 't', 'q', 'h', 's', 'l', 'c', 'i', 'o'];
       if (key.shift && !reserved.includes(normalizedInput)) {
         runProjectCommand(detailShortcutMap.get(normalizedInput), selectedProject);
         return;
@@ -552,6 +553,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
       case 'tasks': return create(TaskManager, {tasks, activeTaskId, renameMode, renameInput, renameCursor, CursorText});
       case 'registry': return create(PackageRegistry, {selectedProject, projects, onRunCommand: runProjectCommand, CursorText, onSelectProject: (idx) => setSelectedIndex(idx)});
       case 'architect': return create(ProjectArchitect, {rootPath, onRunCommand: runProjectCommand, CursorText, onReturn: () => setMainView('navigator')});
+      case 'ai': return create(AIHorizon, {rootPath, selectedProject, onRunCommand: runProjectCommand, CursorText});
       default: {
         const navigatorBody = [
           create(Header, {projectCountLabel, rootPath, running, statusHint, toggleHint, orbitHint, artHint}),
@@ -575,10 +577,10 @@ function Compass({rootPath, initialView = 'navigator'}) {
           config.showHelpCards && create(Box, {key: 'help-cards', marginTop: 1, flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap'}, [
             {label: 'Navigation', color: 'magenta', body: ['↑ / ↓ move focus, Enter: details', 'Shift+↑ / ↓ scroll output', 'Shift+H toggle help cards', 'Shift+D detach from task']},
             {label: 'Management', color: 'cyan', body: ['Shift+P Package Registry', 'Shift+N Project Architect', 'Shift+X clear / Shift+E export']},
-            {label: 'Orbit & Studio', color: 'yellow', body: ['Shift+T task manager', 'Shift+A studio / Shift+B art board', 'Shift+S structure / Shift+Q quit']}
+            {label: 'Orbit & AI', color: 'yellow', body: ['Shift+T task manager', 'Shift+A studio / Shift+O AI Horizon', 'Shift+S structure / Shift+Q quit']}
           ].map((card, idx) => create(Box, {key: card.label, flexGrow: 1, flexBasis: 0, minWidth: HELP_CARD_MIN_WIDTH, marginRight: idx < 2 ? 1 : 0, marginBottom: 1, borderStyle: 'round', borderColor: card.color, padding: 1, flexDirection: 'column'}, create(Text, {color: card.color, bold: true, marginBottom: 1}, card.label), ...card.body.map((line, lidx) => create(Text, {key: lidx, dimColor: card.color === 'yellow'}, line))))),
           config.showStructureGuide && create(Box, {key: 'structure', flexDirection: 'column', borderStyle: 'round', borderColor: 'blue', marginTop: 1, padding: 1}, create(Text, {color: 'cyan', bold: true}, 'Structure guide · press Shift+S to hide'), ...SCHEMA_GUIDE.map(e => create(Text, {key: e.type, dimColor: true}, `• ${e.icon} ${e.label}: ${e.files.join(', ')}`))),
-          showHelp && create(Box, {key: 'overlay', flexDirection: 'column', borderStyle: 'double', borderColor: 'cyan', marginTop: 1, padding: 1}, create(Text, {color: 'cyan', bold: true}, 'Help overlay'), create(Text, null, 'Shift+↑/↓ scrolls logs; Shift+X clears; Shift+E exports; Shift+A Studio; Shift+T Tasks; Shift+D Detach; Shift+B Toggle Art Board; Shift+P Packages; Shift+N Creator.'))
+          showHelp && create(Box, {key: 'overlay', flexDirection: 'column', borderStyle: 'double', borderColor: 'cyan', marginTop: 1, padding: 1}, create(Text, {color: 'cyan', bold: true}, 'Help overlay'), create(Text, null, 'Shift+↑/↓ scrolls logs; Shift+X clears; Shift+E exports; Shift+A Studio; Shift+T Tasks; Shift+D Detach; Shift+B Toggle Art Board; Shift+P Packages; Shift+N Creator; Shift+O AI Horizon.'))
         ];
         return create(Box, {flexDirection: 'column'}, ...navigatorBody);
       }
@@ -623,10 +625,12 @@ async function main() {
     console.log('  Shift+T  ' + kleur.bold('Orbit Task Manager') + '  - Manage background processes & stream logs');
     console.log('  Shift+P  ' + kleur.bold('Package Registry') + '    - Direct dependency management (add/remove)');
     console.log('  Shift+N  ' + kleur.bold('Project Architect') + '   - Scaffold new projects from templates');
+    console.log('  Shift+O  ' + kleur.bold('AI Horizon') + '          - Intelligent project analysis & commands');
     console.log('  Shift+A  ' + kleur.bold('Omni-Studio') + '         - Environment & runtime health audit');
     console.log('');
     console.log(kleur.bold(kleur.yellow('🎮 Navigation & Details:')));
     console.log('  ↑ / ↓    Move focus through discovered projects');
+    console.log('  PgUp/Dn  Jump a full page of projects');
     console.log('  Enter    Toggle deep detail view (manifests, scripts, frameworks)');
     console.log('  Shift+C  Add a persistent custom command to the focused project');
     console.log('  1-9      Quick-run numbered scripts in detail view');
