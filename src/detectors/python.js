@@ -123,7 +123,7 @@ export default {
   icon: '🐍',
   priority: 95,
   files: ['pyproject.toml', 'requirements.txt', 'setup.py', 'Pipfile', 'manage.py'],
-  binaries: ['python3', 'python', 'uv'].filter(Boolean),
+  binaries: ['python3', 'python', 'uv'],
   async build(projectPath, manifest) {
     const missingBinaries = this.binaries.filter(b => !checkBinary(b));
     const pkgManager = getPythonPackageManager(projectPath);

@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import fastGlob from 'fast-glob';
-import { ensureConfigDir, PLUGIN_FILE } from './configPaths.js';
+import { ensureConfigDir, PLUGIN_FILE, CONFIG_PATH } from './configPaths.js';
 import { dependencyMatches, hasProjectFile, parseCommandTokens, checkBinary } from './detectors/utils.js';
 import nodeDetector from './detectors/node.js';
 import pythonDetector from './detectors/python.js';
@@ -72,11 +72,20 @@ function loadUserFrameworks() {
 }
 
 let cachedFrameworkPlugins = null;
+let cachedPluginMtime = 0;
 
 function getFrameworkPlugins() {
-  if (cachedFrameworkPlugins) {
+  let currentMtime = 0;
+  try {
+    if (fs.existsSync(PLUGIN_FILE)) {
+      currentMtime = fs.statSync(PLUGIN_FILE).mtimeMs;
+    }
+  } catch { /* ignore */ }
+
+  if (cachedFrameworkPlugins && currentMtime <= cachedPluginMtime) {
     return cachedFrameworkPlugins;
   }
+  cachedPluginMtime = currentMtime;
   cachedFrameworkPlugins = [...builtInFrameworks, ...loadUserFrameworks()];
   return cachedFrameworkPlugins;
 }
@@ -170,7 +179,6 @@ export async function discoverProjects(root) {
           if (!entry) {
             continue;
           }
-          // Load project-specific compass.config.js if it exists
           const projectConfig = await loadProjectConfig(projectDir);
           if (projectConfig) {
             entry.commands = { ...entry.commands, ...(projectConfig.commands || {}) };
@@ -188,7 +196,23 @@ export async function discoverProjects(root) {
       console.error(`Error in detector ${detector.type}: ${error.message}`);
     }
   }
-  return Array.from(projectMap.values()).sort((a, b) => b.priority - a.priority);
+  const sorted = Array.from(projectMap.values()).sort((a, b) => b.priority - a.priority);
+
+  let savedMeta = {};
+  try {
+    if (fs.existsSync(CONFIG_PATH)) {
+      savedMeta = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'))?.projectMeta || {};
+    }
+  } catch { /* ignore */ }
+
+  let portBase = 3000;
+  for (const project of sorted) {
+    const saved = savedMeta[project.path];
+    const existingPort = saved?.port || project.metadata?.port;
+    project.metadata = { ...project.metadata, port: existingPort || String(portBase) };
+    if (!existingPort) portBase++;
+  }
+  return sorted;
 }
 
 export const SCHEMA_GUIDE = detectors.map((d) => ({

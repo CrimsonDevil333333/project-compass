@@ -73,7 +73,7 @@ export const builtInFrameworks = [
     languages: ['Node.js'],
     priority: 106,
     match(project) {
-      return dependencyMatches(project, 'koa') && !dependencyMatches(project, 'koa-router');
+      return dependencyMatches(project, 'koa');
     },
     commands(project) {
       const pm = project.metadata?.packageManager || 'npm';

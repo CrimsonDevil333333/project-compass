@@ -58,7 +58,7 @@ export default {
     const commands = {
       install: { label: 'Bundle install', command: ['bundle', 'install'], source: 'builtin' },
       update: { label: 'Bundle update', command: ['bundle', 'update'], source: 'builtin' },
-      console: { label: 'Ruby console', command: ['ruby', '-e', 'puts "IRB"'], source: 'builtin' }
+      console: { label: 'Ruby console', command: ['irb'], source: 'builtin' }
     };
     
     if (hasProjectFile(projectPath, 'bin/rails')) {

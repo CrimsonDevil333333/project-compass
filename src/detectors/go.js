@@ -46,16 +46,16 @@ function detectGoFrameworks(deps) {
   const frameworks = [];
   const depStr = deps.join(' ').toLowerCase();
   
-  if (depStr.includes('gin') || depStr.includes('gin-gonic')) frameworks.push({ name: 'Gin', icon: '🍸' });
-  if (depStr.includes('echo') || depStr.includes('labstack/echo')) frameworks.push({ name: 'Echo', icon: '🔊' });
-  if (depStr.includes('fiber') || depStr.includes('gofiber')) frameworks.push({ name: 'Fiber', icon: '🔥' });
-  if (depStr.includes('chi')) frameworks.push({ name: 'Chi', icon: '🤝' });
+  if (/\bgin\b/.test(depStr) || depStr.includes('gin-gonic')) frameworks.push({ name: 'Gin', icon: '🍸' });
+  if (depStr.includes('labstack/echo')) frameworks.push({ name: 'Echo', icon: '🔊' });
+  if (depStr.includes('gofiber')) frameworks.push({ name: 'Fiber', icon: '🔥' });
+  if (depStr.includes('go-chi/chi')) frameworks.push({ name: 'Chi', icon: '🤝' });
   if (depStr.includes('gorilla')) frameworks.push({ name: 'Gorilla', icon: '🦍' });
-  if (depStr.includes('iris')) frameworks.push({ name: 'Iris', icon: '🌺' });
+  if (depStr.includes('iris-go')) frameworks.push({ name: 'Iris', icon: '🌺' });
   if (depStr.includes('beego')) frameworks.push({ name: 'Beego', icon: '🐝' });
   if (depStr.includes('revel')) frameworks.push({ name: 'Revel', icon: '🎉' });
   if (depStr.includes('gqlgen')) frameworks.push({ name: 'GQLGen', icon: '◼️' });
-  if (depStr.includes('grpc')) frameworks.push({ name: 'gRPC', icon: '🔌' });
+  if (depStr.includes('/grpc')) frameworks.push({ name: 'gRPC', icon: '🔌' });
   
   return frameworks;
 }

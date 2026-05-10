@@ -55,7 +55,7 @@ export default {
     
     const commands = {
       install: { label: 'Composer install', command: ['composer', 'install'], source: 'builtin' },
-      update: { label: 'Composer update', command: ['composer', 'update'], source: 'builtin' }
+      update: { label: 'Composer update all', command: ['composer', 'update'], source: 'builtin' }
     };
     
     if (hasProjectFile(projectPath, 'artisan')) {

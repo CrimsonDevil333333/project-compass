@@ -859,4 +859,3 @@ Navigator uses pagination to handle large workspaces:
 ---
 
 *Built for scale and precision.*  
-*Last Updated: 2026-05-08*

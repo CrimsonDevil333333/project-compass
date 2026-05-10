@@ -98,13 +98,12 @@ export function dependencyMatches(project, needle) {
     return '';
   }).filter(Boolean);
   const target = needle.toLowerCase();
-  return dependencies.some((value) => 
-    value === target || 
-    value.startsWith(`${target}@`) || 
-    value.includes(`/${target}`) ||
-    value.startsWith(`${target}/`) ||
-    value.endsWith(`/${target}`)
-  );
+  return dependencies.some((value) => {
+    if (value === target) return true;
+    if (value.startsWith(`${target}@`) || value.startsWith(`${target}==`) || value.startsWith(`${target}>=`) || value.startsWith(`${target}~=`)) return true;
+    if (value.startsWith(`${target}/`) || value.endsWith(`/${target}`)) return true;
+    return false;
+  });
 }
 
 export function parseCommandTokens(value) {

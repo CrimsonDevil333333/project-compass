@@ -1126,6 +1126,3 @@ npm start
 
 ---
 
-*Created for the CrimsonDevil333333 Ecosystem.*  
-*Last Updated: 2026-05-08*  
-*Version: 4.3.6*

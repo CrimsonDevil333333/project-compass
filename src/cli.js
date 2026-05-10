@@ -33,6 +33,12 @@ const ACTION_MAP = {
   r: 'run',
   i: 'install'
 };
+const COMMAND_FALLBACKS = {
+  build: ['compile', 'dist', 'bundle', 'package'],
+  test: ['check', 'spec', 'unit', 'coverage'],
+  run: ['start', 'serve', 'dev'],
+  install: ['setup', 'bootstrap', 'fetch']
+};
 
 function saveConfig(config) {
   try {
@@ -238,13 +244,63 @@ function Compass({rootPath, initialView = 'navigator'}) {
     if (!project) return;
     if (!commandMeta || !Array.isArray(commandMeta.command) || commandMeta.command.length === 0) return;
 
+    let finalCommand = [...commandMeta.command];
+    const port = config.projectMeta?.[project.path]?.port || project.metadata?.port;
+    let portApplied = false;
+    if (port) {
+      const cmdStr = finalCommand.join(' ');
+      const portStr = String(port);
+      const patterns = [
+        { match: 'uvicorn', flag: '--port' },
+        { match: 'gunicorn', flag: '--bind' },
+        { match: 'gunicorn', flag: '-b' },
+        { match: 'hypercorn', flag: '-b' },
+        { match: 'next dev', flag: '-p' },
+        { match: 'vite', flag: '--port' },
+        { match: 'flask', flag: '--port' },
+        { match: 'webpack', flag: '--port' },
+        { match: 'serve', flag: '-l' },
+        { match: 'django', flag: '--port' },
+        { match: 'react-scripts start', flag: '--port' }
+      ];
+      for (const { match, flag } of patterns) {
+        if (cmdStr.includes(match.toLowerCase())) {
+          const flagIdx = finalCommand.indexOf(flag);
+          if (flagIdx !== -1 && flagIdx + 1 < finalCommand.length) {
+            finalCommand[flagIdx + 1] = portStr;
+            portApplied = true;
+          } else if (flagIdx === -1) {
+            finalCommand.push(flag, portStr);
+            portApplied = true;
+          }
+          break;
+        }
+      }
+      if (!portApplied && cmdStr.includes('runserver')) {
+        const hasPort = finalCommand.some(t => /^\d{4,5}$/.test(t));
+        if (!hasPort) {
+          finalCommand.push(portStr);
+          portApplied = true;
+        }
+      }
+      if (!portApplied && (cmdStr.match(/(?:node|bun|deno)\s/))) {
+        const hasPortEnv = finalCommand.some(t => t.startsWith('--port=')) || finalCommand.includes('PORT');
+        if (!hasPortEnv) {
+          finalCommand.unshift(`PORT=${portStr}`);
+          portApplied = true;
+        }
+      }
+    }
+
     const commandLabel = commandMeta.label || commandMeta.command.join(' ');
     const taskId = `task-${Date.now()}`;
+    const logLines = [kleur.cyan(`> ${finalCommand.join(' ')}`)];
+    if (portApplied) logLines.push(kleur.dim(`Port ${port} applied`));
     const newTask = {
       id: taskId,
       name: `${project.name} · ${commandLabel}`,
       status: 'running',
-      logs: [kleur.cyan(`> ${commandMeta.command.join(' ')}`)],
+      logs: logLines,
       project: project.name
     };
 
@@ -253,7 +309,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
     lastCommandRef.current = {project, commandMeta};
 
     try {
-      const subprocess = execa(commandMeta.command[0], commandMeta.command.slice(1), {
+      const subprocess = execa(finalCommand[0], finalCommand.slice(1), {
         cwd: project.path,
         env: process.env,
         stdin: 'pipe',
@@ -279,7 +335,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
     } finally {
       runningProcessMap.current.delete(taskId);
     }
-  }, [addLogToTask, selectedProject]);
+  }, [addLogToTask, selectedProject, config]);
 
   const exportLogs = useCallback(() => {
     const taskToExport = tasks.find(t => t.id === activeTaskId);
@@ -295,16 +351,6 @@ function Compass({rootPath, initialView = 'navigator'}) {
 
     useInput((input, key) => {
 
-    if (key.shift && (input === 'R' || input === 'r')) {
-      if (viewMode === 'detail' && selectedProject) {
-        setPortConfigMode(true);
-        const currentPort = config.projectMeta?.[selectedProject.path]?.port || '3000';
-        setCustomInput(String(currentPort));
-        setCustomCursor(String(currentPort).length);
-        return;
-      }
-    }
-    
     if (quitConfirm) {
       if (input?.toLowerCase() === 'y') { killAllTasks(); process.stdout.write('\x1b[2J\x1b[0;0H'); exit(); return; }
       if (input?.toLowerCase() === 'n' || key.escape) { setQuitConfirm(false); return; }
@@ -494,7 +540,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
     if (key.shift && key.downArrow) { scrollLogs(-1); return; }
 
     
-    const pageLimit = config.maxVisibleProjects || 3;
+    const pageLimit = config.maxVisibleProjects || 2;
     const totalProjects = projects.length;
     
     if (key.pageUp && totalProjects > pageLimit) {
@@ -524,8 +570,8 @@ function Compass({rootPath, initialView = 'navigator'}) {
     if (normalizedInput === '?') { console.clear(); setShowHelp((prev) => !prev); return; }
     if (shiftCombo('l') && lastCommandRef.current) { runProjectCommand(lastCommandRef.current.commandMeta, lastCommandRef.current.project); return; }
 
-    if (key.upArrow && !key.shift && projects.length > 0) { console.clear(); setSelectedIndex((prev) => (prev - 1 + projects.length) % projects.length); return; }
-    if (key.downArrow && !key.shift && projects.length > 0) { console.clear(); setSelectedIndex((prev) => (prev + 1) % projects.length); return; }
+    if (key.upArrow && !key.shift && projects.length > 0) { setSelectedIndex((prev) => Math.max(0, prev - 1)); return; }
+    if (key.downArrow && !key.shift && projects.length > 0) { setSelectedIndex((prev) => Math.min(projects.length - 1, prev + 1)); return; }
     if (key.return) {
       if (!selectedProject) return;
       console.clear();
@@ -543,16 +589,39 @@ function Compass({rootPath, initialView = 'navigator'}) {
     }
 
     
-    if (shiftCombo('r') && viewMode === 'detail' && selectedProject) {
-      setPortConfigMode(true); setCustomInput(selectedProject.metadata?.port || '3000'); setCustomCursor(String(selectedProject.metadata?.port || '3000').length);
+    if (shiftCombo('m') && viewMode === 'detail' && selectedProject) {
+      setPortConfigMode(true);
+      const port = config.projectMeta?.[selectedProject.path]?.port || selectedProject.metadata?.port || '3000';
+      setCustomInput(String(port));
+      setCustomCursor(String(port).length);
       return;
     }
         if (shiftCombo('c') && viewMode === 'detail' && selectedProject) { setCustomMode(true); setCustomInput(''); setCustomCursor(0); return; }
     
     const actionKey = normalizedInput && ACTION_MAP[normalizedInput];
-    if (actionKey) {
-      const commandMeta = selectedProject?.commands?.[actionKey];
-      runProjectCommand(commandMeta, selectedProject);
+    if (actionKey && selectedProject) {
+      if (!key.shift) {
+        return;
+      }
+      const findCommand = (project, key) => {
+        let meta = project.commands?.[key];
+        if (meta) return meta;
+        const alts = COMMAND_FALLBACKS[key] || [];
+        for (const alt of alts) {
+          meta = project.commands?.[alt];
+          if (meta) return meta;
+        }
+        return null;
+      };
+      const commandMeta = findCommand(selectedProject, actionKey);
+      if (commandMeta) {
+        runProjectCommand(commandMeta, selectedProject);
+      } else {
+        const msg = kleur.yellow(`! No ${actionKey} command available for ${selectedProject.name}`);
+        const taskId = `task-${Date.now()}`;
+        setTasks(prev => [...prev, { id: taskId, name: `Notification`, status: 'failed', logs: [msg], project: '' }]);
+        globalThis.setTimeout(() => setTasks(prev => prev.filter(t => t.id !== taskId)), 3000);
+      }
       return;
     }
     if (viewMode === 'detail' && normalizedInput && detailShortcutMap.has(normalizedInput)) {
@@ -605,7 +674,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
         create(Text, {key: `dl-${command.shortcut}`, dimColor: true}, `   ↳ ${command.command.join(' ')}`)
       );
     });
-    content.push(create(Text, {key: 'h-l', dimColor: true, marginTop: 1}, 'Press Shift+C → label|cmd to save custom actions, Enter to close detail view.'));
+    content.push(create(Text, {key: 'h-l', dimColor: true, marginTop: 1}, 'Shift+C: custom cmd · Shift+M: port · Enter: close detail view.'));
     return content;
   }, [viewMode, selectedProject, rootPath, detailedIndexed]);
 
@@ -656,7 +725,14 @@ function Compass({rootPath, initialView = 'navigator'}) {
             {label: 'Orbit & AI', color: 'yellow', body: ['Shift+T: Tasks, Shift+O: AI, 0: Analyze', 'Shift+A studio / Shift+O AI Horizon', 'Shift+S structure / Shift+Q quit']}
           ].map((card, idx) => create(Box, {key: card.label, flexGrow: 1, flexBasis: 0, minWidth: HELP_CARD_MIN_WIDTH, marginRight: idx < 2 ? 1 : 0, marginBottom: 1, borderStyle: 'round', borderColor: card.color, padding: 1, flexDirection: 'column'}, create(Text, {color: card.color, bold: true, marginBottom: 1}, card.label), ...card.body.map((line, lidx) => create(Text, {key: lidx, dimColor: card.color === 'yellow'}, line))))),
           config.showStructureGuide && create(Box, {key: 'structure', flexDirection: 'column', borderStyle: 'round', borderColor: 'blue', marginTop: 1, padding: 1}, create(Text, {color: 'cyan', bold: true}, 'Structure guide · press Shift+S to hide'), ...SCHEMA_GUIDE.map(e => create(Text, {key: e.type, dimColor: true}, `• ${e.icon} ${e.label}: ${e.files.join(', ')}`))),
-          showHelp && create(Box, {key: 'overlay', flexDirection: 'column', borderStyle: 'double', borderColor: 'cyan', marginTop: 1, padding: 1}, create(Text, {color: 'cyan', bold: true}, 'Help overlay'), create(Text, null, 'Shift+↑/↓ scrolls logs; Shift+X clears; Shift+E exports; Shift+A Studio; Shift+T Tasks; Shift+D Detach; Shift+B Toggle Art Board; Shift+P Packages; Shift+N Creator; Shift+O AI Horizon.'))
+          showHelp && create(Box, {key: 'overlay', flexDirection: 'column', borderStyle: 'double', borderColor: 'cyan', marginTop: 1, padding: 1},
+            create(Text, {color: 'cyan', bold: true}, '📖 Help Overview'),
+            create(Text, null, 'Shift+T Tasks · Shift+P Packages · Shift+N Architect · Shift+O AI · Shift+A Studio'),
+            create(Text, null, 'Shift+B/T/R/I Build/Test/Run/Install   Shift+C custom cmd   Shift+M port'),
+            create(Text, null, 'Shift+K kill · Shift+R rename · Shift+D detach · Shift+X clear · Shift+E export · Shift+L rerun'),
+            create(Text, null, 'Shift+H help cards · Shift+S structure · Shift+B art · Shift+Q quit'),
+            create(Text, null, '↑/↓ navigate · Enter detail · Esc back · ? close')
+          )
         ];
         return create(Box, {flexDirection: 'column'}, ...navigatorBody);
       }
@@ -666,6 +742,28 @@ function Compass({rootPath, initialView = 'navigator'}) {
   return create(Box, {flexDirection: 'column', padding: 1, width: '100%'}, renderView());
 }
 
+
+function getAddCmd(project, pkg) {
+  if (!project || !pkg) return null;
+  const type = project.type;
+  if (type === 'Node.js') return [project.metadata?.packageManager || 'npm', 'install', pkg];
+  if (type === 'Python') return ['pip', 'install', pkg];
+  if (type === 'Rust') return ['cargo', 'add', pkg];
+  if (type === '.NET') return ['dotnet', 'add', 'package', pkg];
+  if (type === 'PHP') return ['composer', 'require', pkg];
+  return null;
+}
+
+function getRemoveCmd(project, pkg) {
+  if (!project || !pkg) return null;
+  const type = project.type;
+  if (type === 'Node.js') return [project.metadata?.packageManager || 'npm', 'uninstall', pkg];
+  if (type === 'Python') return ['pip', 'uninstall', '-y', pkg];
+  if (type === 'Rust') return ['cargo', 'remove', pkg];
+  if (type === '.NET') return ['dotnet', 'remove', 'package', pkg];
+  if (type === 'PHP') return ['composer', 'remove', pkg];
+  return null;
+}
 
 function parseArgs() {
   const args = {};
@@ -679,6 +777,16 @@ function parseArgs() {
     else if (token === '--studio') args.view = 'studio';
     else if (token === '--ai') args.view = 'ai';
     else if (token === '--task' || token === '--tasks') args.view = 'tasks';
+    else if (token === '--list-projects') args.listProjects = true;
+    else if (token === '--json') args.json = true;
+    else if (token === '--project-info' && tokens[i + 1]) { args.projectInfo = parseInt(tokens[i + 1], 10); i += 1; }
+    else if (token === '--run' && tokens[i + 1]) { args.runCommand = tokens[i + 1]; i += 1; }
+    else if (token === '--add-pkg' && tokens[i + 1]) { args.addPkg = tokens[i + 1]; i += 1; }
+    else if (token === '--remove-pkg' && tokens[i + 1]) { args.removePkg = tokens[i + 1]; i += 1; }
+    else if (token === '--scaffold' && tokens[i + 1]) { args.scaffold = tokens[i + 1]; i += 1; }
+    else if (token === '--name' && tokens[i + 1]) { args.name = tokens[i + 1]; i += 1; }
+    else if (token === '--studio-check') args.studioCheck = true;
+    else if (token === '--ai-analyze') args.aiAnalyze = true;
   }
   return args;
 }
@@ -696,45 +804,174 @@ async function main() {
     console.log(kleur.dim('───────────────────────────────────────────────────'));
     console.log('');
     console.log(kleur.bold('Usage:'));
-    console.log('  project-compass [--dir <path>] [--studio] [--ai] [--task]');
+    console.log('  project-compass                               Launch TUI');
+    console.log('  project-compass [--dir <path>] [--studio|--ai|--task]');
+    console.log('  project-compass --list-projects [--json]       List detected projects');
+    console.log('  project-compass --project-info <idx> [--json]  Show project details');
+    console.log('  project-compass --run "<cmd>" [--dir <path>]   Run a command');
+    console.log('  project-compass --add-pkg <name> [--dir]       Add package');
+    console.log('  project-compass --remove-pkg <name> [--dir]    Remove package');
+    console.log('  project-compass --scaffold <template> --name <n> [--dir]  Scaffold project');
+    console.log('  project-compass --studio-check                 Check runtimes');
+    console.log('  project-compass --version / --help             Version / help');
     console.log('');
-    console.log(kleur.bold(kleur.cyan('🌌 Core Views:')));
-    console.log('  Shift+T  ' + kleur.bold('Orbit Task Manager') + '  - Manage background processes & stream logs');
-    console.log('  Shift+P  ' + kleur.bold('Package Registry') + '    - Direct dependency management (add/remove)');
-    console.log('  Shift+N  ' + kleur.bold('Project Architect') + '   - Scaffold new projects from templates');
-    console.log('  Shift+O  ' + kleur.bold('AI Horizon') + '          - Intelligent project analysis & commands');
-    console.log('  Shift+A  ' + kleur.bold('Omni-Studio') + '         - Environment & runtime health audit');
+    console.log(kleur.bold(kleur.cyan('🌌 CLI Arguments:')));
+    console.log('  --dir <path>     Working directory for scanning');
+    console.log('  --studio         Launch in Studio view');
+    console.log('  --ai             Launch in AI Horizon view');
+    console.log('  --task           Launch in Task Manager view');
+    console.log('  --list-projects  List all detected projects');
+    console.log('  --json           JSON output (with --list-projects, --project-info)');
+    console.log('  --project-info   Project details by index');
+    console.log('  --run            Execute command in project directory');
+    console.log('  --add-pkg        Add a package dependency');
+    console.log('  --remove-pkg     Remove a package dependency');
+    console.log('  --scaffold       Scaffold from template (' + Object.keys({
+      nextjs: 1, 'nextjs-bun': 1, 'react-vite': 1, 'react-vite-npm': 1,
+      'vue-vite': 1, rust: 1, django: 1, 'python-basic': 1, go: 1
+    }).join(', ') + ')');
+    console.log('  --name           Project name (with --scaffold)');
+    console.log('  --studio-check   Environment runtime audit');
     console.log('');
-    console.log(kleur.bold(kleur.yellow('🎮 Navigation & Details:')));
-    console.log('  ↑ / ↓    Move focus through discovered projects');
-    console.log('  PgUp/Dn  Jump a full page of projects');
-    console.log('  Enter    Toggle deep detail view (manifests, scripts, frameworks)');
-    console.log('  0        Quick AI Analysis (inside Detail View)');
-    console.log('  Shift+C  Add a persistent custom command to the focused project');
-    console.log('  1-9      Quick-run numbered scripts in detail view');
-    console.log('  B/T/R/I  Macro run: Build / Test / Run / Install');
+    console.log(kleur.bold(kleur.yellow('🎮 TUI Keyboard Shortcuts:')));
+    console.log('  Core Views:       Shift+T(asks)  Shift+P(ackages)  Shift+N(ew)');
+    console.log('                    Shift+O(AI)    Shift+A(Studio)');
+    console.log('  Detail View:      Shift+B(uild)  Shift+T(est)  Shift+R(un)  Shift+I(nstall)');
+    console.log('                    Shift+C(custom cmd)  Shift+M(port)  0(AI)  1-9(scripts)');
+    console.log('  Navigation:       ↑/↓  PgUp/Dn  Enter(detail)  Esc(back)  ?(help)');
+    console.log('  Workspace:        Shift+H(help)  Shift+S(structure)  Shift+B(art)');
+    console.log('  Tasks:            Shift+K(kill)  Shift+R(rename)  Shift+D(etach)');
+    console.log('                    Shift+X(clear)  Shift+E(xport)  Shift+L(rerun)');
+    console.log('  System:           Shift+Q(quit)');
     console.log('');
-    console.log(kleur.bold(kleur.green('🛠️ Workspace Tools:')));
-    console.log('  Shift+B  Toggle Art-coded Build Atlas');
-    console.log('  Shift+S  Toggle Directory Structure Guide');
-    console.log('  Shift+H  Toggle Navigation Help Cards');
-    console.log('  Shift+↑/↓ Scroll the live output log window');
-    console.log('  Shift+X  Clear active log buffer');
-    console.log('  Shift+E  Export current session logs to .txt');
-    console.log('');
-    console.log(kleur.bold(kleur.red('🚪 System:')));
-    console.log('  Shift+Q  Quit application (triggers confirmation if tasks are running)');
-    console.log('  Esc      Global "Back" key to return to Main Navigator');
+    console.log(kleur.bold(kleur.green('📦 Scaffold Templates:')));
+    console.log('  nextjs, nextjs-bun, react-vite, react-vite-npm,');
+    console.log('  vue-vite, rust, django, python-basic, go');
     console.log('');
     console.log(kleur.dim('Documentation: https://github.com/CrimsonDevil333333/project-compass'));
-    console.log(kleur.magenta('Crafted for performance by Satyaa & Clawdy'));
+    console.log(kleur.dim('Crafted for performance by Satyaa & Clawdy'));
     return;
   }
   const rootPath = args.root ? path.resolve(args.root) : process.cwd();
-  if (args.mode === 'test') {
+
+  if (args.listProjects || args.mode === 'test') {
     const projects = await discoverProjects(rootPath);
-    console.log(`Detected ${projects.length} project(s) under ${rootPath}`);
-    projects.forEach((project) => { console.log(` • [${project.type}] ${project.name} (${project.path})`); });
+    if (args.json) {
+      console.log(JSON.stringify(projects, (key, value) => key === 'commands' ? Object.keys(value) : value, 2));
+    } else {
+      console.log(`Detected ${projects.length} project(s) under ${rootPath}`);
+      projects.forEach((project) => { console.log(` • [${project.type}] ${project.name} (${project.path})`); });
+    }
+    return;
+  }
+
+  if (args.projectInfo !== undefined) {
+    const projects = await discoverProjects(rootPath);
+    const project = projects[args.projectInfo];
+    if (!project) { console.error(`Project index ${args.projectInfo} not found. Total: ${projects.length}`); process.exit(1); }
+    if (args.json) {
+      console.log(JSON.stringify(project, null, 2));
+    } else {
+      console.log(`Name: ${project.name}`);
+      console.log(`Type: ${project.type}`);
+      console.log(`Path: ${project.path}`);
+      console.log(`Frameworks: ${(project.frameworks || []).map(f => f.name).join(', ') || 'none'}`);
+      console.log(`Manifest: ${project.manifest}`);
+      console.log('Commands:');
+      Object.entries(project.commands || {}).forEach(([key, cmd]) => console.log(`  ${key}: ${cmd.label || key} → ${cmd.command.join(' ')}`));
+    }
+    return;
+  }
+
+  if (args.runCommand) {
+    const projects = await discoverProjects(rootPath);
+    const targetDir = projects.length > 0 ? (args.root ? projects.find(p => p.path.startsWith(rootPath)) || projects[0] : projects[0]).path : rootPath;
+    console.log(`Running "${args.runCommand}" in ${targetDir}...`);
+    const subprocess = execa(args.runCommand, { cwd: targetDir, shell: true, stdio: 'inherit' });
+    await subprocess;
+    return;
+  }
+
+  if (args.addPkg) {
+    const projects = await discoverProjects(rootPath);
+    const target = projects[0];
+    if (!target) { console.error('No projects detected'); process.exit(1); }
+    const cmd = getAddCmd(target, args.addPkg);
+    if (!cmd) { console.error(`Cannot add package: unsupported project type ${target.type}`); process.exit(1); }
+    console.log(`Adding ${args.addPkg} to ${target.name}...`);
+    const subprocess = execa(cmd[0], cmd.slice(1), { cwd: target.path, stdio: 'inherit' });
+    await subprocess;
+    return;
+  }
+
+  if (args.removePkg) {
+    const projects = await discoverProjects(rootPath);
+    const target = projects[0];
+    if (!target) { console.error('No projects detected'); process.exit(1); }
+    const cmd = getRemoveCmd(target, args.removePkg);
+    if (!cmd) { console.error(`Cannot remove package: unsupported project type ${target.type}`); process.exit(1); }
+    console.log(`Removing ${args.removePkg} from ${target.name}...`);
+    const subprocess = execa(cmd[0], cmd.slice(1), { cwd: target.path, stdio: 'inherit' });
+    await subprocess;
+    return;
+  }
+
+  if (args.scaffold) {
+    const template = args.scaffold;
+    const projectName = args.name || 'my-project';
+    const targetPath = args.root ? path.resolve(args.root, projectName) : path.resolve(process.cwd(), projectName);
+    const scaffoldCmds = {
+      'nextjs': ['npx', 'create-next-app@latest', targetPath],
+      'nextjs-bun': ['bun', 'create', 'next-app', targetPath],
+      'react-vite': ['pnpm', 'create', 'vite', targetPath, '--template', 'react'],
+      'react-vite-npm': ['npm', 'create', 'vite@latest', targetPath, '--', '--template', 'react'],
+      'vue-vite': ['npm', 'create', 'vite@latest', targetPath, '--', '--template', 'vue'],
+      'rust': ['cargo', 'new', targetPath],
+      'django': ['django-admin', 'startproject', projectName, targetPath],
+      'python-basic': ['mkdir', '-p', targetPath],
+      'go': ['mkdir', '-p', targetPath, '&&', 'cd', targetPath, '&&', 'go', 'mod', 'init', projectName]
+    };
+    const cmd = scaffoldCmds[template];
+    if (!cmd) { console.error(`Unknown template: ${template}. Available: ${Object.keys(scaffoldCmds).join(', ')}`); process.exit(1); }
+    console.log(`Scaffolding ${template} at ${targetPath}...`);
+    if (template === 'go') {
+      await execa('mkdir', ['-p', targetPath]);
+      await execa('go', ['mod', 'init', projectName], { cwd: targetPath });
+    } else {
+      const subprocess = execa(cmd[0], cmd.slice(1), { stdio: 'inherit' });
+      await subprocess;
+    }
+    console.log(`✓ Project created at ${targetPath}`);
+    return;
+  }
+
+  if (args.studioCheck) {
+    console.log('Environment check running...');
+    const checks = [
+      {name: 'Node.js', binary: 'node', versionCmd: ['-v']},
+      {name: 'npm', binary: 'npm', versionCmd: ['-v']},
+      {name: 'Python', binary: process.platform === 'win32' ? 'python' : 'python3', versionCmd: ['--version']},
+      {name: 'Rust (Cargo)', binary: 'cargo', versionCmd: ['--version']},
+      {name: 'Go', binary: 'go', versionCmd: ['version']},
+      {name: 'Java', binary: 'java', versionCmd: ['-version']},
+      {name: 'PHP', binary: 'php', versionCmd: ['-v']},
+      {name: 'Ruby', binary: 'ruby', versionCmd: ['-v']},
+      {name: '.NET', binary: 'dotnet', versionCmd: ['--version']}
+    ];
+    for (const lang of checks) {
+      try {
+        const { stdout, stderr } = await execa(lang.binary, lang.versionCmd);
+        const version = (stdout || stderr || '').split('\n')[0].trim();
+        console.log(` ✓ ${lang.name}: ${version}`);
+      } catch {
+        console.log(` ✗ ${lang.name}: not installed`);
+      }
+    }
+    return;
+  }
+
+  if (args.aiAnalyze) {
+    console.log('AI Analysis is only available in TUI mode. Run: project-compass');
     return;
   }
 

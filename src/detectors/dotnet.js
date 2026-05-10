@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { checkBinary, hasProjectFile } from './utils.js';
+import { checkBinary } from './utils.js';
 
 function parseCsProj(content) {
   const metadata = {
@@ -78,7 +78,8 @@ export default {
       publish: { label: 'Dotnet publish', command: ['dotnet', 'publish'], source: 'builtin' }
     };
     
-    if (hasProjectFile(projectPath, '*.sln')) {
+    const hasSln = fs.readdirSync(projectPath).some(f => f.endsWith('.sln'));
+    if (hasSln) {
       commands['restore-sl'] = { label: 'Restore Solution', command: ['dotnet', 'restore'], source: 'builtin' };
     }
 

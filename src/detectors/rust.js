@@ -40,8 +40,8 @@ function parseCargoToml(content) {
     }
     
     if (inDependencies && trimmed && !trimmed.startsWith('#')) {
-      const depName = trimmed.split('=')[0]?.trim() || trimmed.split('{')[0]?.trim();
-      if (depName) metadata.dependencies.push(depName);
+      const depName = trimmed.split(/[={]/)[0]?.trim();
+      if (depName && !depName.startsWith('#')) metadata.dependencies.push(depName);
     }
     
     if (inBin && trimmed.startsWith('name')) {

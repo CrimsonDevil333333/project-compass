@@ -122,7 +122,8 @@ export default {
       commands.install = { label: 'Maven install', command: [...mvnCmd, 'install'], source: 'builtin' };
       commands.build = { label: 'Maven package', command: [...mvnCmd, 'package'], source: 'builtin' };
       commands.test = { label: 'Maven test', command: [...mvnCmd, 'test'], source: 'builtin' };
-      commands.run = { label: 'Maven spring-boot:run', command: [...mvnCmd, 'spring-boot:run'], source: 'builtin' };
+      const isSpring = frameworks.some(f => f.name === 'Spring Boot');
+      commands.run = { label: isSpring ? 'Maven spring-boot:run' : 'Maven compile', command: isSpring ? [...mvnCmd, 'spring-boot:run'] : [...mvnCmd, 'compile'], source: 'builtin' };
       commands.clean = { label: 'Maven clean', command: [...mvnCmd, 'clean'], source: 'builtin' };
     }
 

@@ -29,7 +29,6 @@ function detectNodeProjectType(pkg) {
   if (allDeps['nuxt']) return { type: 'Nuxt', icon: '🟢' };
   if (allDeps['vite']) return { type: 'Vite', icon: '⚡' };
   if (allDeps['electron']) return { type: 'Electron', icon: '⚛️' };
-  if (allDeps['typescript']) return { type: 'TypeScript', icon: '🔷' };
   return { type: 'Node.js', icon: '🟢' };
 }
 

@@ -20,7 +20,12 @@ const ProjectArchitect = memo(({rootPath, onRunCommand, CursorText, onReturn}) =
     {name: 'Rust (Binary)', cmd: (p, n) => ['cargo', 'new', path.join(p, n)]},
     {name: 'Django Project', cmd: (p, n) => ['django-admin', 'startproject', n, path.join(p, n)]},
     {name: 'Python (Basic)', cmd: (p, n) => ['mkdir', '-p', path.join(p, n)]},
-    {name: 'Go Module', cmd: (p, n) => ['mkdir', '-p', path.join(p, n), '&&', 'cd', path.join(p, n), '&&', 'go', 'mod', 'init', n]}
+    {name: 'Go Module', cmd: (p, n) => {
+      const dir = path.join(p, n);
+      return process.platform === 'win32'
+        ? ['cmd', '/c', `mkdir "${dir}" && cd /d "${dir}" && go mod init ${n}`]
+        : ['sh', '-c', `mkdir -p "${dir}" && cd "${dir}" && go mod init ${n}`];
+    }}
   ];
 
   useInput((inputStr, key) => {

@@ -1,6 +1,8 @@
 /* global fetch */
 import React, {useState, memo} from 'react';
 import {Box, Text, useInput} from 'ink';
+import fs from 'fs';
+import path from 'path';
 
 const create = React.createElement;
 
@@ -11,40 +13,85 @@ const AI_PROVIDERS = [
   { id: 'ollama', name: 'Ollama (Local)', endpoint: 'http://localhost:11434/api/generate' }
 ];
 
-const AIHorizon = memo(({selectedProject, CursorText, config, setConfig, saveConfig}) => {
+function readProjectFile(projectPath, filename) {
+  const fullPath = path.join(projectPath, filename);
+  try {
+    if (fs.existsSync(fullPath)) {
+      return fs.readFileSync(fullPath, 'utf-8').slice(0, 3000);
+    }
+  } catch {
+    // file may not be readable
+  }
+  return null;
+}
+
+function buildProjectContext(project, rootPath) {
+  const lines = [];
+  lines.push(`Project: ${project.name}`);
+  lines.push(`Type: ${project.type}`);
+  lines.push(`Location: ${path.relative(rootPath, project.path) || '.'}`);
+  lines.push(`Manifest: ${project.manifest}`);
+  if (project.description) lines.push(`Description: ${project.description}`);
+  if (project.frameworks?.length) {
+    lines.push(`Frameworks: ${project.frameworks.map(f => f.name).join(', ')}`);
+  }
+  const readme = readProjectFile(project.path, 'README.md') || readProjectFile(project.path, 'Readme.md') || readProjectFile(project.path, 'readme.md');
+  if (readme) {
+    lines.push(`--- README ---\n${readme.slice(0, 2000)}\n--- END README ---`);
+  } else {
+    const mainCandidates = ['src/main.py', 'main.py', 'app.py', 'src/index.js', 'index.js', 'src/main.ts', 'main.ts', 'server.js', 'app.js'];
+    for (const candidate of mainCandidates) {
+      const content = readProjectFile(project.path, candidate);
+      if (content) {
+        lines.push(`--- ${candidate} ---\n${content.slice(0, 1500)}\n--- END ${candidate} ---`);
+        break;
+      }
+    }
+  }
+  if (project.metadata?.scripts) {
+    lines.push('Scripts: ' + JSON.stringify(project.metadata.scripts));
+  }
+  if (project.metadata?.dependencies?.length) {
+    const depNames = project.metadata.dependencies.slice(0, 30).map(d => typeof d === 'string' ? d : d.name);
+    lines.push('Dependencies: ' + depNames.join(', '));
+  }
+  return lines.join('\n');
+}
+
+const AIHorizon = memo(({rootPath, selectedProject, CursorText, config, setConfig, saveConfig}) => {
   const [step, setStep] = useState(config?.aiToken ? 'analyze' : 'provider');
-  const [providerIdx, setProviderIdx] = useState(AI_PROVIDERS.findIndex(p => p.id === (config?.aiProvider || 'openrouter')) || 0);
+  const providerIndex = AI_PROVIDERS.findIndex(p => p.id === (config?.aiProvider || 'openrouter'));
+  const [providerIdx, setProviderIdx] = useState(providerIndex >= 0 ? providerIndex : 0);
   const [model, setModel] = useState(config?.aiModel || 'deepseek/deepseek-r1');
   const [token, setToken] = useState(config?.aiToken || '');
   const [cursor, setCursor] = useState(0);
   const [status, setStatus] = useState('ready');
   const [error, setError] = useState(null);
   const [suggestions, setSuggestions] = useState([]);
+  const [rawAIResponse, setRawAIResponse] = useState('');
 
   const runRealAnalysis = async () => {
     setStatus('busy');
     setError(null);
+    setRawAIResponse('');
     const provider = AI_PROVIDERS[providerIdx];
-    
-    try {
-      const projectData = JSON.stringify({
-        name: selectedProject.name,
-        type: selectedProject.type,
-        manifest: selectedProject.manifest,
-        scripts: selectedProject.metadata?.scripts || {},
-        dependencies: selectedProject.metadata?.dependencies || []
-      });
 
-      const prompt = `Analyze this project structure and suggest valid CLI commands for:
+    try {
+      const projectContext = buildProjectContext(selectedProject, rootPath);
+
+      const prompt = `You are analyzing a software project. Based on the project data below, suggest valid CLI commands for:
 1. Build
-2. Run
-3. Install
+2. Run (with port flag if applicable)
+3. Install dependencies
 4. Test
 
-Project Data: ${projectData}
+Project Data:
+${projectContext}
 
-Return ONLY a JSON object with this structure: {"build": "cmd", "run": "cmd", "install": "cmd", "test": "cmd"}. 
-Use the project's detected type (${selectedProject.type}) to ensure commands are correct (e.g., npm, pip, cargo).`;
+Return ONLY a JSON object with this structure:
+{"build": "build command here", "run": "run command here", "install": "install command here", "test": "test command here"}
+
+Use the project's detected type (${selectedProject.type}) to ensure commands are correct. Do NOT wrap the JSON in markdown code blocks.`;
 
       let response;
       let aiText = '';
@@ -64,8 +111,8 @@ Use the project's detected type (${selectedProject.type}) to ensure commands are
           })
         });
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error?.message || 'OpenRouter Error');
-        aiText = data.choices[0].message.content;
+        if (!response.ok) throw new Error(data.error?.message || data.error || 'OpenRouter Error');
+        aiText = data.choices?.[0]?.message?.content || '';
       } else if (provider.id === 'gemini') {
         const url = provider.endpoint.replace('{model}', model) + `?key=${token}`;
         response = await fetch(url, {
@@ -74,8 +121,8 @@ Use the project's detected type (${selectedProject.type}) to ensure commands are
           body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
         });
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error?.message || 'Gemini Error');
-        aiText = data.candidates[0].content.parts[0].text;
+        if (!response.ok) throw new Error(data.error?.message || data.error || 'Gemini Error');
+        aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
       } else if (provider.id === 'claude') {
         response = await fetch(provider.endpoint, {
           method: 'POST',
@@ -91,8 +138,8 @@ Use the project's detected type (${selectedProject.type}) to ensure commands are
           })
         });
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error?.message || 'Claude Error');
-        aiText = data.content[0].text;
+        if (!response.ok) throw new Error(data.error?.message || data.error || 'Claude Error');
+        aiText = data.content?.[0]?.text || '';
       } else if (provider.id === 'ollama') {
         response = await fetch(provider.endpoint, {
           method: 'POST',
@@ -100,20 +147,31 @@ Use the project's detected type (${selectedProject.type}) to ensure commands are
           body: JSON.stringify({ model: model, prompt: prompt, stream: false })
         });
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Ollama Error');
-        aiText = data.response;
+        if (!response.ok) throw new Error(data.error || data.message || 'Ollama Error');
+        aiText = data.response || '';
       }
 
-      const jsonMatch = aiText.match(/{.*?}/s);
-      if (!jsonMatch) throw new Error("AI returned invalid DNA mapping format.");
-      
+      if (!aiText) throw new Error('Empty response from AI provider');
+
+      setRawAIResponse(aiText);
+
+      let jsonStr = aiText;
+      const codeBlockMatch = aiText.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
+      if (codeBlockMatch) {
+        jsonStr = codeBlockMatch[1];
+      }
+      const jsonMatch = jsonStr.match(/\{[\s\S]*?\}/);
+      if (!jsonMatch) throw new Error("AI returned invalid JSON format. Raw response:\n" + aiText.slice(0, 500));
+
       const parsed = JSON.parse(jsonMatch[0]);
       const mapped = [
-        { label: 'AI Build', command: parsed.build.split(' ') },
-        { label: 'AI Run', command: parsed.run.split(' ') },
-        { label: 'AI Install', command: parsed.install.split(' ') },
-        { label: 'AI Test', command: parsed.test.split(' ') }
-      ];
+        { label: 'AI Build', command: String(parsed.build || '').trim().split(/\s+/) },
+        { label: 'AI Run', command: String(parsed.run || '').trim().split(/\s+/) },
+        { label: 'AI Install', command: String(parsed.install || '').trim().split(/\s+/) },
+        { label: 'AI Test', command: String(parsed.test || '').trim().split(/\s+/) }
+      ].filter(cmd => cmd.command.length > 0 && cmd.command[0] !== '');
+
+      if (mapped.length === 0) throw new Error("AI returned empty commands. Raw response:\n" + aiText.slice(0, 500));
 
       setSuggestions(mapped);
       const projectKey = selectedProject.path;
@@ -205,7 +263,7 @@ Use the project's detected type (${selectedProject.type}) to ensure commands are
       create(Text, {bold: true, color: 'red', marginBottom: 1}, 'Step 3: API Token Authorization'),
       create(Box, {flexDirection: 'row'},
         create(Text, null, 'Token: '),
-        create(CursorText, {value: '*'.repeat(token.length), cursorIndex: cursor})
+        create(CursorText, {value: token ? '********' : '', cursorIndex: cursor})
       ),
       create(Text, {dimColor: true, marginTop: 1}, 'Enter: Save Token, Esc: Back')
     ),
@@ -221,10 +279,27 @@ Use the project's detected type (${selectedProject.type}) to ensure commands are
         status === 'busy' && create(Text, {color: 'yellow'}, ' ⏳ Contacting AI Agent... mapping project structure...'),
         status === 'done' && create(Box, {flexDirection: 'column'},
           create(Text, {color: 'green', bold: true}, ' ✅ DNA Mapped via AI Agent!'),
-          create(Text, null, ' Successfully injected ' + suggestions.length + ' optimized commands. AI detected potential port conflicts? Checking...'),
+          create(Text, null, ' Successfully injected ' + suggestions.length + ' optimized commands.'),
           create(Text, {dimColor: true, marginTop: 1}, 'Return to Navigator to use BRIT shortcuts.')
         ),
-        error && create(Text, {color: 'red', bold: true, marginTop: 1}, ' ✗ AI ERROR: ' + error)
+        status === 'done' && rawAIResponse && create(
+          Box,
+          {flexDirection: 'column', marginTop: 1, borderStyle: 'single', borderColor: 'gray', padding: 1},
+          create(Text, {bold: true, color: 'cyan'}, '📄 Raw AI Response:'),
+          create(Text, {dimColor: true}, rawAIResponse.slice(0, 2000))
+        ),
+        status === 'busy' && rawAIResponse && create(
+          Box,
+          {flexDirection: 'column', marginTop: 1, borderStyle: 'single', borderColor: 'gray', padding: 1},
+          create(Text, {bold: true, color: 'yellow'}, '📄 Partial Response:'),
+          create(Text, {dimColor: true}, rawAIResponse.slice(0, 1000))
+        ),
+        error && create(
+          Box,
+          {flexDirection: 'column', marginTop: 1, borderStyle: 'single', borderColor: 'red', padding: 1},
+          create(Text, {color: 'red', bold: true}, ' ✗ AI ERROR'),
+          create(Text, {color: 'red'}, error.length > 500 ? error.slice(0, 500) + '...' : error)
+        )
       ),
       create(Text, {dimColor: true, marginTop: 1}, 'Esc: Return, R: Reset Credentials')
     )

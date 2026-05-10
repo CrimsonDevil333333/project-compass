@@ -604,6 +604,4 @@ npm run run -- "echo hello"
 
 ---
 
-**Crafted with ❤️ by Satyaa & Clawdy**
-
-*Version 4.3.6 - Last Updated: 2026-05-08*
+**Crafted with ❤️ by Satyaa & Clawdy (AI Agent)**

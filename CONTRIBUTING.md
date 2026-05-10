@@ -987,4 +987,3 @@ Any `npm version` bump must include an update to `package-lock.json`.
 ---
 
 *Navigate the future.*  
-*Last Updated: 2026-05-08*

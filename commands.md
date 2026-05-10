@@ -842,4 +842,3 @@ export default {
 ---
 
 *Built for the modern developer.*  
-*Last Updated: 2026-05-08*

@@ -88,11 +88,12 @@ const PackageRegistry = memo(({selectedProject, projects = [], onRunCommand, Cur
       return;
     }
 
-    if (inputStr.toLowerCase() === 'a') { setMode('add'); setInput(''); setCursor(0); }
-    if (inputStr.toLowerCase() === 'r') { setMode('remove'); setInput(''); setCursor(0); }
-    if (inputStr.toLowerCase() === 's') { setView('select'); }
+    if (inputStr.toLowerCase() === 'a') { setMode('add'); setInput(''); setCursor(0); return; }
+    if (inputStr.toLowerCase() === 'r') { setMode('remove'); setInput(''); setCursor(0); return; }
+    if (inputStr.toLowerCase() === 's') { setView('select'); return; }
     if (inputStr.toLowerCase() === 'v' && projectType === 'Python') {
       onRunCommand({label: 'Create venv', command: ['python3', '-m', 'venv', '.venv']}, activeProject);
+      return;
     }
   });
 
