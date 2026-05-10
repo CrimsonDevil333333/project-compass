@@ -13,6 +13,7 @@ import rubyDetector from './detectors/ruby.js';
 import dotnetDetector from './detectors/dotnet.js';
 import genericDetector from './detectors/generic.js';
 import { builtInFrameworks } from './detectors/frameworks.js';
+import { loadProjectConfig } from './detectors/compass-config.js';
 
 const IGNORE_PATTERNS = ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/build/**', '**/target/**'];
 
@@ -114,13 +115,16 @@ function matchesPlugin(project, plugin) {
 function applyFrameworkPlugins(project) {
   const plugins = getFrameworkPlugins();
   let commands = { ...project.commands };
-  const frameworks = [];
+  const frameworks = [...(project.frameworks || [])];
   let maxPriority = project.priority || 0;
   for (const plugin of plugins) {
     if (!matchesPlugin(project, plugin)) {
       continue;
     }
-    frameworks.push({ id: plugin.id, name: plugin.name, icon: plugin.icon, description: plugin.description });
+    const exists = frameworks.some(f => f.name === plugin.name);
+    if (!exists) {
+      frameworks.push({ id: plugin.id, name: plugin.name, icon: plugin.icon, description: plugin.description });
+    }
     if (plugin.priority && plugin.priority > maxPriority) {
       maxPriority = plugin.priority;
     }
@@ -165,6 +169,14 @@ export async function discoverProjects(root) {
           const entry = await detector.build(projectDir, match);
           if (!entry) {
             continue;
+          }
+          // Load project-specific compass.config.js if it exists
+          const projectConfig = await loadProjectConfig(projectDir);
+          if (projectConfig) {
+            entry.commands = { ...entry.commands, ...(projectConfig.commands || {}) };
+            if (projectConfig.frameworks) {
+              entry.frameworks = [...(entry.frameworks || []), ...projectConfig.frameworks];
+            }
           }
           const withFrameworks = applyFrameworkPlugins(entry);
           projectMap.set(projectDir, withFrameworks);

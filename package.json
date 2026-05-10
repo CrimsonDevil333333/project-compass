@@ -1,7 +1,7 @@
 {
   "name": "project-compass",
-  "version": "4.2.1",
-  "description": "Futuristic project navigator and runner for Node, Python, Rust, and Go",
+  "version": "4.3.6",
+  "description": "🧭 Futuristic TUI workspace navigator & runner - AI-powered project detection for Node, Python, Rust, Go, Java, PHP, Ruby, .NET",
   "main": "src/cli.js",
   "bin": {
     "project-compass": "src/cli.js"
@@ -10,17 +10,43 @@
   "scripts": {
     "start": "node src/cli.js",
     "test": "node src/cli.js --mode test",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "run": "node src/cli.js --run"
   },
   "keywords": [
     "cli",
     "navigator",
     "ink",
     "runner",
-    "projects"
+    "projects",
+    "tui",
+    "terminal",
+    "workspace",
+    "ai",
+    "detect",
+    "python",
+    "rust",
+    "node",
+    "java",
+    "php",
+    "ruby",
+    "dotnet",
+    "uv",
+    "fastapi",
+    "django",
+    "nextjs",
+    "react"
   ],
   "author": "Satyaa & Clawdy",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CrimsonDevil333333/project-compass.git"
+  },
+  "homepage": "https://github.com/CrimsonDevil333333/project-compass",
+  "bugs": {
+    "url": "https://github.com/CrimsonDevil333333/project-compass/issues"
+  },
   "dependencies": {
     "execa": "^9.5.2",
     "fast-glob": "^3.3.3",
