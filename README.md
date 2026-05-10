@@ -566,14 +566,6 @@ This file is automatically loaded during project detection and merged into proje
 - Removed dead code file
 - Updated all documentation
 
-### 3. Pagination Default Values Fixed
-**Problem**: Inconsistent defaults across the codebase.
-
-**Fix Applied**:
-- `Navigator.js`: Changed default from `2` to `3`
-- `cli.js`: Changed fallback from `2` to `3`
-- Now consistent with config default of `maxVisibleProjects: 3`
-
 ### 4. Added Screenshots to README
 **Problem**: README had no images, and package wouldn't show screenshots on npmjs.com because of relative paths.
 
