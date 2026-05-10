@@ -124,9 +124,16 @@ export default {
   priority: 95,
   files: ['pyproject.toml', 'requirements.txt', 'setup.py', 'Pipfile', 'manage.py'],
   binaries: ['python3', 'python', 'uv'],
-  async build(projectPath, manifest) {
-    const missingBinaries = this.binaries.filter(b => !checkBinary(b));
-    const pkgManager = getPythonPackageManager(projectPath);
+   async build(projectPath, manifest) {
+     const hasPython3 = checkBinary('python3');
+     const hasPython = checkBinary('python');
+     const hasUv = checkBinary('uv');
+     const hasRuntime = hasPython3 || hasPython || hasUv;
+     const missingBinaries = [];
+     if (!hasRuntime) {
+       missingBinaries.push('python');
+     }
+     const pkgManager = getPythonPackageManager(projectPath);
     const isUV = pkgManager === 'uv';
     const isPoetry = pkgManager === 'poetry';
     const isPipenv = pkgManager === 'pipenv';

@@ -138,8 +138,6 @@ project-compass/
 │   │                           # - CONFIG_PATH: ~/.project-compass/config.json
 │   │                           # - PLUGIN_FILE: ~/.project-compass/plugins.json
 │   │                           # - ensureConfigDir()
-│   ├── store/
-│   │   └── useProjectStore.js  # Unused store (available for future use)
 │   ├── detectors/
 │   │   ├── utils.js            # Shared utilities (148 lines)
 │   │   │                       # - checkBinary(name)
@@ -368,28 +366,6 @@ const [customMode, setCustomMode] = useState(false);
 const [portConfigMode, setPortConfigMode] = useState(false);
 // ... more state variables
 ```
-
-### Unused Store (`src/store/useProjectStore.js`)
-
-Exists but is NOT imported anywhere:
-
-```javascript
-export function useProjectStore(initialProjects = []) {
-  const [projects, setProjects] = useState(initialProjects);
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [activeTab, setActiveTab] = useState('navigator');
-  const [selectedProjectId, setSelectedProjectId] = useState(null);
-  const [config, setConfig] = useState({ maxVisibleProjects: 8 });
-  
-  const selectedProject = useMemo(() => {
-    return projects.find(p => p.id === selectedProjectId) || projects[selectedIndex] || null;
-  }, [projects, selectedIndex, selectedProjectId]);
-
-  return { projects, setProjects, selectedIndex, /* ... */ };
-}
-```
-
-**Note**: This store could be integrated in future versions to centralize state management.
 
 ---
 

@@ -540,7 +540,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
     if (key.shift && key.downArrow) { scrollLogs(-1); return; }
 
     
-    const pageLimit = config.maxVisibleProjects || 2;
+    const pageLimit = config.maxVisibleProjects || 3;
     const totalProjects = projects.length;
     
     if (key.pageUp && totalProjects > pageLimit) {

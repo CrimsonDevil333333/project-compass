@@ -83,8 +83,6 @@ project-compass/
 │   ├── cli.js                   # Entry point (840+ lines)
 │   ├── projectDetection.js       # Orchestrator (189 lines)
 │   ├── configPaths.js            # Config directory paths (13 lines)
-│   ├── store/
-│   │   └── useProjectStore.js  # Unused store (32 lines, available for future)
 │   ├── detectors/
 │   │   ├── utils.js            # Shared utilities (148 lines)
 │   │   ├── node.js             # Node.js detection (140 lines)
@@ -620,6 +618,44 @@ project-compass --ai-analyze           # Shows message to use TUI mode
 
 ---
 
+## Recent Fixes (Post-v4.3.6)
+
+### 1. Python Binary Detection Bug FIXED
+
+**Problem**: `python.js` checked if ALL of `['python3', 'python', 'uv']` binaries existed, causing false "Runtime missing" warnings when only `python` or `python3` was available.
+
+**Root Cause**: `binaries.filter(b => !checkBinary(b))` treats alternate Python binary names as separate requirements.
+
+**Fix Applied** (src/detectors/python.js:126-135):
+```javascript
+const hasPython3 = checkBinary('python3');
+const hasPython = checkBinary('python');
+const hasUv = checkBinary('uv');
+const hasRuntime = hasPython3 || hasPython || hasUv;
+const missingBinaries = hasRuntime ? [] : ['python'];
+```
+
+**Result**: Only shows "Runtime missing" if NO Python runtime exists at all.
+
+### 2. Removed Unused Store
+
+**Problem**: `src/store/useProjectStore.js` existed but was never imported anywhere.
+
+**Fix Applied**: Removed `src/store/useProjectStore.js` - dead code cleanup.
+
+### 3. Pagination Default Values Fixed
+
+**Problem**: Inconsistent defaults:
+- Config default: `maxVisibleProjects: 3`
+- `Navigator.js` prop default: `2`  
+- `cli.js` pageLimit fallback: `2`
+
+**Fix Applied**:
+- `Navigator.js:11`: Changed from `maxVisibleProjects = 2` to `maxVisibleProjects = 3`
+- `cli.js:543`: Changed from `config.maxVisibleProjects || 2` to `config.maxVisibleProjects || 3`
+
+---
+
 ## Component Details
 
 ### Entry Point: `src/cli.js`
@@ -861,27 +897,7 @@ const [portConfigMode, setPortConfigMode] = useState(false);
 // ... more state variables
 ```
 
-### Unused Store (`src/store/useProjectStore.js`)
 
-Exists but is NOT imported anywhere:
-
-```javascript
-export function useProjectStore(initialProjects = []) {
-  const [projects, setProjects] = useState(initialProjects);
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [activeTab, setActiveTab] = useState('navigator');
-  const [selectedProjectId, setSelectedProjectId] = useState(null);
-  const [config, setConfig] = useState({ maxVisibleProjects: 8 });
-  
-  const selectedProject = useMemo(() => {
-    return projects.find(p => p.id === selectedProjectId) || projects[selectedIndex] || null;
-  }, [projects, selectedIndex, selectedProjectId]);
-
-  return { projects, setProjects, selectedIndex, /* ... */ };
-}
-```
-
-**Note**: This store could be integrated in future versions to centralize state management.
 
 ---
 
@@ -1044,41 +1060,30 @@ This file is:
 
 ### Known Issues
 
-1. **Unused Store**: `src/store/useProjectStore.js` exists but is never imported
-   - **Fix**: Integrate into `Compass` component or remove
-
-2. **Config Loading Race Condition**: `loadConfig()` is called in `useState(() => loadConfig())`
+1. **Config Loading**: `loadConfig()` is called in `useState(() => loadConfig())`
    - If config file is corrupted, falls back to defaults but doesn't persist the fix
 
-3. **Process Killing on Windows**: Line 242 in `cli.js`
+2. **Process Killing on Windows**: Line 242 in `cli.js`
    - May not properly kill child processes on Windows
 
-4. **Log Buffer Memory**: Capped at 500 lines, but truncation happens in `addLogToTask`
+3. **Log Buffer Memory**: Capped at 500 lines, but truncation happens in `addLogToTask`
    - If many tasks run simultaneously, memory could grow
 
-5. **Python Binary Detection**: Line 126 in `python.js`
-   - `binaries: ['python3', 'python', 'uv']` - On some systems `python3` exists but `python` doesn't (or vice versa)
-
-6. **fast-glob Depth**: `projectDetection.js` line 155
+4. **fast-glob Depth**: `projectDetection.js` line 155
    - `deep: 5` could miss deeply nested projects or be slow on large directories
 
-7. **AI JSON Parsing**: `AIHorizon.js` line 173
+5. **AI JSON Parsing**: `AIHorizon.js` line 173
    - Regex may fail on malformed JSON or if AI returns code blocks
-
-8. **Page Navigation Edge Cases**: `Navigator.js` pagination
-   - Assumes `maxVisibleProjects` defaults to 3
-   - If config loading fails, pagination could break
 
 ### TODO (Future Enhancements)
 
-1. **Integrate `useProjectStore`**: Replace inline state management in `Compass` with the store
-2. **Add More Detectors**: Flutter, Elixir, Swift, Haskell
-3. **Improve Log Viewing**: Search/filter, click to expand, export per-task
-4. **Enhanced AI Integration**: Stream AI responses, more providers, cache suggestions
-5. **Configuration UI**: Settings view for config.json options
-6. **Task Dependencies**: Allow tasks to depend on other tasks
-7. **Project Groups/Tags**: Tag projects, filter by tag
-8. **WebSocket/Real-time Updates**: Watch for file changes, hot-reload plugins.json
+1. **Add More Detectors**: Flutter, Elixir, Swift, Haskell
+2. **Improve Log Viewing**: Search/filter, click to expand, export per-task
+3. **Enhanced AI Integration**: Stream AI responses, more providers, cache suggestions
+4. **Configuration UI**: Settings view for config.json options
+5. **Task Dependencies**: Allow tasks to depend on other tasks
+6. **Project Groups/Tags**: Tag projects, filter by tag
+7. **WebSocket/Real-time Updates**: Watch for file changes, hot-reload plugins.json
 
 ---
 

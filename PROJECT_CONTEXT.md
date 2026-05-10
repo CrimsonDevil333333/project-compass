@@ -89,8 +89,6 @@ All components use `React.createElement` directly (no JSX) with Ink's `Box` and 
   - Config file: `config.json`
   - Plugin file: `plugins.json`
 
-- **Unused Store:** `src/store/useProjectStore.js` exists but is not imported anywhere
-
 ---
 
 ## Data Flow
@@ -293,47 +291,31 @@ Commands are stored as:
 
 ## Potential Bug Areas
 
-### 1. **Unused Store** (`src/store/useProjectStore.js`)
-- File exists but is never imported
-- Could be integrated for better state management
-
-### 2. **Config Loading Race Condition**
+### 1. **Config Loading**
 - `loadConfig()` is called in `useState(() => loadConfig())` 
 - If config file is corrupted, falls back to defaults but doesn't persist the fix
 
-### 3. **Process Killing on Windows**
+### 2. **Process Killing on Windows**
 - Line 242: `execa('taskkill', ['/pid', proc.pid, '/f', '/t'])`
 - May not properly kill child processes
 
-### 4. **Log Buffer Memory**
+### 3. **Log Buffer Memory**
 - Capped at 500 lines, but truncation happens in `addLogToTask`
 - If many tasks run simultaneously, memory could grow
 
-### 5. **Python Binary Detection**
-- Line 126 in `python.js`: `binaries: ['python3', 'python', 'uv']`
-- On some systems `python3` exists but `python` doesn't (or vice versa)
-
-### 6. **fast-glob Depth**
+### 4. **fast-glob Depth**
 - `projectDetection.js` line 155: `deep: 5`
 - Could miss deeply nested projects or be slow on large directories
 
-### 7. **AI JSON Parsing**
+### 5. **AI JSON Parsing**
 - `AIHorizon.js` line 173: `aiText.match(/{[\s\S]*?}/)`
 - Regex may fail on malformed JSON or if AI returns code blocks
-
-### 8. **Page Navigation Edge Cases**
-- `Navigator.js` pagination assumes `maxVisibleProjects` defaults to 3
-- If config loading fails, pagination could break
 
 ---
 
 ## Enhancement Opportunities
 
-### 1. **Integrate `useProjectStore`**
-- Replace inline state management in `Compass` with the store
-- Centralizes project selection logic
-
-### 2. **Add More Detectors**
+### 1. **Add More Detectors**
 - Flutter (`pubspec.yaml`)
 - Elixir (`mix.exs`)
 - Swift (`Package.swift`)

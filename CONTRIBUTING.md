@@ -295,8 +295,6 @@ project-compass/
 │   │                           # - CONFIG_PATH: ~/.project-compass/config.json
 │   │                           # - PLUGIN_FILE: ~/.project-compass/plugins.json
 │   │                           # - ensureConfigDir()
-│   ├── store/
-│   │   └── useProjectStore.js  # Unused store (available for future use)
 │   ├── detectors/
 │   │   ├── utils.js            # Shared utilities (148 lines)
 │   │   │                       # - checkBinary(name)
