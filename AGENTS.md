@@ -31,8 +31,8 @@ Welcome to Project Compass. This file provides **COMPLETE** context for AI agent
 
 **Project Compass** is a futuristic project navigator and runner designed for modern polygot development. It provides a high-fidelity terminal UI (using Ink) to manage complex workspaces with integrated Agentic AI intelligence.
 
-**Version:** 4.3.6  
-**Last Updated:** 2026-05-08  
+**Version:** 4.3.7  
+**Last Updated:** 2026-05-10  
 **Author:** Satyaa & Clawdy  
 **License:** MIT  
 **Repository:** https://github.com/CrimsonDevil333333/project-compass
@@ -54,12 +54,12 @@ Welcome to Project Compass. This file provides **COMPLETE** context for AI agent
 
 | Attribute | Value |
 |-----------|-------|
-| **Version** | 4.3.6 |
+| **Version** | 4.3.7 |
 | **NPM Package** | `project-compass` |
 | **Node.js Requirement** | ^18.0.0 (ESM support) |
 | **Build Status** | Stable |
 | **Platform Support** | Linux, macOS, Windows (with caveats) |
-| **Last Release** | 2026-05-08 |
+| **Last Release** | 2026-05-10 |
 
 ---
 
