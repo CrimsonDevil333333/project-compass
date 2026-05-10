@@ -21,6 +21,12 @@ npm start
 
 ---
 
+## 📸 Screenshot
+
+![Project Compass Navigator](https://raw.githubusercontent.com/CrimsonDevil333333/project-compass/master/assets/screenshots/home.png)
+
+---
+
 ## 🔗 Links
 
 - **NPM Package**: [npmjs.com/package/project-compass](https://www.npmjs.com/package/project-compass)
@@ -60,6 +66,8 @@ npm start
 - **Live Log Streaming**: Real-time output with scroll support (`Shift+↑/↓`)
 - **Log Management**: Clear logs (`Shift+X`) or export to file (`Shift+E`)
 - **Multi-Task Support**: Run multiple commands simultaneously
+
+![Orbit Task Manager](https://raw.githubusercontent.com/CrimsonDevil333333/project-compass/master/assets/screenshots/task_manager.png)
 
 ---
 
@@ -120,6 +128,8 @@ project-compass --scaffold python-basic --name my-script --dir /tmp
 | **Anthropic Claude** | `https://api.anthropic.com/v1/messages` | Requires API key |
 | **Ollama (Local)** | `http://localhost:11434/api/generate` | Local installation required |
 
+![AI Horizon](https://raw.githubusercontent.com/CrimsonDevil333333/project-compass/master/assets/screenshots/ai_mode.png)
+
 ---
 
 ## 🔌 Infrastructure Control (`Shift+R`)
@@ -141,6 +151,12 @@ project-compass --scaffold python-basic --name my-script --dir /tmp
 ### Art Board (`Shift+B`)
 - **Build Atlas**: Visual representation of your workspace
 - **Toggle Visibility**: Saved to config (`showArtBoard`)
+
+![Omni-Studio](https://raw.githubusercontent.com/CrimsonDevil333333/project-compass/master/assets/screenshots/languages_checker_omni_studio.png)
+
+![Art Board](https://raw.githubusercontent.com/CrimsonDevil333333/project-compass/master/assets/screenshots/art_bar.png)
+
+![Help & Structure](https://raw.githubusercontent.com/CrimsonDevil333333/project-compass/master/assets/screenshots/help_structure.png)
 
 ---
 
@@ -529,6 +545,41 @@ This file is automatically loaded during project detection and merged into proje
 **Fix Applied**:
 - Added check to avoid adding duplicate frameworks
 - Now preserves detector-detected frameworks and merges with plugin-detected ones
+
+---
+
+## 🎯 Recent Fixes (v4.3.7)
+
+### 1. Python Binary Detection Bug FIXED
+**Problem**: `python.js` checked if ALL of `['python3', 'python', 'uv']` binaries existed, causing false "Runtime missing" warnings when only `python` or `python3` was available.
+
+**Root Cause**: `binaries.filter(b => !checkBinary(b))` treats alternate Python binary names as separate requirements.
+
+**Fix Applied**:
+- Now checks if AT LEAST ONE Python runtime exists
+- Only shows "Runtime missing" when no Python runtime is found
+
+### 2. Removed Unused Store
+**Problem**: `src/store/useProjectStore.js` existed but was never imported anywhere.
+
+**Fix Applied**:
+- Removed dead code file
+- Updated all documentation
+
+### 3. Pagination Default Values Fixed
+**Problem**: Inconsistent defaults across the codebase.
+
+**Fix Applied**:
+- `Navigator.js`: Changed default from `2` to `3`
+- `cli.js`: Changed fallback from `2` to `3`
+- Now consistent with config default of `maxVisibleProjects: 3`
+
+### 4. Added Screenshots to README
+**Problem**: README had no images, and package wouldn't show screenshots on npmjs.com because of relative paths.
+
+**Fix Applied**:
+- Added 6 screenshots using raw GitHub URLs
+- Navigator Home, Task Manager, AI Horizon, Omni-Studio, Art Board, Help Structure
 
 ---
 
