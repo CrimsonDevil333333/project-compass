@@ -31,7 +31,15 @@ function parseGoMod(content) {
       continue;
     }
     
-    if (inRequire || (trimmed.includes(' ') && !trimmed.startsWith('//'))) {
+    if (trimmed.startsWith('require ') && !trimmed.startsWith('require (')) {
+      const parts = trimmed.split(/\s+/);
+      if (parts[1] && !parts[1].startsWith('//')) {
+        metadata.dependencies.push(parts[1].replace(/"/g, ''));
+      }
+      continue;
+    }
+
+    if (inRequire) {
       const parts = trimmed.split(/\s+/);
       if (parts[0] && !parts[0].startsWith('//')) {
         metadata.dependencies.push(parts[0].replace(/"/g, ''));

@@ -7,6 +7,7 @@ import fs from 'fs';
 import kleur from 'kleur';
 import {execa} from 'execa';
 import {discoverProjects, SCHEMA_GUIDE} from './projectDetection.js';
+import {parseShellWords} from './detectors/utils.js';
 import {CONFIG_PATH, ensureConfigDir} from './configPaths.js';
 
 // Modular Components
@@ -18,6 +19,7 @@ import AIHorizon from './components/AIHorizon.js';
 import Navigator from './components/Navigator.js';
 import Header from './components/Header.js';
 import Footer from './components/Footer.js';
+import {getAddCmd, getRemoveCmd} from './packageCommands.js';
 
 const create = React.createElement;
 const ART_CHARS = ['▁', '▃', '▄', '▅', '▇'];
@@ -395,7 +397,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
         const selProj = selectedProject;
         if (selProj && raw) {
           const [labelPart, commandPart] = raw.split('|');
-          const commandTokens = (commandPart || labelPart).trim().split(/\s+/).filter(Boolean);
+          const commandTokens = parseShellWords(commandPart || labelPart);
           if (commandTokens.length) {
             const label = commandPart ? labelPart.trim() : `Custom ${selProj.name}`;
             setConfig((prev) => {
@@ -460,6 +462,39 @@ function Compass({rootPath, initialView = 'navigator'}) {
       setShowHelp(false);
     };
     
+    const findCommand = (project, key) => {
+      let meta = project.commands?.[key];
+      if (meta) return meta;
+      const alts = COMMAND_FALLBACKS[key] || [];
+      for (const alt of alts) {
+        meta = project.commands?.[alt];
+        if (meta) return meta;
+      }
+      return null;
+    };
+
+    const actionKey = normalizedInput && ACTION_MAP[normalizedInput];
+    if (viewMode === 'detail' && actionKey && selectedProject) {
+      if (actionKey === 'run' && key.shift) {
+        setPortConfigMode(true);
+        const port = config.projectMeta?.[selectedProject.path]?.port || selectedProject.metadata?.port || '3000';
+        setCustomInput(String(port));
+        setCustomCursor(String(port).length);
+        return;
+      }
+
+      const commandMeta = findCommand(selectedProject, actionKey);
+      if (commandMeta) {
+        runProjectCommand(commandMeta, selectedProject);
+      } else {
+        const msg = kleur.yellow(`! No ${actionKey} command available for ${selectedProject.name}`);
+        const taskId = `task-${Date.now()}`;
+        setTasks(prev => [...prev, { id: taskId, name: `Notification`, status: 'failed', logs: [msg], project: '' }]);
+        globalThis.setTimeout(() => setTasks(prev => prev.filter(t => t.id !== taskId)), 3000);
+      }
+      return;
+    }
+
     if (shiftCombo('h')) { console.clear(); setConfig(prev => { const next = {...prev, showHelpCards: !prev.showHelpCards}; saveConfig(next); return next; }); return; }
     if (shiftCombo('s')) { console.clear(); setConfig(prev => { const next = {...prev, showStructureGuide: !prev.showStructureGuide}; saveConfig(next); return next; }); return; }
     if (shiftCombo('a')) { clearAndSwitch(mainView === 'navigator' ? 'studio' : 'navigator'); return; }
@@ -589,41 +624,8 @@ function Compass({rootPath, initialView = 'navigator'}) {
     }
 
     
-    if (shiftCombo('m') && viewMode === 'detail' && selectedProject) {
-      setPortConfigMode(true);
-      const port = config.projectMeta?.[selectedProject.path]?.port || selectedProject.metadata?.port || '3000';
-      setCustomInput(String(port));
-      setCustomCursor(String(port).length);
-      return;
-    }
         if (shiftCombo('c') && viewMode === 'detail' && selectedProject) { setCustomMode(true); setCustomInput(''); setCustomCursor(0); return; }
     
-    const actionKey = normalizedInput && ACTION_MAP[normalizedInput];
-    if (actionKey && selectedProject) {
-      if (!key.shift) {
-        return;
-      }
-      const findCommand = (project, key) => {
-        let meta = project.commands?.[key];
-        if (meta) return meta;
-        const alts = COMMAND_FALLBACKS[key] || [];
-        for (const alt of alts) {
-          meta = project.commands?.[alt];
-          if (meta) return meta;
-        }
-        return null;
-      };
-      const commandMeta = findCommand(selectedProject, actionKey);
-      if (commandMeta) {
-        runProjectCommand(commandMeta, selectedProject);
-      } else {
-        const msg = kleur.yellow(`! No ${actionKey} command available for ${selectedProject.name}`);
-        const taskId = `task-${Date.now()}`;
-        setTasks(prev => [...prev, { id: taskId, name: `Notification`, status: 'failed', logs: [msg], project: '' }]);
-        globalThis.setTimeout(() => setTasks(prev => prev.filter(t => t.id !== taskId)), 3000);
-      }
-      return;
-    }
     if (viewMode === 'detail' && normalizedInput && detailShortcutMap.has(normalizedInput)) {
       if (!isNaN(parseInt(normalizedInput))) {
         runProjectCommand(detailShortcutMap.get(normalizedInput), selectedProject);
@@ -674,7 +676,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
         create(Text, {key: `dl-${command.shortcut}`, dimColor: true}, `   ↳ ${command.command.join(' ')}`)
       );
     });
-    content.push(create(Text, {key: 'h-l', dimColor: true, marginTop: 1}, 'Shift+C: custom cmd · Shift+M: port · Enter: close detail view.'));
+    content.push(create(Text, {key: 'h-l', dimColor: true, marginTop: 1}, 'Shift+C: custom cmd · Shift+R: port · B/T/R/I: quick actions · Enter: close detail view.'));
     return content;
   }, [viewMode, selectedProject, rootPath, detailedIndexed]);
 
@@ -728,7 +730,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
           showHelp && create(Box, {key: 'overlay', flexDirection: 'column', borderStyle: 'double', borderColor: 'cyan', marginTop: 1, padding: 1},
             create(Text, {color: 'cyan', bold: true}, '📖 Help Overview'),
             create(Text, null, 'Shift+T Tasks · Shift+P Packages · Shift+N Architect · Shift+O AI · Shift+A Studio'),
-            create(Text, null, 'Shift+B/T/R/I Build/Test/Run/Install   Shift+C custom cmd   Shift+M port'),
+            create(Text, null, 'B/T/R/I Build/Test/Run/Install   Shift+C custom cmd   Shift+R port'),
             create(Text, null, 'Shift+K kill · Shift+R rename · Shift+D detach · Shift+X clear · Shift+E export · Shift+L rerun'),
             create(Text, null, 'Shift+H help cards · Shift+S structure · Shift+B art · Shift+Q quit'),
             create(Text, null, '↑/↓ navigate · Enter detail · Esc back · ? close')
@@ -743,27 +745,6 @@ function Compass({rootPath, initialView = 'navigator'}) {
 }
 
 
-function getAddCmd(project, pkg) {
-  if (!project || !pkg) return null;
-  const type = project.type;
-  if (type === 'Node.js') return [project.metadata?.packageManager || 'npm', 'install', pkg];
-  if (type === 'Python') return ['pip', 'install', pkg];
-  if (type === 'Rust') return ['cargo', 'add', pkg];
-  if (type === '.NET') return ['dotnet', 'add', 'package', pkg];
-  if (type === 'PHP') return ['composer', 'require', pkg];
-  return null;
-}
-
-function getRemoveCmd(project, pkg) {
-  if (!project || !pkg) return null;
-  const type = project.type;
-  if (type === 'Node.js') return [project.metadata?.packageManager || 'npm', 'uninstall', pkg];
-  if (type === 'Python') return ['pip', 'uninstall', '-y', pkg];
-  if (type === 'Rust') return ['cargo', 'remove', pkg];
-  if (type === '.NET') return ['dotnet', 'remove', 'package', pkg];
-  if (type === 'PHP') return ['composer', 'remove', pkg];
-  return null;
-}
 
 function parseArgs() {
   const args = {};
@@ -836,8 +817,8 @@ async function main() {
     console.log(kleur.bold(kleur.yellow('🎮 TUI Keyboard Shortcuts:')));
     console.log('  Core Views:       Shift+T(asks)  Shift+P(ackages)  Shift+N(ew)');
     console.log('                    Shift+O(AI)    Shift+A(Studio)');
-    console.log('  Detail View:      Shift+B(uild)  Shift+T(est)  Shift+R(un)  Shift+I(nstall)');
-    console.log('                    Shift+C(custom cmd)  Shift+M(port)  0(AI)  1-9(scripts)');
+    console.log('  Detail View:      B(uild)  T(est)  R(un)  I(nstall)');
+    console.log('                    Shift+C(custom cmd)  Shift+R(port)  0(AI)  1-9(scripts)');
     console.log('  Navigation:       ↑/↓  PgUp/Dn  Enter(detail)  Esc(back)  ?(help)');
     console.log('  Workspace:        Shift+H(help)  Shift+S(structure)  Shift+B(art)');
     console.log('  Tasks:            Shift+K(kill)  Shift+R(rename)  Shift+D(etach)');

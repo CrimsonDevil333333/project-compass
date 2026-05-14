@@ -1,6 +1,6 @@
 # Project Compass · Complete Commands & Shortcuts Reference
 
-This document lists **ALL** supported languages, frameworks, commands, keyboard shortcuts, and CLI arguments available in Project Compass (v4.3.6).
+This document lists **ALL** supported languages, frameworks, commands, keyboard shortcuts, and CLI arguments available in Project Compass (v4.3.8).
 
 ---
 
@@ -217,10 +217,10 @@ project-compass --list-projects --json | jq -r '.[0].path'
 | Key | Action | Command | Description |
 |-----|--------|---------|-------------|
 | `0` | **Quick AI Analysis** | - | Switch to AI Horizon for selected project |
-| `B` | **Build** project | `commands.build` | Run build command |
-| `T` | **Test** project | `commands.test` | Run test command |
-| `R` | **Run** project | `commands.run` | Run project command |
-| `I` | **Install** dependencies | `commands.install` | Run install command |
+| `B` / `b` | **Build** project | `commands.build` | Run build command |
+| `T` / `t` | **Test** project | `commands.test` | Run test command |
+| `R` / `r` | **Run** project | `commands.run` | Run project command (`Shift+R` configures port) |
+| `I` / `i` | **Install** dependencies | `commands.install` | Run install command |
 | `1-9` | **Run numbered commands** | `detailShortcutMap` | Execute commands 1-9 from detail view |
 | `Shift+1-9` (A-Z) | **Run commands 10+** | `detailShortcutMap` | Execute commands 10+ (A=10, B=11, etc.) |
 
@@ -335,10 +335,10 @@ Quick: [B] Build · [T] Test · [R] Run · [I] Install · [0] AI
 
 ### Command Execution
 
-- Press `B` → Runs `commands.build`
-- Press `T` → Runs `commands.test`
-- Press `R` → Runs `commands.run`
-- Press `I` → Runs `commands.install`
+- Press `B` / `b` → Runs `commands.build`
+- Press `T` / `t` → Runs `commands.test`
+- Press `R` / `r` → Runs `commands.run` (`Shift+R` opens port config)
+- Press `I` / `i` → Runs `commands.install`
 
 ### AI Analysis (Detail View)
 
@@ -407,7 +407,7 @@ Press `0` in detail view to:
 3. Enter API token (type, Enter)
 4. Press Enter to analyze
 5. Review/edit suggestions
-6. Save to config
+6. Save to config with `S`
 
 ### Omni-Studio (`Shift+A`)
 

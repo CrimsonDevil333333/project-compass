@@ -118,7 +118,7 @@ project-compass --scaffold python-basic --name my-script --dir /tmp
 - **Persistent Auth**: Save your API tokens once; Compass handles the secure handshake thereafter
 - **Project-Specific Config**: Loads `compass.config.js` from project directories
 - **Editable Suggestions**: Review and edit AI suggestions before saving (`E` to edit)
-- **Manual Save**: Press `S` to save suggestions to config
+- **Manual Save**: Press `S` to save reviewed suggestions to config
 
 ### Supported AI Providers
 | Provider | Endpoint | Configuration |
@@ -177,10 +177,10 @@ project-compass --scaffold python-basic --name my-script --dir /tmp
 | Key | Action | Description |
 |-----|--------|-------------|
 | `0` | **Quick AI Analysis** | Switches to AI Horizon for selected project |
-| `B` | **Build** project | Runs build command |
-| `T` | **Test** project | Runs test command |
-| `R` | **Run** project | Runs run command |
-| `I` | **Install** dependencies | Runs install command |
+| `B` / `b` | **Build** project | Runs build command |
+| `T` / `t` | **Test** project | Runs test command |
+| `R` / `r` | **Run** project | Runs run command (`Shift+R` configures port) |
+| `I` / `i` | **Install** dependencies | Runs install command |
 | `1-9` | **Run numbered commands** | Execute commands 1-9 from detail view |
 | `Shift+1-9` (A-Z) | **Run commands 10+** | Execute commands 10+ (A=10, B=11, etc.) |
 

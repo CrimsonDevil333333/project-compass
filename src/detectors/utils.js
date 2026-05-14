@@ -106,6 +106,50 @@ export function dependencyMatches(project, needle) {
   });
 }
 
+export function parseShellWords(input) {
+  const source = String(input || '').trim();
+  const tokens = [];
+  let current = '';
+  let quote = null;
+  let escaped = false;
+
+  for (const char of source) {
+    if (escaped) {
+      current += char;
+      escaped = false;
+      continue;
+    }
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      if (char === quote) {
+        quote = null;
+      } else {
+        current += char;
+      }
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      continue;
+    }
+    if (/\s/.test(char)) {
+      if (current) {
+        tokens.push(current);
+        current = '';
+      }
+      continue;
+    }
+    current += char;
+  }
+
+  if (escaped) current += '\\';
+  if (current) tokens.push(current);
+  return tokens;
+}
+
 export function parseCommandTokens(value) {
   if (Array.isArray(value)) {
     return value;
@@ -115,11 +159,11 @@ export function parseCommandTokens(value) {
       return value.command;
     }
     if (typeof value.command === 'string') {
-      return value.command.trim().split(/\s+/).filter(Boolean);
+      return parseShellWords(value.command);
     }
   }
   if (typeof value === 'string') {
-    return value.trim().split(/\s+/).filter(Boolean);
+    return parseShellWords(value);
   }
   return [];
 }

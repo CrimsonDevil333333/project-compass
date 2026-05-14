@@ -3,6 +3,7 @@ import React, {useState, memo} from 'react';
 import {Box, Text, useInput} from 'ink';
 import fs from 'fs';
 import path from 'path';
+import {parseShellWords} from '../detectors/utils.js';
 
 const create = React.createElement;
 
@@ -69,6 +70,10 @@ const AIHorizon = memo(({rootPath, selectedProject, CursorText, config, setConfi
   const [error, setError] = useState(null);
   const [suggestions, setSuggestions] = useState([]);
   const [rawAIResponse, setRawAIResponse] = useState('');
+  const [selectedSuggestion, setSelectedSuggestion] = useState(0);
+  const [editMode, setEditMode] = useState(false);
+  const [editInput, setEditInput] = useState('');
+  const [editCursor, setEditCursor] = useState(0);
 
   const runRealAnalysis = async () => {
     setStatus('busy');
@@ -165,22 +170,16 @@ Use the project's detected type (${selectedProject.type}) to ensure commands are
 
       const parsed = JSON.parse(jsonMatch[0]);
       const mapped = [
-        { label: 'AI Build', command: String(parsed.build || '').trim().split(/\s+/) },
-        { label: 'AI Run', command: String(parsed.run || '').trim().split(/\s+/) },
-        { label: 'AI Install', command: String(parsed.install || '').trim().split(/\s+/) },
-        { label: 'AI Test', command: String(parsed.test || '').trim().split(/\s+/) }
+        { label: 'AI Build', command: parseShellWords(parsed.build || '') },
+        { label: 'AI Run', command: parseShellWords(parsed.run || '') },
+        { label: 'AI Install', command: parseShellWords(parsed.install || '') },
+        { label: 'AI Test', command: parseShellWords(parsed.test || '') }
       ].filter(cmd => cmd.command.length > 0 && cmd.command[0] !== '');
 
       if (mapped.length === 0) throw new Error("AI returned empty commands. Raw response:\n" + aiText.slice(0, 500));
 
       setSuggestions(mapped);
-      const projectKey = selectedProject.path;
-      const currentCustom = config.customCommands?.[projectKey] || [];
-      const nextConfig = { 
-        ...config, 
-        customCommands: { ...config.customCommands, [projectKey]: [...currentCustom, ...mapped] } 
-      };
-      setConfig(nextConfig); saveConfig(nextConfig);
+      setSelectedSuggestion(0);
       setStatus('done');
     } catch (err) {
       setError(err.message);
@@ -189,6 +188,28 @@ Use the project's detected type (${selectedProject.type}) to ensure commands are
   };
 
   useInput((input, key) => {
+    if (editMode) {
+      if (key.return) {
+        const command = parseShellWords(editInput);
+        if (command.length) {
+          setSuggestions(prev => prev.map((suggestion, idx) => idx === selectedSuggestion ? {...suggestion, command} : suggestion));
+        }
+        setEditMode(false); setEditInput(''); setEditCursor(0);
+        return;
+      }
+      if (key.escape) { setEditMode(false); setEditInput(''); setEditCursor(0); return; }
+      if (key.backspace || key.delete) {
+        if (editCursor > 0) { setEditInput(prev => prev.slice(0, editCursor - 1) + prev.slice(editCursor)); setEditCursor(c => c - 1); }
+        return;
+      }
+      if (key.leftArrow) { setEditCursor(c => Math.max(0, c - 1)); return; }
+      if (key.rightArrow) { setEditCursor(c => Math.min(editInput.length, c + 1)); return; }
+      if (input && !key.ctrl && !key.meta) {
+        setEditInput(prev => prev.slice(0, editCursor) + input + prev.slice(editCursor)); setEditCursor(c => c + input.length);
+      }
+      return;
+    }
+
     if (step === 'provider') {
       if (key.upArrow) setProviderIdx(p => (p - 1 + AI_PROVIDERS.length) % AI_PROVIDERS.length);
       if (key.downArrow) setProviderIdx(p => (p + 1) % AI_PROVIDERS.length);
@@ -224,6 +245,25 @@ Use the project's detected type (${selectedProject.type}) to ensure commands are
     } else if (step === 'analyze') {
       if (key.return && status === 'ready' && selectedProject) {
         runRealAnalysis();
+      }
+      if (status === 'done' && suggestions.length > 0) {
+        if (key.upArrow) { setSelectedSuggestion(prev => (prev - 1 + suggestions.length) % suggestions.length); return; }
+        if (key.downArrow) { setSelectedSuggestion(prev => (prev + 1) % suggestions.length); return; }
+        if (input?.toLowerCase() === 'e') {
+          const current = suggestions[selectedSuggestion]?.command?.join(' ') || '';
+          setEditInput(current); setEditCursor(current.length); setEditMode(true); return;
+        }
+        if (input?.toLowerCase() === 's' && selectedProject) {
+          const projectKey = selectedProject.path;
+          const currentCustom = config.customCommands?.[projectKey] || [];
+          const nextConfig = {
+            ...config,
+            customCommands: { ...config.customCommands, [projectKey]: [...currentCustom, ...suggestions] }
+          };
+          setConfig(nextConfig); saveConfig(nextConfig);
+          setStatus('saved');
+          return;
+        }
       }
       if (input === 'r') {
         const nextConfig = { ...config, aiToken: '' };
@@ -279,7 +319,16 @@ Use the project's detected type (${selectedProject.type}) to ensure commands are
         status === 'busy' && create(Text, {color: 'yellow'}, ' ⏳ Contacting AI Agent... mapping project structure...'),
         status === 'done' && create(Box, {flexDirection: 'column'},
           create(Text, {color: 'green', bold: true}, ' ✅ DNA Mapped via AI Agent!'),
-          create(Text, null, ' Successfully injected ' + suggestions.length + ' optimized commands.'),
+          create(Text, null, ' Review ' + suggestions.length + ' suggested commands below.'),
+          ...suggestions.map((suggestion, index) => create(Text, {key: `${suggestion.label}-${index}`, color: index === selectedSuggestion ? 'cyan' : 'white'}, `${index === selectedSuggestion ? '→' : ' '} ${suggestion.label}: ${suggestion.command.join(' ')}`)),
+          editMode && create(Box, {flexDirection: 'row', marginTop: 1},
+            create(Text, null, 'Edit command: '),
+            create(CursorText, {value: editInput, cursorIndex: editCursor})
+          ),
+          create(Text, {dimColor: true, marginTop: 1}, '↑/↓ select · E edit · S save to config')
+        ),
+        status === 'saved' && create(Box, {flexDirection: 'column'},
+          create(Text, {color: 'green', bold: true}, ' ✅ Saved AI commands to project config.'),
           create(Text, {dimColor: true, marginTop: 1}, 'Return to Navigator to use BRIT shortcuts.')
         ),
         status === 'done' && rawAIResponse && create(
