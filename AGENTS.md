@@ -906,7 +906,7 @@ const [portConfigMode, setPortConfigMode] = useState(false);
 ### Execution Flow
 
 ```
-User presses key (B/T/R/I or Enter on detail view)
+User presses key (Alt+B/Alt+T/Alt+R/Alt+I or Enter on detail view)
     ↓
 useInput handler in Compass component (src/cli.js:324-592)
     ↓

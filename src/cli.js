@@ -676,7 +676,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
         create(Text, {key: `dl-${command.shortcut}`, dimColor: true}, `   ↳ ${command.command.join(' ')}`)
       );
     });
-    content.push(create(Text, {key: 'h-l', dimColor: true, marginTop: 1}, 'Shift+C: custom cmd · Shift+R: port · B/T/R/I: quick actions · Enter: close detail view.'));
+    content.push(create(Text, {key: 'h-l', dimColor: true, marginTop: 1}, 'Shift+C: custom cmd · Shift+R: port · Alt+B/Alt+T/Alt+R/Alt+I: quick actions · Enter: close detail view.'));
     return content;
   }, [viewMode, selectedProject, rootPath, detailedIndexed]);
 
@@ -730,7 +730,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
           showHelp && create(Box, {key: 'overlay', flexDirection: 'column', borderStyle: 'double', borderColor: 'cyan', marginTop: 1, padding: 1},
             create(Text, {color: 'cyan', bold: true}, '📖 Help Overview'),
             create(Text, null, 'Shift+T Tasks · Shift+P Packages · Shift+N Architect · Shift+O AI · Shift+A Studio'),
-            create(Text, null, 'B/T/R/I Build/Test/Run/Install   Shift+C custom cmd   Shift+R port'),
+            create(Text, null, 'Alt+B/Alt+T/Alt+R/Alt+I Build/Test/Run/Install   Shift+C custom cmd   Shift+R port'),
             create(Text, null, 'Shift+K kill · Shift+R rename · Shift+D detach · Shift+X clear · Shift+E export · Shift+L rerun'),
             create(Text, null, 'Shift+H help cards · Shift+S structure · Shift+B art · Shift+Q quit'),
             create(Text, null, '↑/↓ navigate · Enter detail · Esc back · ? close')

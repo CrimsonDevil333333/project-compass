@@ -602,7 +602,7 @@ project-compass
 
 # Use ↑/↓ to select project
 # Press Enter to see details
-# Press B/T/R/I to Build/Test/Run/Install
+# Press Alt+B/Alt+T/Alt+R/Alt+I to Build/Test/Run/Install
 # Press 0 for AI analysis
 ```
 
