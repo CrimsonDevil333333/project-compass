@@ -23,7 +23,7 @@ npm start
 
 ---
 
-## 🛰️ v5.0.0: The Neural Convergence
+## 🛰️ v5.1.0: The Neural Convergence
 
 This version transforms Project Compass into a **Single-Brain Architecture**, unifying the terminal, browser, and CLI into a single high-fidelity workspace engine.
 

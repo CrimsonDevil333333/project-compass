@@ -2,7 +2,7 @@
 
 Thank you for your interest in helping to navigate the project universe! 🚀
 
-This document provides **COMPLETE** guidelines for contributing to Project Compass (v5.0.0).
+This document provides **COMPLETE** guidelines for contributing to Project Compass (v5.1.0).
 
 
 
@@ -65,7 +65,7 @@ All code uses ECMAScript modules (`import/export`).
 
 ---
 
-### 🧬 Zero-Mock Engineering (v5.0.0 Requirement)
+### 🧬 Zero-Mock Engineering (v5.1.0 Requirement)
 Project Compass is built on **High-Fidelity Reliability**. 
 - **No Mock Data**: Do not use hardcoded sample data for project discovery, framework detection, or system runtimes. Always read from the disk or system binaries.
 - **No Simulation**: Commands must trigger real processes. Scaffolding must create real files. Diagnostics must perform real checks.

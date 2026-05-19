@@ -1,6 +1,6 @@
 # Project Compass Architecture
 
-This document describes the complete high-level architecture of Project Compass (v5.0.0 - Neural Convergence).
+This document describes the complete high-level architecture of Project Compass (v5.1.0 - Neural Convergence).
 
 
 ---
@@ -37,9 +37,9 @@ Project Compass is a terminal-based project navigator and runner built with:
 
 ---
 
-## 🧠 Neural Convergence (v5.0.0 Upgrade)
+## 🧠 Neural Convergence (v5.1.0 Upgrade)
 
-Project Compass v5.0.0 represents a massive architectural leap from independent interface logic to a **Single-Brain Architecture**.
+Project Compass v5.1.0 represents a massive architectural leap from independent interface logic to a **Single-Brain Architecture**.
 
 ### The Universal Orchestrator (`src/core/Orchestrator.js`)
 At the heart of the system is the Orchestrator, a centralized engine that manages:

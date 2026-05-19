@@ -3,16 +3,16 @@
 ## Overview
 Project Compass is a terminal UI (TUI) workspace navigator and runner built with **Ink (React for CLI)**. It automatically detects projects across multiple languages and provides an interface to manage, run, and analyze them with optional AI integration.
 
-**Version:** 4.5.0  
+**Version:** 5.1.0  
 **Author:** Satyaa & Clawdy  
 **License:** MIT
 
 ---
 
-## Architecture (v5.0.0 - Neural Convergence)
+## Architecture (v5.1.0 - Neural Convergence)
 
 ### The Single-Brain Core
-Project Compass v5.0.0 uses a centralized engine to unify the TUI, Web Dashboard, and CLI interfaces.
+Project Compass v5.1.0 uses a centralized engine to unify the TUI, Web Dashboard, and CLI interfaces.
 
 - **`src/core/Orchestrator.js`** - The "Brain" of the system.
   - Manages all project discovery (`scan`), command execution (`runCommand`), and scaffolding (`scaffold`).

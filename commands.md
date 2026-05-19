@@ -1,6 +1,6 @@
 # Project Compass · Complete Commands & Shortcuts Reference
 
-This document lists **ALL** supported languages, frameworks, commands, keyboard shortcuts, and CLI arguments available in Project Compass (v5.0.0).
+This document lists **ALL** supported languages, frameworks, commands, keyboard shortcuts, and CLI arguments available in Project Compass (v5.1.0).
 
 
 ---
