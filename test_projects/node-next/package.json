@@ -1,0 +1,10 @@
+{
+  "name": "node-next-test",
+  "dependencies": {
+    "next": "latest",
+    "react": "latest"
+  },
+  "scripts": {
+    "dev": "next dev"
+  }
+}

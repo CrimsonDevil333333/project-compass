@@ -7,8 +7,13 @@ import fs from 'fs';
 import kleur from 'kleur';
 import {execa} from 'execa';
 import {discoverProjects, SCHEMA_GUIDE} from './projectDetection.js';
-import {parseShellWords} from './detectors/utils.js';
-import {CONFIG_PATH, ensureConfigDir} from './configPaths.js';
+import {parseShellWords, peekScriptCommand} from './detectors/utils.js';
+import {CONFIG_PATH, ensureConfigDir, loadConfig, saveConfig} from './configPaths.js';
+
+import { orchestrator } from './core/Orchestrator.js';
+import { startServer, setupSystemdService } from './server.js';
+import { startMcpServer } from './mcp.js';
+
 
 // Modular Components
 import Studio from './components/Studio.js';
@@ -42,59 +47,45 @@ const COMMAND_FALLBACKS = {
   install: ['setup', 'bootstrap', 'fetch']
 };
 
-function saveConfig(config) {
-  try {
-    ensureConfigDir();
-    fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
-  } catch (error) {
-    console.error(`Unable to persist config: ${error.message}`);
-  }
-}
 
-function loadConfig() {
-  try {
-    if (fs.existsSync(CONFIG_PATH)) {
-      const payload = fs.readFileSync(CONFIG_PATH, 'utf-8');
-      const parsed = JSON.parse(payload || '{}');
-      return {
-        customCommands: {},
-        showArtBoard: true,
-        showHelpCards: false,
-        showStructureGuide: false,
-        maxVisibleProjects: 3,
-        ...parsed,
-      };
-    }
-  } catch (error) {
-    console.error(`Ignoring corrupt config: ${error.message}`);
-  }
-  return {customCommands: {}, showArtBoard: true, showHelpCards: false, showStructureGuide: false, maxVisibleProjects: 3};
-}
-
-function useScanner(rootPath) {
-  const [state, setState] = useState({projects: [], loading: true, error: null});
+function useScanner(rootPath, initialDepth = 7) {
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
+    let isMounted = true;
+    
+    const performScan = async () => {
+      setLoading(true);
       try {
-        const projects = await discoverProjects(rootPath);
-        if (!cancelled) {
-          setState({projects, loading: false, error: null});
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setState({projects: [], loading: false, error: error.message});
-        }
+        const found = await orchestrator.scan(rootPath, initialDepth);
+        if (isMounted) setProjects(found);
+      } catch (err) {
+        if (isMounted) setError(err.message);
+      } finally {
+        if (isMounted) setLoading(false);
       }
-    })();
-    return () => {
-      cancelled = true;
     };
-  }, [rootPath]);
 
-  return state;
+    performScan();
+    
+    const handleUpdate = (updatedProjects) => {
+      if (isMounted) setProjects([...updatedProjects]);
+    };
+    
+    orchestrator.on('scan_complete', handleUpdate);
+    return () => {
+      isMounted = false;
+      orchestrator.off('scan_complete', handleUpdate);
+    };
+  }, [rootPath, initialDepth]);
+
+  return {projects, loading, error, refresh: () => orchestrator.scan(rootPath, initialDepth)};
 }
+
+
+
 
 function buildDetailCommands(project, config) {
   if (!project) return [];
@@ -135,35 +126,91 @@ const OutputPanel = memo(({activeTask, logOffset}) => {
     ? visibleLogs.map((line, i) => create(Text, {key: i}, line)) 
     : [create(Text, {key: 'empty', dimColor: true}, 'Select a task or run a command to see logs.')];
 
+  const borderColor = !activeTask ? 'gray' : 
+                    activeTask.status === 'running' ? 'yellow' : 
+                    activeTask.status === 'finished' ? 'green' : 'red';
+
   return create(
     Box,
     {
       flexDirection: 'column',
       borderStyle: 'round',
-      borderColor: 'yellow',
+      borderColor,
       padding: 1,
       minHeight: OUTPUT_WINDOW_HEIGHT,
       maxHeight: OUTPUT_WINDOW_HEIGHT,
       height: OUTPUT_WINDOW_HEIGHT,
       overflow: 'hidden'
     },
-    ...logNodes
+    ...logNodes,
+    logOffset > 0 && create(
+      Box,
+      { position: 'absolute', right: 2, top: 0 },
+      create(Text, { backgroundColor: 'white', color: 'black' }, ` ↑ SCROLLED ${logOffset} `)
+    )
   );
 });
 
-function Compass({rootPath, initialView = 'navigator'}) {
+
+const Splash = () => {
+  const [frame, setFrame] = React.useState(0);
+  React.useEffect(() => {
+    const timer = setInterval(() => setFrame(f => f + 1), 100);
+    return () => clearInterval(timer);
+  }, []);
+
+  const logo = `
+   ▄████████  ▄██████▄   ▄▄▄▄███▄▄▄▄      ▀█████████▄   ▄████████    ▄████████    ▄████████ 
+  ███    ███ ███    ███ ▄██▀▀▀███▀▀▀██▄     ███    ███ ███    ███   ███    ███   ███    ███ 
+  ███    █▀  ███    ███ ███   ███   ███     ███    ███ ███    █▀    ███    █▀    ███    █▀  
+  ███        ███    ███ ███   ███   ███    ▄███▄▄▄██▀  ███         ▄███▄▄▄       ███        
+▀███████████ ███    ███ ███   ███   ███   ▀▀███▀▀▀██▄  ███        ▀▀███▀▀▀     ▀███████████ 
+         ███ ███    ███ ███   ███   ███     ███    ██▄ ███    █▄    ███    █▄           ███ 
+   ▄█    ███ ███    ███ ███   ███   ███     ███    ███ ███    ███   ███    ███    ▄█    ███ 
+ ▄████████▀   ▀██████▀   ▀█   ███   █▀    ▄█████████▀  ████████▀    ██████████  ▄████████▀  
+  `;
+
+  return create(
+    Box,
+    {flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', width: '100%'},
+    create(Text, {color: 'magenta', bold: true}, logo),
+    create(Box, {marginTop: 2},
+      create(Text, {color: 'cyan'}, 'Initializing high-fidelity systems'),
+      create(Text, null, '.'.repeat((frame % 4)))
+    ),
+    create(Text, {dimColor: true, marginTop: 1}, 'Version 4.5.0 · Production Grade')
+  );
+};
+
+
+function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
   const {exit} = useApp();
-  const {projects, loading, error} = useScanner(rootPath);
+  const {projects, loading, error} = useScanner(rootPath, scanDepth);
+  const [showSplash, setShowSplash] = useState(true);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => setShowSplash(false), 1500);
+    return () => clearTimeout(timer);
+  }, []);
+
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [viewMode, setViewMode] = useState('list');
   const [mainView, setMainView] = useState(initialView);
   const [tasks, setTasks] = useState([]);
   const [activeTaskId, setActiveTaskId] = useState(null);
-  const [logOffset, setLogOffset] = useState(0);
+  const [showHelp, setShowHelp] = useState(false);
+  const [aiAnalysisContext, setAiAnalysisContext] = useState(null);
+  const [searchMode, setSearchMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchCursor, setSearchCursor] = useState(0);
   const [customMode, setCustomMode] = useState(false);
+
+
+
   const [portConfigMode, setPortConfigMode] = useState(false);
   const [customInput, setCustomInput] = useState('');
   const [customCursor, setCustomCursor] = useState(0);
+  const [logOffset, setLogOffset] = useState(0);
   const [renameMode, setRenameMode] = useState(false);
   const [renameInput, setRenameInput] = useState('');
   const [renameCursor, setRenameCursor] = useState(0);
@@ -171,14 +218,24 @@ function Compass({rootPath, initialView = 'navigator'}) {
   const [config, setConfig] = useState(() => loadConfig());
   const [stdinBuffer, setStdinBuffer] = useState('');
   const [stdinCursor, setStdinCursor] = useState(0);
-  const [showHelp, setShowHelp] = useState(false);
+
+
+
   const runningProcessMap = useRef(new Map());
   const lastCommandRef = useRef(null);
 
   const activeTask = useMemo(() => tasks.find(t => t.id === activeTaskId), [tasks, activeTaskId]);
   const running = activeTask?.status === 'running';
   const hasRunningTasks = useMemo(() => tasks.some(t => t.status === 'running'), [tasks]);
-  const selectedProject = useMemo(() => projects[selectedIndex] || null, [projects, selectedIndex]);
+
+  const filteredProjects = useMemo(() => {
+    if (!searchQuery) return projects;
+    const q = searchQuery.toLowerCase();
+    return projects.filter(p => p.name.toLowerCase().includes(q) || p.type.toLowerCase().includes(q));
+  }, [projects, searchQuery]);
+
+  const selectedProject = useMemo(() => filteredProjects[selectedIndex] || null, [filteredProjects, selectedIndex]);
+
 
   const addLogToTask = useCallback((taskId, line) => {
     setTasks(prev => {
@@ -241,103 +298,49 @@ function Compass({rootPath, initialView = 'navigator'}) {
     runningProcessMap.current.clear();
   }, [handleKillTask]);
 
-  const runProjectCommand = useCallback(async (commandMeta, targetProject = selectedProject) => {
-    const project = targetProject || selectedProject;
-    if (!project) return;
-    if (!commandMeta || !Array.isArray(commandMeta.command) || commandMeta.command.length === 0) return;
-
-    let finalCommand = [...commandMeta.command];
-    const port = config.projectMeta?.[project.path]?.port || project.metadata?.port;
-    let portApplied = false;
-    if (port) {
-      const cmdStr = finalCommand.join(' ');
-      const portStr = String(port);
-      const patterns = [
-        { match: 'uvicorn', flag: '--port' },
-        { match: 'gunicorn', flag: '--bind' },
-        { match: 'gunicorn', flag: '-b' },
-        { match: 'hypercorn', flag: '-b' },
-        { match: 'next dev', flag: '-p' },
-        { match: 'vite', flag: '--port' },
-        { match: 'flask', flag: '--port' },
-        { match: 'webpack', flag: '--port' },
-        { match: 'serve', flag: '-l' },
-        { match: 'django', flag: '--port' },
-        { match: 'react-scripts start', flag: '--port' }
-      ];
-      for (const { match, flag } of patterns) {
-        if (cmdStr.includes(match.toLowerCase())) {
-          const flagIdx = finalCommand.indexOf(flag);
-          if (flagIdx !== -1 && flagIdx + 1 < finalCommand.length) {
-            finalCommand[flagIdx + 1] = portStr;
-            portApplied = true;
-          } else if (flagIdx === -1) {
-            finalCommand.push(flag, portStr);
-            portApplied = true;
-          }
-          break;
-        }
-      }
-      if (!portApplied && cmdStr.includes('runserver')) {
-        const hasPort = finalCommand.some(t => /^\d{4,5}$/.test(t));
-        if (!hasPort) {
-          finalCommand.push(portStr);
-          portApplied = true;
-        }
-      }
-      if (!portApplied && (cmdStr.match(/(?:node|bun|deno)\s/))) {
-        const hasPortEnv = finalCommand.some(t => t.startsWith('--port=')) || finalCommand.includes('PORT');
-        if (!hasPortEnv) {
-          finalCommand.unshift(`PORT=${portStr}`);
-          portApplied = true;
-        }
-      }
-    }
-
-    const commandLabel = commandMeta.label || commandMeta.command.join(' ');
-    const taskId = `task-${Date.now()}`;
-    const logLines = [kleur.cyan(`> ${finalCommand.join(' ')}`)];
-    if (portApplied) logLines.push(kleur.dim(`Port ${port} applied`));
-    const newTask = {
-      id: taskId,
-      name: `${project.name} · ${commandLabel}`,
-      status: 'running',
-      logs: logLines,
-      project: project.name
+  useEffect(() => {
+    const handleStart = (task) => {
+      setTasks(prev => {
+        if (prev.some(t => t.id === task.id)) return prev;
+        return [...prev, task];
+      });
+      if (!activeTaskId) setActiveTaskId(task.id);
     };
 
-    setTasks(prev => [...prev, newTask]);
-    setActiveTaskId(taskId);
-    lastCommandRef.current = {project, commandMeta};
+    const handleOutput = ({ taskId, chunk, logs }) => {
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, logs } : t));
+    };
 
+    const handleEnd = (task) => {
+      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: task.status, endTime: task.endTime } : t));
+    };
+
+    orchestrator.on('task_start', handleStart);
+    orchestrator.on('task_output', handleOutput);
+    orchestrator.on('task_end', handleEnd);
+
+    return () => {
+      orchestrator.off('task_start', handleStart);
+      orchestrator.off('task_output', handleOutput);
+      orchestrator.off('task_end', handleEnd);
+    };
+  }, [activeTaskId]);
+
+  const runProjectCommand = useCallback((commandMeta, targetProject = null) => {
+    const project = targetProject || selectedProject;
+    
     try {
-      const subprocess = execa(finalCommand[0], finalCommand.slice(1), {
-        cwd: project.path,
-        env: process.env,
-        stdin: 'pipe',
-        detached: process.platform !== 'win32',
-        cleanup: true
-      });
-      runningProcessMap.current.set(taskId, subprocess);
-
-      subprocess.stdout?.on('data', (chunk) => addLogToTask(taskId, chunk.toString()));
-      subprocess.stderr?.on('data', (chunk) => addLogToTask(taskId, kleur.red(chunk.toString())));
-
-      await subprocess;
-      setTasks(prev => prev.map(t => t.id === taskId ? {...t, status: 'finished'} : t));
-      addLogToTask(taskId, kleur.green(`✓ ${commandLabel} finished`));
-    } catch (error) {
-      if (error.isCanceled || error.killed || error.signal === 'SIGKILL' || error.signal === 'SIGINT') {
-        setTasks(prev => prev.map(t => t.id === taskId ? {...t, status: 'killed'} : t));
-        addLogToTask(taskId, kleur.yellow('! Task killed forcefully'));
-      } else {
-        setTasks(prev => prev.map(t => t.id === taskId ? {...t, status: 'failed'} : t));
-        addLogToTask(taskId, kleur.red(`✗ ${commandLabel} failed: ${error.shortMessage || error.message}`));
-      }
-    } finally {
-      runningProcessMap.current.delete(taskId);
+      // If no project is selected, run as a system-wide command (scaffolding, etc.)
+      const taskId = orchestrator.runCommand(project?.id || 'system', null, commandMeta);
+      setActiveTaskId(taskId);
+      lastCommandRef.current = { project, commandMeta };
+    } catch (err) {
+      const errorTaskId = `error-${Date.now()}`;
+      setTasks(prev => [...prev, { id: errorTaskId, name: 'Execution Error', status: 'failed', logs: [kleur.red(`✗ ${err.message}`)] }]);
+      globalThis.setTimeout(() => setTasks(prev => prev.filter(t => t.id !== errorTaskId)), 3000);
     }
-  }, [addLogToTask, selectedProject, config]);
+  }, [selectedProject]);
+
 
   const exportLogs = useCallback(() => {
     const taskToExport = tasks.find(t => t.id === activeTaskId);
@@ -477,7 +480,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
     if (viewMode === 'detail' && actionKey && selectedProject) {
       if (actionKey === 'run' && key.shift) {
         setPortConfigMode(true);
-        const port = config.projectMeta?.[selectedProject.path]?.port || selectedProject.metadata?.port || '3000';
+        const port = config.projectMeta?.[selectedProject.path]?.port || selectedProject.metadata?.port || '7654';
         setCustomInput(String(port));
         setCustomCursor(String(port).length);
         return;
@@ -571,18 +574,19 @@ function Compass({rootPath, initialView = 'navigator'}) {
       return;
     }
 
-    if (key.shift && key.upArrow) { scrollLogs(1); return; }
-    if (key.shift && key.downArrow) { scrollLogs(-1); return; }
+    if (input?.toLowerCase() === 'a' && activeTask?.status === 'failed') {
+      const logs = activeTask.logs.slice(-100).join('\n');
+      const ctx = `Task "${activeTask.name}" failed for project "${activeTask.project}".\nLogs:\n${logs}`;
+      setAiAnalysisContext(ctx);
+      clearAndSwitch('ai');
+      return;
+    }
 
-    
     const pageLimit = config.maxVisibleProjects || 3;
-    const totalProjects = projects.length;
+    const totalProjects = filteredProjects.length;
     
     if (key.pageUp && totalProjects > pageLimit) {
-      setSelectedIndex((prev) => {
-        const next = prev - pageLimit;
-        return next < 0 ? 0 : next;
-      });
+      setSelectedIndex((prev) => Math.max(0, prev - pageLimit));
       console.clear();
       return;
     }
@@ -602,7 +606,30 @@ function Compass({rootPath, initialView = 'navigator'}) {
     }
     
 
+    if (searchMode) {
+      if (key.return || key.escape) { setSearchMode(false); return; }
+      if (key.backspace || key.delete) {
+        if (searchCursor > 0) {
+          setSearchQuery(prev => prev.slice(0, searchCursor - 1) + prev.slice(searchCursor));
+          setSearchCursor(c => Math.max(0, c - 1));
+          setSelectedIndex(0);
+        }
+        return;
+      }
+      if (key.leftArrow) { setSearchCursor(c => Math.max(0, c - 1)); return; }
+      if (key.rightArrow) { setSearchCursor(c => Math.min(searchQuery.length, c + 1)); return; }
+      if (input) {
+        setSearchQuery(prev => prev.slice(0, searchCursor) + input + prev.slice(searchCursor));
+        setSearchCursor(c => c + input.length);
+        setSelectedIndex(0);
+      }
+      return;
+    }
+
+    if (input === '/' && mainView === 'navigator') { setSearchMode(true); return; }
+    
     if (normalizedInput === '?') { console.clear(); setShowHelp((prev) => !prev); return; }
+
     if (shiftCombo('l') && lastCommandRef.current) { runProjectCommand(lastCommandRef.current.commandMeta, lastCommandRef.current.project); return; }
 
     if (key.upArrow && !key.shift && projects.length > 0) { setSelectedIndex((prev) => Math.max(0, prev - 1)); return; }
@@ -700,7 +727,7 @@ function Compass({rootPath, initialView = 'navigator'}) {
       case 'tasks': return create(TaskManager, {tasks, activeTaskId, renameMode, renameInput, renameCursor, CursorText});
       case 'registry': return create(PackageRegistry, {selectedProject, projects, onRunCommand: runProjectCommand, CursorText, onSelectProject: (idx) => setSelectedIndex(idx)});
       case 'architect': return create(ProjectArchitect, {rootPath, onRunCommand: runProjectCommand, CursorText, onReturn: () => setMainView('navigator')});
-      case 'ai': return create(AIHorizon, {rootPath, selectedProject, onRunCommand: runProjectCommand, CursorText, config, setConfig, saveConfig});
+      case 'ai': return create(AIHorizon, {rootPath, selectedProject, onRunCommand: runProjectCommand, CursorText, config, setConfig, saveConfig, analysisContext: aiAnalysisContext, clearContext: () => setAiAnalysisContext(null)});
       default: {
         const navigatorBody = [
           create(Header, {projectCountLabel, rootPath, running, statusHint, toggleHint, orbitHint, artHint}),
@@ -712,7 +739,17 @@ function Compass({rootPath, initialView = 'navigator'}) {
           create(Box, {key: 'projects-row', marginTop: 1, flexDirection: 'row', alignItems: 'stretch', width: '100%', flexWrap: 'wrap'},
             create(Box, {flexGrow: 1, flexBasis: 0, minWidth: PROJECTS_MIN_WIDTH, marginRight: 1, borderStyle: 'round', borderColor: 'magenta', padding: 1}, 
               create(Text, {bold: true, color: 'magenta'}, 'Projects'), 
-              create(Box, {flexDirection: 'column', marginTop: 1}, create(Navigator, {projects, selectedIndex, rootPath, loading, error, maxVisibleProjects: config.maxVisibleProjects}))
+              create(Box, {flexDirection: 'column', marginTop: 1}, create(Navigator, {
+            projects, 
+            selectedIndex, 
+            rootPath, 
+            loading, 
+            error, 
+            maxVisibleProjects: config.maxVisibleProjects || 3,
+            searchQuery: (searchMode || searchQuery) ? searchQuery : null,
+            CursorText,
+            searchCursor
+          }))
             ),
             create(Box, {flexGrow: 1.3, flexBasis: 0, minWidth: DETAILS_MIN_WIDTH, borderStyle: 'round', borderColor: 'cyan', padding: 1, flexDirection: 'column'}, create(Text, {bold: true, color: 'cyan'}, 'Details'), ...detailContent)
           ),
@@ -741,8 +778,12 @@ function Compass({rootPath, initialView = 'navigator'}) {
     }
   };
 
+
+  if (showSplash) return create(Splash);
+
   return create(Box, {flexDirection: 'column', padding: 1, width: '100%'}, renderView());
 }
+
 
 
 
@@ -755,9 +796,12 @@ function parseArgs() {
     else if (token === '--mode' && tokens[i + 1]) { args.mode = tokens[i + 1]; i += 1; }
     else if (token === '--help' || token === '-h') args.help = true;
     else if (token === '--version' || token === '-v') args.version = true;
-    else if (token === '--studio') args.view = 'studio';
+    else if (token === '--view' && tokens[i + 1]) { args.view = tokens[i + 1]; i += 1; }
+    else if (token === '--studio') args.studioCheck = true;
     else if (token === '--ai') args.view = 'ai';
     else if (token === '--task' || token === '--tasks') args.view = 'tasks';
+    else if (token === '--registry') args.view = 'registry';
+    else if (token === '--architect') args.view = 'architect';
     else if (token === '--list-projects') args.listProjects = true;
     else if (token === '--json') args.json = true;
     else if (token === '--project-info' && tokens[i + 1]) { args.projectInfo = parseInt(tokens[i + 1], 10); i += 1; }
@@ -768,9 +812,20 @@ function parseArgs() {
     else if (token === '--name' && tokens[i + 1]) { args.name = tokens[i + 1]; i += 1; }
     else if (token === '--studio-check') args.studioCheck = true;
     else if (token === '--ai-analyze') args.aiAnalyze = true;
+
+    else if (token === '--deep') args.deep = true;
+    else if (token === '--server') args.server = true;
+    else if (token === '--mcp') args.mcp = true;
+    else if (token === '--host' && tokens[i + 1]) { args.host = tokens[i + 1]; i += 1; }
+    else if (token === '--port' && tokens[i + 1]) { args.port = tokens[i + 1]; i += 1; }
+    else if (token === '--setup-service') args.setupService = true;
+    else if (token === '--update') args.update = true;
   }
+
   return args;
 }
+
+
 
 async function main() {
   const args = parseArgs();
@@ -781,61 +836,56 @@ async function main() {
     return;
   }
   if (args.help) {
-    console.log(kleur.bold(kleur.magenta('🧭 Project Compass · Premium Developer Cockpit')));
-    console.log(kleur.dim('───────────────────────────────────────────────────'));
+    console.log(kleur.bold(kleur.magenta('🧭 PROJECT COMPASS · HIGH-FIDELITY WORKSPACE NAVIGATOR')));
+    console.log(kleur.dim('─────────────────────────────────────────────────────────────'));
     console.log('');
     console.log(kleur.bold('Usage:'));
-    console.log('  project-compass                               Launch TUI');
-    console.log('  project-compass [--dir <path>] [--studio|--ai|--task]');
-    console.log('  project-compass --list-projects [--json]       List detected projects');
-    console.log('  project-compass --project-info <idx> [--json]  Show project details');
-    console.log('  project-compass --run "<cmd>" [--dir <path>]   Run a command');
-    console.log('  project-compass --add-pkg <name> [--dir]       Add package');
-    console.log('  project-compass --remove-pkg <name> [--dir]    Remove package');
-    console.log('  project-compass --scaffold <template> --name <n> [--dir]  Scaffold project');
-    console.log('  project-compass --studio-check                 Check runtimes');
-    console.log('  project-compass --version / --help             Version / help');
+    console.log('  project-compass [options]');
     console.log('');
-    console.log(kleur.bold(kleur.cyan('🌌 CLI Arguments:')));
-    console.log('  --dir <path>     Working directory for scanning');
-    console.log('  --studio         Launch in Studio view');
-    console.log('  --ai             Launch in AI Horizon view');
-    console.log('  --task           Launch in Task Manager view');
-    console.log('  --list-projects  List all detected projects');
-    console.log('  --json           JSON output (with --list-projects, --project-info)');
-    console.log('  --project-info   Project details by index');
-    console.log('  --run            Execute command in project directory');
-    console.log('  --add-pkg        Add a package dependency');
-    console.log('  --remove-pkg     Remove a package dependency');
-    console.log('  --scaffold       Scaffold from template (' + Object.keys({
-      nextjs: 1, 'nextjs-bun': 1, 'react-vite': 1, 'react-vite-npm': 1,
-      'vue-vite': 1, rust: 1, django: 1, 'python-basic': 1, go: 1
-    }).join(', ') + ')');
-    console.log('  --name           Project name (with --scaffold)');
-    console.log('  --studio-check   Environment runtime audit');
+    console.log(kleur.bold(kleur.cyan('🛰️ VIEWS:')));
+    console.log('  --studio         Environment runtime & health audit');
+    console.log('  --ai             AI Horizon (Project DNA mapping & chat)');
+    console.log('  --tasks          Orbit Task Manager (Background processes)');
+    console.log('  --registry       Package Registry (Dependency management)');
+    console.log('  --architect      Project Architect (Scaffolding templates)');
     console.log('');
-    console.log(kleur.bold(kleur.yellow('🎮 TUI Keyboard Shortcuts:')));
-    console.log('  Core Views:       Shift+T(asks)  Shift+P(ackages)  Shift+N(ew)');
-    console.log('                    Shift+O(AI)    Shift+A(Studio)');
-    console.log('  Detail View:      B(uild)  T(est)  R(un)  I(nstall)');
-    console.log('                    Shift+C(custom cmd)  Shift+R(port)  0(AI)  1-9(scripts)');
-    console.log('  Navigation:       ↑/↓  PgUp/Dn  Enter(detail)  Esc(back)  ?(help)');
-    console.log('  Workspace:        Shift+H(help)  Shift+S(structure)  Shift+B(art)');
-    console.log('  Tasks:            Shift+K(kill)  Shift+R(rename)  Shift+D(etach)');
-    console.log('                    Shift+X(clear)  Shift+E(xport)  Shift+L(rerun)');
-    console.log('  System:           Shift+Q(quit)');
+    console.log(kleur.bold(kleur.yellow('⚙️ ARGUMENTS:')));
+    console.log('  --dir <path>     Working directory for scanning (default: cwd)');
+    console.log('  --deep           Unlimited discovery depth for massive monorepos');
+    console.log('  --list-projects  Output detected projects list');
+    console.log('  --json           Enable JSON output for CLI commands');
+    console.log('  --project-info   Get detailed metadata for project by index');
     console.log('');
-    console.log(kleur.bold(kleur.green('📦 Scaffold Templates:')));
+    console.log(kleur.bold(kleur.green('📦 SCAFFOLD TEMPLATES:')));
     console.log('  nextjs, nextjs-bun, react-vite, react-vite-npm,');
     console.log('  vue-vite, rust, django, python-basic, go');
     console.log('');
-    console.log(kleur.dim('Documentation: https://github.com/CrimsonDevil333333/project-compass'));
-    console.log(kleur.dim('Crafted for performance by Satyaa & Clawdy'));
+    console.log(kleur.bold(kleur.blue('🌐 SERVER & MCP:')));
+    console.log('  --server         Launch Web Server mode');
+    console.log('  --host <ip>      Host to bind server to (default: 0.0.0.0)');
+    console.log('  --port <number>  Port for web server (default: 7654)');
+    console.log('  --mcp            Launch as Model Context Protocol server');
+    console.log('  --setup-service  Generate systemd service for background mode');
+    console.log('  --update         Update Project Compass to the latest version');
+    console.log('');
+
+    console.log(kleur.bold(kleur.magenta('🎮 TUI SHORTCUTS (ACTIVE IN NAVIGATOR):')));
+
+    console.log('  /                Enter Search/Filter mode');
+    console.log('  Shift+T          Orbit Task Manager');
+    console.log('  Shift+O          AI Horizon Analysis');
+    console.log('  Shift+P          Package Registry');
+    console.log('  Shift+N          Project Architect');
+    console.log('  Enter            Toggle Detailed Project View');
+    console.log('  Esc              Global back / Clear focus');
+    console.log('');
+    console.log(kleur.dim('For more documentation, visit: https://github.com/CrimsonDevil333333/project-compass'));
     return;
   }
   const rootPath = args.root ? path.resolve(args.root) : process.cwd();
 
-  if (args.listProjects || args.mode === 'test') {
+  if (args.listProjects) {
+
     const projects = await discoverProjects(rootPath);
     if (args.json) {
       console.log(JSON.stringify(projects, (key, value) => key === 'commands' ? Object.keys(value) : value, 2));
@@ -926,37 +976,93 @@ async function main() {
     return;
   }
 
+  if (args.update) {
+    console.log(kleur.bold(kleur.magenta('\n🚀 PROJECT COMPASS | OMNI-UPDATER')));
+    console.log(kleur.dim('──────────────────────────────────\n'));
+    console.log(kleur.cyan('📡 Checking for latest version on npmjs.com...'));
+    try {
+      const subprocess = execa('npm', ['install', '-g', 'project-compass@latest'], { stdio: 'inherit' });
+      await subprocess;
+      console.log(kleur.green('\n✨ Update successful! Project Compass is now at the latest production build.'));
+    } catch (err) {
+      console.log(kleur.red(`\n❌ Update failed: ${err.message}`));
+      console.log(kleur.yellow('ℹ️  Try running with sudo if permissions were denied.'));
+    }
+    return;
+  }
+
+  if (args.setupService) {
+
+    setupSystemdService(args.host || '0.0.0.0', args.port || 7654);
+    return;
+  }
+
+  if (args.mcp) {
+    await startMcpServer();
+    return;
+  }
+
+  if (args.server) {
+    startServer(args.host || '0.0.0.0', args.port || 7654);
+    return;
+  }
+
+
+
   if (args.studioCheck) {
-    console.log('Environment check running...');
+    console.log(kleur.bold(kleur.magenta('\n  🧭 Omni-Studio Diagnostic Audit')));
+    console.log(kleur.dim('  ─────────────────────────────────\n'));
+    
     const checks = [
       {name: 'Node.js', binary: 'node', versionCmd: ['-v']},
       {name: 'npm', binary: 'npm', versionCmd: ['-v']},
       {name: 'Python', binary: process.platform === 'win32' ? 'python' : 'python3', versionCmd: ['--version']},
-      {name: 'Rust (Cargo)', binary: 'cargo', versionCmd: ['--version']},
+      {name: 'Rust', binary: 'cargo', versionCmd: ['--version']},
       {name: 'Go', binary: 'go', versionCmd: ['version']},
       {name: 'Java', binary: 'java', versionCmd: ['-version']},
       {name: 'PHP', binary: 'php', versionCmd: ['-v']},
       {name: 'Ruby', binary: 'ruby', versionCmd: ['-v']},
       {name: '.NET', binary: 'dotnet', versionCmd: ['--version']}
     ];
+
     for (const lang of checks) {
       try {
         const { stdout, stderr } = await execa(lang.binary, lang.versionCmd);
-        const version = (stdout || stderr || '').split('\n')[0].trim();
-        console.log(` ✓ ${lang.name}: ${version}`);
+        const version = (stdout || stderr || '').split('\n')[0].replace(/Python |cargo |go version /i, '').trim();
+        console.log(`  ${kleur.green('✓')} ${kleur.bold(lang.name.padEnd(12))} ${kleur.dim(version)}`);
       } catch {
-        console.log(` ✗ ${lang.name}: not installed`);
+        console.log(`  ${kleur.red('✗')} ${kleur.bold(lang.name.padEnd(12))} ${kleur.red('Not Installed')}`);
       }
     }
+    console.log('');
     return;
   }
+
 
   if (args.aiAnalyze) {
     console.log('AI Analysis is only available in TUI mode. Run: project-compass');
     return;
   }
 
-  render(create(Compass, {rootPath, initialView: args.view || 'navigator'}));
+  const scanDepth = args.deep ? Infinity : 7;
+  const { waitUntilExit } = render(create(Compass, {rootPath: args.root || process.cwd(), initialView: args.view || 'navigator', scanDepth}));
+  
+  // Robust process cleanup on exit
+  const cleanup = () => {
+    process.stdout.write('\x1b[?25h'); // Show cursor
+    // The Compass component handles killing processes via useEffect cleanup if designed correctly,
+    // but we force exit here to be sure.
+    process.exit(0);
+  };
+
+  process.on('SIGINT', cleanup);
+  process.on('SIGTERM', cleanup);
+
+  await waitUntilExit();
 }
 
-main().catch((error) => { console.error(error); process.exit(1); });
+
+main().catch((error) => { 
+  console.error(kleur.red('█ CRITICAL ERROR:'), error); 
+  process.exit(1); 
+});

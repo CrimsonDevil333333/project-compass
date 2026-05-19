@@ -24,63 +24,94 @@ function getPythonPackageManager(projectPath) {
 function gatherPythonDependencies(projectPath) {
   const deps = new Set();
   
-  // Only read requirements.txt
-  const reqPath = path.join(projectPath, 'requirements.txt');
-  if (fs.existsSync(reqPath)) {
-    const raw = fs.readFileSync(reqPath, 'utf-8');
-    raw.split(/\r?\n/).forEach((line) => {
-      const clean = line.trim().split('#')[0].trim();
-      if (!clean || clean.startsWith('-') || clean.startsWith('"') || clean.startsWith("'")) return;
-      const match = clean.match(/^([a-zA-Z0-9_.-]+)/);
-      if (match) deps.add(match[1].toLowerCase());
-    });
-  }
+  // 1. requirements.txt & requirements-dev.txt
+  ['requirements.txt', 'requirements-dev.txt'].forEach(file => {
+    const fullPath = path.join(projectPath, file);
+    if (fs.existsSync(fullPath)) {
+      const raw = fs.readFileSync(fullPath, 'utf-8');
+      raw.split(/\r?\n/).forEach((line) => {
+        const clean = line.trim().split('#')[0].trim();
+        if (!clean || clean.startsWith('-') || clean.startsWith('"') || clean.startsWith("'")) return;
+        const match = clean.match(/^([a-zA-Z0-9_.-]+)/);
+        if (match) deps.add(match[1].toLowerCase());
+      });
+    }
+  });
   
-  // Only read requirements-dev.txt
-  const reqDevPath = path.join(projectPath, 'requirements-dev.txt');
-  if (fs.existsSync(reqDevPath)) {
-    const raw = fs.readFileSync(reqDevPath, 'utf-8');
-    raw.split(/\r?\n/).forEach((line) => {
-      const clean = line.trim().split('#')[0].trim();
-      if (!clean || clean.startsWith('-') || clean.startsWith('"') || clean.startsWith("'")) return;
-      const match = clean.match(/^([a-zA-Z0-9_.-]+)/);
-      if (match) deps.add(match[1].toLowerCase());
-    });
-  }
-  
-  // Only read pyproject.toml dependencies section
+  // 2. pyproject.toml
   const pyproject = path.join(projectPath, 'pyproject.toml');
   if (fs.existsSync(pyproject)) {
     const content = fs.readFileSync(pyproject, 'utf-8');
-    const depSection = content.match(/(?:dependencies|requires)\s*=\s*\[([^\]]+)\]/g);
-    if (depSection) {
-      depSection.forEach((section) => {
-        const matches = section.match(/["']([^"']+)/g);
-        if (matches) {
-          matches.forEach((m) => {
-            const dep = m.replace(/["']/g, '').split(/[>=<=~!]/)[0].trim();
-            if (dep) deps.add(dep.toLowerCase());
-          });
-        }
+    
+    // Standard PEP 621 dependencies
+    const standardDeps = content.match(/dependencies\s*=\s*\[([\s\S]*?)\]/);
+    if (standardDeps) {
+      const matches = standardDeps[1].match(/["']([^"']+)/g);
+      if (matches) matches.forEach(m => {
+        const d = m.replace(/["']/g, '').split(/[>=<=~!\[]/)[0].trim();
+        if (d) deps.add(d.toLowerCase());
+      });
+    }
+
+    // Poetry dependencies
+    const poetrySection = content.match(/\[tool\.poetry\.(?:group\..+\.)?dependencies\]([\s\S]*?)(?=\n\[|$)/g);
+    if (poetrySection) {
+      poetrySection.forEach(section => {
+        const lines = section.split('\n').slice(1);
+        lines.forEach(line => {
+          const match = line.match(/^([a-zA-Z0-9_.-]+)\s*=/);
+          if (match && match[1] !== 'python') deps.add(match[1].toLowerCase());
+        });
       });
     }
   }
   
-  // Only read Pipfile
+  // 3. Pipfile
   const pipfile = path.join(projectPath, 'Pipfile');
   if (fs.existsSync(pipfile)) {
     const content = fs.readFileSync(pipfile, 'utf-8');
-    const matches = content.match(/["']([^"']+)/g);
-    if (matches) {
-      matches.forEach((m) => {
-        const dep = m.replace(/["']/g, '').split(/[>=<=~!]/)[0].trim();
-        if (dep) deps.add(dep.toLowerCase());
+    const sections = content.match(/\[(?:packages|dev-packages)\]([\s\S]*?)(?=\n\[|$)/g);
+    if (sections) {
+      sections.forEach(section => {
+        const lines = section.split('\n').slice(1);
+        lines.forEach(line => {
+          const match = line.match(/^([a-zA-Z0-9_.-]+)\s*=/);
+          if (match) deps.add(match[1].toLowerCase());
+        });
       });
     }
   }
   
   return Array.from(deps);
 }
+
+function gatherPythonScripts(projectPath) {
+  const scripts = {};
+  const pyproject = path.join(projectPath, 'pyproject.toml');
+  if (fs.existsSync(pyproject)) {
+    const content = fs.readFileSync(pyproject, 'utf-8');
+    
+    // Standard project.scripts
+    const stdScripts = content.match(/\[project\.scripts\]([\s\S]*?)(?=\n\[|$)/);
+    if (stdScripts) {
+      stdScripts[1].split('\n').forEach(line => {
+        const match = line.match(/^([a-zA-Z0-9_.-]+)\s*=\s*["'](.+)["']/);
+        if (match) scripts[match[1]] = match[2];
+      });
+    }
+
+    // Poetry scripts
+    const poetryScripts = content.match(/\[tool\.poetry\.scripts\]([\s\S]*?)(?=\n\[|$)/);
+    if (poetryScripts) {
+      poetryScripts[1].split('\n').forEach(line => {
+        const match = line.match(/^([a-zA-Z0-9_.-]+)\s*=\s*["'](.+)["']/);
+        if (match) scripts[match[1]] = match[2];
+      });
+    }
+  }
+  return scripts;
+}
+
 
 function detectPythonFramework(deps) {
   const frameworks = [];
@@ -140,19 +171,31 @@ export default {
     
     const allDeps = gatherPythonDependencies(projectPath);
     const detectedFrameworks = detectPythonFramework(allDeps);
+    const pythonScripts = gatherPythonScripts(projectPath);
     
     const commands = {};
+    const pmPrefix = isUV ? ['uv', 'run'] : isPoetry ? ['poetry', 'run'] : isPipenv ? ['pipenv', 'run'] : [];
+    
+    // Add detected scripts to commands
+    Object.entries(pythonScripts).forEach(([name, target]) => {
+      commands[name] = { 
+        label: `Py Script: ${name}`, 
+        command: [...pmPrefix, ...(pmPrefix.length ? [] : ['python', '-c']), target],
+        source: 'builtin'
+      };
+    });
+
     if (isUV) {
       commands.install = { label: 'UV Sync', command: ['uv', 'sync'], source: 'builtin' };
       commands.add = { label: 'UV Add', command: ['uv', 'add'], source: 'builtin' };
-      commands.run = { label: 'UV Run', command: ['uv', 'run', 'python'], source: 'builtin' };
+      if (!commands.run) commands.run = { label: 'UV Run', command: ['uv', 'run', 'python'], source: 'builtin' };
     } else if (isPoetry) {
       commands.install = { label: 'Poetry Install', command: ['poetry', 'install'], source: 'builtin' };
       commands.add = { label: 'Poetry Add', command: ['poetry', 'add'], source: 'builtin' };
-      commands.run = { label: 'Poetry Run', command: ['poetry', 'run', 'python'], source: 'builtin' };
+      if (!commands.run) commands.run = { label: 'Poetry Run', command: ['poetry', 'run', 'python'], source: 'builtin' };
     } else if (isPipenv) {
       commands.install = { label: 'Pipenv Install', command: ['pipenv', 'install'], source: 'builtin' };
-      commands.run = { label: 'Pipenv Run', command: ['pipenv', 'run', 'python'], source: 'builtin' };
+      if (!commands.run) commands.run = { label: 'Pipenv Run', command: ['pipenv', 'run', 'python'], source: 'builtin' };
     } else {
       commands.install = { label: 'Pip Install', command: ['pip', 'install', '-r', 'requirements.txt'], source: 'builtin' };
     }
@@ -183,8 +226,10 @@ export default {
     const metadata = {
       dependencies: allDeps,
       frameworks: detectedFrameworks,
-      packageManager: pkgManager
+      packageManager: pkgManager,
+      scripts: pythonScripts
     };
+
 
     const setupHints = [];
     if (isUV) setupHints.push('uv sync');

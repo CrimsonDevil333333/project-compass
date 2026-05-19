@@ -2,7 +2,9 @@
 
 Thank you for your interest in helping to navigate the project universe! 🚀
 
-This document provides **COMPLETE** guidelines for contributing to Project Compass (v4.3.6).
+This document provides **COMPLETE** guidelines for contributing to Project Compass (v5.0.0).
+
+
 
 ---
 
@@ -63,7 +65,16 @@ All code uses ECMAScript modules (`import/export`).
 
 ---
 
+### 🧬 Zero-Mock Engineering (v5.0.0 Requirement)
+Project Compass is built on **High-Fidelity Reliability**. 
+- **No Mock Data**: Do not use hardcoded sample data for project discovery, framework detection, or system runtimes. Always read from the disk or system binaries.
+- **No Simulation**: Commands must trigger real processes. Scaffolding must create real files. Diagnostics must perform real checks.
+- **Unified Logic**: All core functions (Scan, Run, Scaffold, Audit) must reside in the `Orchestrator` or `AuditEngine` to maintain interface parity.
+
+---
+
 ## Working with AI Agents
+
 
 This repository is "AI-First." Always update `AGENTS.md` after making structural changes to the code or adding new core components. This helps subsequent agents (and humans!) maintain high-velocity context.
 

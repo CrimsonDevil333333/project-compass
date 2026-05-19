@@ -1,6 +1,7 @@
 # Project Compass · Complete Commands & Shortcuts Reference
 
-This document lists **ALL** supported languages, frameworks, commands, keyboard shortcuts, and CLI arguments available in Project Compass (v4.3.8).
+This document lists **ALL** supported languages, frameworks, commands, keyboard shortcuts, and CLI arguments available in Project Compass (v5.0.0).
+
 
 ---
 
@@ -37,6 +38,7 @@ project-compass -v
 # Launch TUI (default: navigator view)
 project-compass
 project-compass --dir /path/to/workspace
+project-compass --deep                  # Launch with unlimited scan depth
 ```
 
 ### Direct View Launch
@@ -59,6 +61,7 @@ project-compass --dir /path/to/workspace --mode test
 # Enhanced project listing (RECOMMENDED)
 project-compass --list-projects
 project-compass --list-projects --dir /path/to/workspace
+project-compass --list-projects --deep # Deep scan mode
 
 # Get project info by index
 project-compass --project-info 0
@@ -85,6 +88,28 @@ project-compass --run "go mod tidy" --dir /path/to/go
 # - Waits for completion before exiting
 ```
 
+### Server & MCP Mode (Omni-Upgrade v5.0)
+
+```bash
+# Launch the high-fidelity Web Server & Dashboard
+project-compass --server
+project-compass --server --port 8080 --host 127.0.0.1
+
+# Launch as a native Model Context Protocol (MCP) server
+project-compass --mcp
+```
+
+### System & Updates (No TUI)
+
+```bash
+# Generate systemd service for background mode
+project-compass --setup-service
+project-compass --setup-service --port 7654 --host 0.0.0.0
+
+# Update Project Compass to the latest version
+project-compass --update
+```
+
 ### Package Management (No TUI)
 
 ```bash
@@ -98,6 +123,7 @@ project-compass --remove-pkg "lodash" --dir /path/to/node-project
 project-compass --remove-pkg "requests" --dir /path/to/python-project
 
 # Auto-detects package manager:
+
 # - Node.js: npm/yarn/pnpm/bun
 # - Python: pip/uv/poetry/pipenv
 # - Rust: cargo
@@ -212,17 +238,20 @@ project-compass --list-projects --json | jq -r '.[0].path'
 | `Shift+Q` | **Quit** application | Global | Quit (confirms if tasks are running) |
 | `Ctrl+C` | Interrupt running command | When process running | Send SIGINT to running process |
 
-### Quick Actions (Detail View Only)
+### Quick Actions (Detail View & Navigator)
 
-| Key | Action | Command | Description |
-|-----|--------|---------|-------------|
-| `0` | **Quick AI Analysis** | - | Switch to AI Horizon for selected project |
-| `B` / `b` | **Build** project | `commands.build` | Run build command |
-| `T` / `t` | **Test** project | `commands.test` | Run test command |
-| `R` / `r` | **Run** project | `commands.run` | Run project command (`Shift+R` configures port) |
-| `I` / `i` | **Install** dependencies | `commands.install` | Run install command |
-| `1-9` | **Run numbered commands** | `detailShortcutMap` | Execute commands 1-9 from detail view |
-| `Shift+1-9` (A-Z) | **Run commands 10+** | `detailShortcutMap` | Execute commands 10+ (A=10, B=11, etc.) |
+| Key | Action | Context |
+|-----|--------|---------|
+| `0` | **Quick AI Analysis** | Detail View |
+| `A` | **AI Error Analysis** | Navigator (when task failed) |
+| `C` | **AI Context Chat** | AI Horizon |
+| `B` | **Build** project | Detail View |
+| `T` | **Test** project | Detail View |
+| `R` | **Run** project | Detail View |
+| `I` | **Install** dependencies | Detail View |
+| `1-9` | **Run numbered commands** | Detail View |
+| `Shift+1-9` (A-Z) | **Run commands 10+** | Detail View |
+| `Shift+L` | **Rerun** last command | Navigator |
 
 ### View Toggles
 
@@ -766,7 +795,7 @@ project-compass --scaffold python-basic --name my-script --dir /tmp
   "aiModel": "deepseek/deepseek-r1",
   "aiToken": "your-api-token-here",
   "projectMeta": {
-    "/path/to/project": { "port": "3000" }
+    "/path/to/project": { "port": "7654" }
   }
 }
 ```
@@ -783,7 +812,7 @@ project-compass --scaffold python-basic --name my-script --dir /tmp
 | `aiProvider` | String | `"openrouter"` | AI provider ID | `"openrouter"`, `"gemini"`, `"claude"`, `"ollama"` |
 | `aiModel` | String | `"deepseek/deepseek-r1"` | AI model to use | `"gpt-4"`, `"claude-3"`, etc. |
 | `aiToken` | String | `""` | API token for AI provider | `"sk-..."` |
-| `projectMeta` | Object | `{}` | Per-project metadata (ports, etc.) | `{"path": {"port": "3000"}}` |
+| `projectMeta` | Object | `{}` | Per-project metadata (ports, etc.) | `{"path": {"port": "7654"}}` |
 
 ### Project-Specific Config: `compass.config.js`
 

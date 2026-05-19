@@ -16,7 +16,7 @@ Welcome to Project Compass. This file provides **COMPLETE** context for AI agent
 8. [TUI Keyboard Shortcuts (Complete List)](#tui-keyboard-shortcuts-complete-list)
 9. [Supported Languages](#supported-languages)
 10. [Built-in Frameworks](#built-in-frameworks)
-11. [Recent Fixes (v4.3.6)](#recent-fixes-v436)
+11. [Recent Fixes (v5.0.0)](#recent-fixes-v500)
 12. [Component Details](#component-details)
 13. [Detection System](#detection-system)
 14. [State Management](#state-management)
@@ -29,24 +29,24 @@ Welcome to Project Compass. This file provides **COMPLETE** context for AI agent
 
 ## Overview
 
-**Project Compass** is a futuristic project navigator and runner designed for modern polygot development. It provides a high-fidelity terminal UI (using Ink) to manage complex workspaces with integrated Agentic AI intelligence.
+**Project Compass** is a futuristic project navigator and runner designed for modern polygot development. It provides a high-fidelity terminal UI (using Ink) and a synchronized Web Dashboard to manage complex workspaces with integrated Agentic AI intelligence.
 
-**Version:** 4.3.8  
-**Last Updated:** 2026-05-10  
+**Version:** 5.0.0  
+**Last Updated:** 2026-05-20  
 **Author:** Satyaa & Clawdy  
 **License:** MIT  
 **Repository:** https://github.com/CrimsonDevil333333/project-compass
 
 ### Key Features
 
+- **Neural Convergence**: Single-Brain architecture powering CLI, TUI, and Web.
+- **Universal Orchestrator**: Centralized task management and cross-interface log streaming.
+- **Zero-Mock Engineering**: Real-world scaffolding and manifest-driven AI DNA analysis.
+- **Omni-Studio Diagnostic**: Unified runtime audit for system health.
 - **Multi-Language Detection**: Node.js, Python, Rust, Go, Java, PHP, Ruby, .NET
-- **40+ Framework Plugins**: Next.js, FastAPI, Django, Spring Boot, etc.
-- **AI Integration**: OpenRouter, Gemini, Claude, Ollama support
-- **TUI + CLI Modes**: Full terminal UI + complete CLI (non-TUI) support
-- **Task Management**: Background process orchestration with live log streaming
-- **Package Management**: Native package manager detection and management
-- **Project Scaffolding**: 8+ templates for new projects
-- **Environment Health Check**: Runtime version auditing
+- **Deep Scan Mode**: Unlimited discovery depth (`--deep`)
+- **Git Visibility**: Real-time branch and status integration in TUI
+- **Task Management**: Background orchestration with status-coded UI
 
 ---
 
@@ -54,12 +54,13 @@ Welcome to Project Compass. This file provides **COMPLETE** context for AI agent
 
 | Attribute | Value |
 |-----------|-------|
-| **Version** | 4.3.7 |
+| **Version** | 5.0.0 |
 | **NPM Package** | `project-compass` |
 | **Node.js Requirement** | ^18.0.0 (ESM support) |
 | **Build Status** | Stable |
 | **Platform Support** | Linux, macOS, Windows (with caveats) |
-| **Last Release** | 2026-05-10 |
+| **Last Release** | 2026-05-20 |
+
 
 ---
 
@@ -69,34 +70,29 @@ Welcome to Project Compass. This file provides **COMPLETE** context for AI agent
 
 ```
 project-compass/
-├── package.json                    # NPM package config (v4.3.6)
+├── package.json                    # NPM package config (v5.0.0)
 ├── README.md                      # Main documentation (COMPREHENSIVE)
-├── ARCHITECTURE.md               # Architecture documentation (DETAILED)
-├── commands.md                    # All commands & shortcuts (COMPLETE)
-├── CONTRIBUTING.md               # Contribution guidelines (DETAILED)
 ├── AGENTS.md                     # THIS FILE (AI agent context)
 ├── PROJECT_CONTEXT.md             # Technical context for agents
-├── LICENSE                       # MIT License
-├── eslint.config.cjs              # ESLint configuration
-├── assets/                       # Screenshots and branding
 ├── src/
-│   ├── cli.js                   # Entry point (840+ lines)
-│   ├── projectDetection.js       # Orchestrator (189 lines)
-│   ├── configPaths.js            # Config directory paths (13 lines)
+│   ├── cli.js                   # Entry point (Unified TUI/CLI)
+│   ├── server.js                # Web Server & REST/WS API
+│   ├── projectDetection.js       # Discovery orchestrator
+│   ├── core/
+│   │   ├── Orchestrator.js      # The Brain (Task & Command engine)
+│   │   └── AuditEngine.js       # Shared diagnostic engine
 │   ├── detectors/
-│   │   ├── utils.js            # Shared utilities (148 lines)
-│   │   ├── node.js             # Node.js detection (140 lines)
-│   │   ├── python.js           # Python detection (208 lines)
-│   │   ├── rust.js             # Rust detection (136 lines)
-│   │   ├── go.js               # Go detection
-│   │   ├── java.js             # Java detection
-│   │   ├── php.js              # PHP detection
-│   │   ├── ruby.js             # Ruby detection
-│   │   ├── dotnet.js           # .NET detection
-│   │   ├── generic.js          # Generic fallback
-│   │   ├── compass-config.js   # Project config loader (39 lines)
-│   │   └── frameworks.js       # 40+ built-in plugins (877 lines)
+│   │   ├── utils.js            # Shared utilities
+│   │   └── frameworks.js       # 40+ built-in plugins
 │   └── components/
+│       ├── Navigator.js          # Project list
+│       ├── AIHorizon.js         # AI analysis
+│       ├── ProjectArchitect.js  # Scaffolding
+│       └── TaskManager.js        # Orbit Task Manager
+├── public/                       # Web Dashboard Production Build
+└── ~/.project-compass/           # User config directory
+```
+
 │       ├── Navigator.js          # Paginated project list (110 lines)
 │       ├── Header.js             # Top bar with logo (60 lines)
 │       ├── Footer.js             # Bottom bar with stdin (81 lines)
@@ -190,7 +186,7 @@ Respect `projectMeta` in `config.json` for manual port assignments.
 
 ```javascript
 // Reading port
-const port = config.projectMeta?.[project.path]?.port || '3000';
+const port = config.projectMeta?.[project.path]?.port || '7654';
 
 // Saving port
 setConfig((prev) => ({
@@ -322,8 +318,10 @@ project-compass --remove-pkg "pkg" --dir /path # Remove package
 # Project scaffolding (no TUI)
 project-compass --scaffold <template> --name <n> --dir <d>
 
-# Environment check (no TUI)
-project-compass --studio-check          # Check runtimes
+# System & Updates (no TUI)
+project-compass --setup-service          # Check runtimes
+project-compass --update                 # Update to latest version
+
 
 # AI analysis (requires TUI)
 project-compass --ai-analyze           # Shows message to use TUI mode
@@ -977,7 +975,7 @@ Task status updates: 'running' → 'finished' / 'failed' / 'killed'
   "aiModel": "deepseek/deepseek-r1",
   "aiToken": "your-api-token-here",
   "projectMeta": {
-    "/path/to/project": { "port": "3000" }
+    "/path/to/project": { "port": "7654" }
   }
 }
 ```
@@ -1078,12 +1076,13 @@ This file is:
 ### TODO (Future Enhancements)
 
 1. **Add More Detectors**: Flutter, Elixir, Swift, Haskell
-2. **Improve Log Viewing**: Search/filter, click to expand, export per-task
-3. **Enhanced AI Integration**: Stream AI responses, more providers, cache suggestions
-4. **Configuration UI**: Settings view for config.json options
-5. **Task Dependencies**: Allow tasks to depend on other tasks
-6. **Project Groups/Tags**: Tag projects, filter by tag
-7. **WebSocket/Real-time Updates**: Watch for file changes, hot-reload plugins.json
+2. **Improve Log Viewing**: [COMPLETED v5.0] WebSocket streaming in Web UI
+3. **Enhanced AI Integration**: [COMPLETED v5.0] MCP tool exposition for AI agents
+4. **Configuration UI**: [COMPLETED v5.0] Web Dashboard settings
+5. **Project Groups/Tags**: [COMPLETED v5.0] Orchestrator-level grouping
+6. **WebSocket/Real-time Updates**: [COMPLETED v5.0] Full WebSocket log engine
+7. **Task Dependencies**: Allow tasks to depend on other tasks
+8. **Plugin Marketplace**: Dynamic loading of community framework plugins
 
 ---
 

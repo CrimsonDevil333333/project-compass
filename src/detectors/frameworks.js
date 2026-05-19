@@ -324,16 +324,18 @@ export const builtInFrameworks = [
     description: 'Modern fast web framework for Python',
     languages: ['Python'],
     priority: 112,
-     match(project) {
-       return dependencyMatches(project, 'fastapi');
-     },
+    match(project) {
+      return dependencyMatches(project, 'fastapi');
+    },
     commands(project) {
       const pm = project.metadata?.packageManager || 'pip';
       const isUV = pm === 'uv';
       const base = isUV ? ['uv', 'run'] : pm === 'poetry' ? ['poetry', 'run'] : [];
+      const entry = project.extra?.entry || 'main.py';
+      const appRef = entry.replace(/\.py$/, '') + ':app';
       return {
         install: { label: 'FastAPI deps', command: isUV ? ['uv', 'sync'] : ['pip', 'install', '-r', 'requirements.txt'], source: 'framework' },
-        run: { label: 'FastAPI dev', command: [...base, 'uvicorn', 'main:app', '--reload'], source: 'framework' },
+        run: { label: 'FastAPI dev', command: [...base, 'uvicorn', appRef, '--reload'], source: 'framework' },
         test: { label: 'FastAPI test', command: [...base, 'pytest'], source: 'framework' }
       };
     }
@@ -351,10 +353,12 @@ export const builtInFrameworks = [
     commands(project) {
       const pm = project.metadata?.packageManager || 'pip';
       const isUV = pm === 'uv';
-      const base = isUV ? ['uv', 'run'] : pm === 'poetry' ? ['poetry', 'run'] : ['python'];
+      const base = isUV ? ['uv', 'run'] : pm === 'poetry' ? ['poetry', 'run'] : [];
+      const entry = project.extra?.entry;
+      const runCmd = entry ? [...base, 'python', entry] : [...base, 'flask', 'run'];
       return {
         install: { label: 'Flask deps', command: isUV ? ['uv', 'sync'] : ['pip', 'install', '-r', 'requirements.txt'], source: 'framework' },
-        run: { label: 'Flask run', command: [...base, 'app.py'], source: 'framework' },
+        run: { label: 'Flask run', command: runCmd, source: 'framework' },
         test: { label: 'Flask test', command: [...base, 'pytest'], source: 'framework' }
       };
     }
@@ -366,18 +370,19 @@ export const builtInFrameworks = [
     description: 'Django web application',
     languages: ['Python'],
     priority: 110,
-     match(project) {
-       return dependencyMatches(project, 'django');
-     },
+    match(project) {
+      return dependencyMatches(project, 'django');
+    },
     commands(project) {
       const pm = project.metadata?.packageManager || 'pip';
       const isUV = pm === 'uv';
-      const base = isUV ? ['uv', 'run'] : pm === 'poetry' ? ['poetry', 'run'] : ['python'];
+      const base = isUV ? ['uv', 'run'] : pm === 'poetry' ? ['poetry', 'run'] : [];
+      const python = base.length ? base : ['python'];
       return {
         install: { label: 'Django deps', command: isUV ? ['uv', 'sync'] : ['pip', 'install', '-r', 'requirements.txt'], source: 'framework' },
-        run: { label: 'Django runserver', command: [...base, 'manage.py', 'runserver'], source: 'framework' },
-        test: { label: 'Django test', command: [...base, 'manage.py', 'test'], source: 'framework' },
-        migrate: { label: 'Django migrate', command: [...base, 'manage.py', 'migrate'], source: 'framework' }
+        run: { label: 'Django runserver', command: [...python, 'manage.py', 'runserver'], source: 'framework' },
+        test: { label: 'Django test', command: [...python, 'manage.py', 'test'], source: 'framework' },
+        migrate: { label: 'Django migrate', command: [...python, 'manage.py', 'migrate'], source: 'framework' }
       };
     }
   },

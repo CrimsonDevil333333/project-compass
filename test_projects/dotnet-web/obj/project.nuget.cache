@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "dgSpecHash": "JiU8pFF2i0I=",
+  "success": true,
+  "projectFilePath": "/mnt/ramdisk/project-compass/test_projects/dotnet-web/test.csproj",
+  "expectedPackageFiles": [
+    "/home/pi/.nuget/packages/microsoft.netcore.app.ref/8.0.23/microsoft.netcore.app.ref.8.0.23.nupkg.sha512",
+    "/home/pi/.nuget/packages/microsoft.aspnetcore.app.ref/8.0.23/microsoft.aspnetcore.app.ref.8.0.23.nupkg.sha512",
+    "/home/pi/.nuget/packages/microsoft.netcore.app.host.linux-arm64/8.0.23/microsoft.netcore.app.host.linux-arm64.8.0.23.nupkg.sha512"
+  ],
+  "logs": []
+}

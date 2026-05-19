@@ -3,25 +3,39 @@
 ## Overview
 Project Compass is a terminal UI (TUI) workspace navigator and runner built with **Ink (React for CLI)**. It automatically detects projects across multiple languages and provides an interface to manage, run, and analyze them with optional AI integration.
 
-**Version:** 4.3.6  
+**Version:** 4.5.0  
 **Author:** Satyaa & Clawdy  
 **License:** MIT
 
 ---
 
-## Architecture
+## Architecture (v5.0.0 - Neural Convergence)
 
-### Entry Point
-- **`src/cli.js`** - Main entry point with argument parsing and the root `Compass` React component
-  - Handles: `--dir`, `--mode test`, `--studio`, `--ai`, `--task`, `--help`, `--version`
-  - Renders the Ink application with the `Compass` component
+### The Single-Brain Core
+Project Compass v5.0.0 uses a centralized engine to unify the TUI, Web Dashboard, and CLI interfaces.
+
+- **`src/core/Orchestrator.js`** - The "Brain" of the system.
+  - Manages all project discovery (`scan`), command execution (`runCommand`), and scaffolding (`scaffold`).
+  - Maintains a unified task pool for cross-interface log streaming and process tracking.
+- **`src/core/AuditEngine.js`** - The diagnostic heart.
+  - Shared runtime audit logic for both the `--studio` CLI command and the Web UI.
+
+### Entry Points
+- **`src/cli.js`** - The TUI/CLI interface.
+  - Acts as a "Thin Client" to the Orchestrator.
+  - Handles: `--dir`, `--deep`, `--studio`, `--ai`, `--tasks`, `--update`, `--help`, `--version`
+  - Subscribes to Orchestrator events (`task_start`, `task_output`) for real-time UI updates.
+- **`src/server.js`** - The Web API & WebSocket Bridge.
+  - Provides a REST/WS interface to the Orchestrator's core functions.
+  - Serves the production-built React dashboard from the `/public` directory.
 
 ### Core Detection System
 - **`src/projectDetection.js`** - Orchestrates project discovery
-  - Uses `fast-glob` to scan for manifest files
-  - Runs detectors in priority order (higher priority wins)
-  - Applies framework plugins after detection
-  - Exports `discoverProjects(root)` async function
+  - Uses `fast-glob` to scan for manifest files.
+  - Assigns deterministic unique IDs based on absolute project paths.
+  - Integrates `git` status discovery and applies framework plugins.
+
+
 
 ### Detectors (`src/detectors/`)
 Each detector exports an object with:

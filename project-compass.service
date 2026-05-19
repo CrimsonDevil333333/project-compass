@@ -1,0 +1,13 @@
+[Unit]
+Description=Project Compass Web Server
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/mnt/ramdisk/project-compass
+ExecStart=/usr/bin/node /mnt/ramdisk/project-compass/src/cli.js --server --host 127.0.0.1 --port 4000
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

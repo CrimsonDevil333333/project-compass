@@ -1,7 +1,7 @@
 {
   "name": "project-compass",
-  "version": "4.3.8",
-  "description": "🧭 Futuristic TUI workspace navigator & runner - AI-powered project detection for Node, Python, Rust, Go, Java, PHP, Ruby, .NET",
+  "version": "5.0.0",
+  "description": "🧭 High-fidelity TUI & Web workspace navigator - Agentic AI project intelligence for polyglot stacks",
   "main": "src/cli.js",
   "bin": {
     "project-compass": "src/cli.js"
@@ -9,10 +9,22 @@
   "type": "module",
   "scripts": {
     "start": "node src/cli.js",
-    "test": "node src/cli.js --mode test",
+    "test": "node scratch/validate_v5.js",
+
     "lint": "eslint src",
-    "run": "node src/cli.js --run"
+    "build:web": "cd web && npm install && npm run build",
+    "prepublishOnly": "npm run build:web"
   },
+  "files": [
+    "src/",
+    "public/",
+    "AGENTS.md",
+    "README.md",
+    "ARCHITECTURE.md",
+    "PROJECT_CONTEXT.md",
+    "LICENSE"
+  ],
+
   "keywords": [
     "cli",
     "navigator",
@@ -48,14 +60,18 @@
     "url": "https://github.com/CrimsonDevil333333/project-compass/issues"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "cors": "^2.8.6",
     "execa": "^9.5.2",
+    "express": "^5.2.1",
     "fast-glob": "^3.3.3",
     "ink": "^5.1.0",
     "kleur": "^4.1.5",
-    "react": "^18.2.0"
+    "react": "^18.2.0",
+    "ws": "^8.20.1"
   },
   "devDependencies": {
-    "eslint": "^9.19.0",
-    "@eslint/js": "^9.19.0"
+    "@eslint/js": "^9.19.0",
+    "eslint": "^9.19.0"
   }
 }

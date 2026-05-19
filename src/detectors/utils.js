@@ -37,12 +37,13 @@ export function getPackageManager(projectPath, language = 'node') {
   
   // Python package managers
   if (language === 'python' || language === 'Python') {
-    if (hasProjectFile(projectPath, 'uv.lock') && checkBinary('uv')) return 'uv';
+    if (hasProjectFile(projectPath, 'uv.lock')) return 'uv';
     if (hasProjectFile(projectPath, 'poetry.lock')) return 'poetry';
     if (hasProjectFile(projectPath, 'Pipfile.lock')) return 'pipenv';
     if (hasProjectFile(projectPath, 'requirements.txt')) return 'pip';
     return 'pip';
   }
+
   
   // Go - uses go modules
   if (language === 'go' || language === 'Go') {
@@ -90,6 +91,17 @@ export function resolveScriptCommand(project, scriptName, fallback = null) {
   }
   return fallback;
 }
+
+export function peekScriptCommand(project, scriptName) {
+  const scripts = project.metadata?.scripts || {};
+  const scriptContent = scripts[scriptName];
+  if (typeof scriptContent === 'string') return scriptContent;
+  if (scriptContent && typeof scriptContent === 'object' && scriptContent.command) {
+    return Array.isArray(scriptContent.command) ? scriptContent.command.join(' ') : scriptContent.command;
+  }
+  return null;
+}
+
 
 export function dependencyMatches(project, needle) {
   const dependencies = (project.metadata?.dependencies || []).map((dep) => {
@@ -189,3 +201,21 @@ export function getLockfileInfo(projectPath) {
   }
   return { lockfile: null, packageManager: null };
 }
+
+export async function getGitInfo(projectPath) {
+  const { execa } = await import('execa');
+  try {
+    const [{ stdout: branch }, { stdout: status }] = await Promise.all([
+      execa('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: projectPath }),
+      execa('git', ['status', '--porcelain'], { cwd: projectPath })
+    ]);
+    return {
+      branch: branch.trim(),
+      dirty: status.trim().length > 0,
+      available: true
+    };
+  } catch {
+    return { available: false };
+  }
+}
+

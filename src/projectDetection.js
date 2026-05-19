@@ -2,7 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import fastGlob from 'fast-glob';
 import { ensureConfigDir, PLUGIN_FILE, CONFIG_PATH } from './configPaths.js';
-import { dependencyMatches, hasProjectFile, parseCommandTokens, checkBinary } from './detectors/utils.js';
+import { dependencyMatches, hasProjectFile, parseCommandTokens, checkBinary, getGitInfo } from './detectors/utils.js';
+
 import nodeDetector from './detectors/node.js';
 import pythonDetector from './detectors/python.js';
 import rustDetector from './detectors/rust.js';
@@ -15,7 +16,10 @@ import genericDetector from './detectors/generic.js';
 import { builtInFrameworks } from './detectors/frameworks.js';
 import { loadProjectConfig } from './detectors/compass-config.js';
 
-const IGNORE_PATTERNS = ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/build/**', '**/target/**'];
+const IGNORE_PATTERNS = [
+  '**/node_modules/**', '**/.git/**', '**/dist/**', '**/build/**', 
+  '**/target/**', '**/venv/**', '**/.venv/**', '**/__pycache__/**'
+];
 
 const detectors = [
   nodeDetector,
@@ -156,7 +160,7 @@ function applyFrameworkPlugins(project) {
   return { ...project, commands, frameworks, priority: maxPriority };
 }
 
-export async function discoverProjects(root) {
+export async function discoverProjects(root, depth = 7) {
   const projectMap = new Map();
   for (const detector of detectors) {
     try {
@@ -165,8 +169,9 @@ export async function discoverProjects(root) {
         cwd: root,
         ignore: IGNORE_PATTERNS,
         onlyFiles: true,
-        deep: 5
+        deep: depth
       });
+
 
       for (const match of matches) {
         try {
@@ -175,10 +180,13 @@ export async function discoverProjects(root) {
           if (existing && existing.priority >= detector.priority) {
             continue;
           }
-          const entry = await detector.build(projectDir, match);
+          const entry = await detector.build(projectDir, path.join(root, match));
           if (!entry) {
             continue;
           }
+          const git = await getGitInfo(projectDir);
+          entry.git = git;
+
           const projectConfig = await loadProjectConfig(projectDir);
           if (projectConfig) {
             entry.commands = { ...entry.commands, ...(projectConfig.commands || {}) };
@@ -205,15 +213,17 @@ export async function discoverProjects(root) {
     }
   } catch { /* ignore */ }
 
-  let portBase = 3000;
+  let portBase = 7654;
   for (const project of sorted) {
     const saved = savedMeta[project.path];
     const existingPort = saved?.port || project.metadata?.port;
     project.metadata = { ...project.metadata, port: existingPort || String(portBase) };
     if (!existingPort) portBase++;
+    project.id = project.path; // Use path as unique ID
   }
   return sorted;
 }
+
 
 export const SCHEMA_GUIDE = detectors.map((d) => ({
   type: d.type,

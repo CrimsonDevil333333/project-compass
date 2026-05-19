@@ -1,6 +1,6 @@
 # 🧭 Project Compass
 
-**Futuristic Project Navigator & Runner for the Modern Developer**
+**Production-Grade Project Navigator & Runner for the Modern Developer**
 
 Project Compass is a high-performance, TUI (Terminal User Interface) workspace orchestrator built with Ink and React. It transforms your terminal into a command center for managing complex, multi-stack environments with a focus on speed, safety, and visual clarity.
 
@@ -21,6 +21,22 @@ npm start
 
 ---
 
+---
+
+## 🛰️ v5.0.0: The Neural Convergence
+
+This version transforms Project Compass into a **Single-Brain Architecture**, unifying the terminal, browser, and CLI into a single high-fidelity workspace engine.
+
+- **🧠 Universal Orchestrator**: Centralized task management and cross-interface log streaming.
+- **🌐 Synchronized Web Dashboard**: A premium, real-time web interface that stays in perfect sync with your TUI.
+- **🛡️ Zero-Mock Engineering**: Real-world scaffolding and manifest-driven AI DNA analysis—no placeholders.
+- **🔍 Omni-Studio Diagnostic**: Unified runtime audit for system health across all interfaces.
+- **🚀 Omni-Updater**: Automated self-updates directly from the CLI (`--update`).
+- **✨ High-Fidelity TUI**: Refined terminal UI with stabilized event-driven state management.
+
+---
+
+
 ## 📸 Screenshot
 
 ![Project Compass Navigator](https://raw.githubusercontent.com/CrimsonDevil333333/project-compass/master/assets/screenshots/home.png)
@@ -38,11 +54,12 @@ npm start
 ## 🌌 The Navigator (Main Interface)
 
 ### Features
-- **Automatic Discovery**: Instantly identifies **Node.js, Python, Rust, Go, Java, PHP, Ruby, .NET** projects
-- **Accurate Framework Detection**: No hallucinations - only detects frameworks with actual dependencies (fixed in v4.3.6)
-- **Paginated Control**: Optimized for massive workspaces. View projects in clean, manageable pages with **Page Up / Page Down** support
-- **Configurable UI**: Customize your view with `maxVisibleProjects` and toggleable Art Boards and Help Cards
-- **Real-time Scanning**: Projects are detected automatically when you navigate to a directory
+- **Automatic Discovery**: Instantly identifies **Node.js, Python, Rust, Go, Java, PHP, Ruby, .NET** projects.
+- **Deep Scan Mode**: Use `--deep` to search your entire workspace without depth limits.
+- **Git Context**: See active branch and changes directly in the project list.
+- **Accurate Framework Detection**: No hallucinations - only detects frameworks with actual dependencies.
+- **Paginated Control**: Optimized for massive workspaces. View projects in clean, manageable pages with **Page Up / Page Down** support.
+- **Configurable UI**: Customize your view with `maxVisibleProjects` and toggleable Art Boards and Help Cards.
 
 ### Supported Languages & Detection
 | Language | Manifest Files | Package Managers | Priority |
@@ -58,23 +75,32 @@ npm start
 
 ---
 
+## 🤖 AI Horizon (`Shift+O`)
+
+### Features
+- **Contextual Chat**: Ask open-ended questions about your project. The AI understands your README, dependencies, and file structure.
+- **Error Analysis (`A`)**: One-key diagnostic for failed tasks. Pass logs directly to the AI for a fix suggestion.
+- **DNA Mapping**: Automated command discovery for any project stack.
+- **AbortController Support**: Safe, cancellable requests with no state race conditions.
+- **Multi-Provider**: Support for OpenRouter, Gemini, Claude, and Ollama.
+
+---
+
 ## 🛰️ Orbit Task Manager (`Shift+T`)
 
 ### Features
-- **Background Orchestration**: Keep tasks running while you navigate
-- **Process Management**: Kill (`Shift+K`) or Rename (`Shift+R`) background tasks on the fly
-- **Live Log Streaming**: Real-time output with scroll support (`Shift+↑/↓`)
-- **Log Management**: Clear logs (`Shift+X`) or export to file (`Shift+E`)
-- **Multi-Task Support**: Run multiple commands simultaneously
-
-![Orbit Task Manager](https://raw.githubusercontent.com/CrimsonDevil333333/project-compass/master/assets/screenshots/task_manager.png)
+- **Background Orchestration**: Keep tasks running while you navigate.
+- **Status-Coded UI**: Borders reflect task health (Yellow = Running, Green = Done, Red = Error).
+- **Process Management**: Kill (`Shift+K`) or Rename (`Shift+R`) background tasks on the fly.
+- **Live Log Streaming**: Real-time output with scroll support and "SCROLLED" indicator.
+- **Log Management**: Clear logs (`Shift+X`) or export to file (`Shift+E`).
 
 ---
 
 ## 📦 Package Registry (`Shift+P`)
 
 ### Features
-- **Native Logic**: Automatically uses your project's preferred package manager
+- **Native Logic**: Automatically uses your project's preferred package manager.
   - Node.js: npm, pnpm, yarn, bun
   - Python: uv, poetry, pipenv, pip
   - Rust: cargo
@@ -83,9 +109,9 @@ npm start
   - PHP: composer
   - Ruby: bundler
   - .NET: dotnet
-- **Internal Switcher**: Quick-swap between detected projects directly inside the registry
-- **Add/Remove Packages**: Interactive package management
-- **Python Virtual Environments**: Create venv with `V` key
+- **Internal Switcher**: Quick-swap between detected projects directly inside the registry.
+- **Add/Remove Packages**: Interactive package management.
+- **Python Virtual Environments**: Create venv with `V` key.
 
 ---
 
@@ -359,7 +385,7 @@ project-compass --ai-analyze  # Shows: "AI analysis requires interactive TUI mod
   "aiModel": "deepseek/deepseek-r1",
   "aiToken": "your-api-token-here",
   "projectMeta": {
-    "/path/to/project": { "port": "3000" }
+    "/path/to/project": { "port": "7654" }
   }
 }
 ```

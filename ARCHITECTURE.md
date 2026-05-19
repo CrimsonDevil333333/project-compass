@@ -1,6 +1,7 @@
 # Project Compass Architecture
 
-This document describes the complete high-level architecture of Project Compass (v4.3.6).
+This document describes the complete high-level architecture of Project Compass (v5.0.0 - Neural Convergence).
+
 
 ---
 
@@ -9,14 +10,15 @@ This document describes the complete high-level architecture of Project Compass 
 1. [Overview](#overview)
 2. [Data Flow](#data-flow)
 3. [Project Structure](#project-structure)
-4. [Core Components](#core-components)
-5. [Detection System](#detection-system)
-6. [Framework Plugin System](#framework-plugin-system)
-7. [State Management](#state-management)
-8. [UI Rendering](#ui-rendering)
-9. [Command Execution](#command-execution)
+4. [Agentic AI Architecture](#agentic-ai-architecture)
+5. [Core Components](#core-components)
+6. [Detection System](#detection-system)
+7. [Framework Plugin System](#framework-plugin-system)
+8. [Search & Filter Engine](#search--filter-engine)
+9. [Orbit Task Management](#orbit-task-management)
 10. [Configuration System](#configuration-system)
 11. [Recent Architecture Changes](#recent-architecture-changes)
+
 12. [Design Patterns](#design-patterns)
 13. [Security](#security)
 14. [Performance](#performance)
@@ -35,7 +37,25 @@ Project Compass is a terminal-based project navigator and runner built with:
 
 ---
 
+## 🧠 Neural Convergence (v5.0.0 Upgrade)
+
+Project Compass v5.0.0 represents a massive architectural leap from independent interface logic to a **Single-Brain Architecture**.
+
+### The Universal Orchestrator (`src/core/Orchestrator.js`)
+At the heart of the system is the Orchestrator, a centralized engine that manages:
+- **Project Discovery**: All scanning logic is centralized here to ensure 100% parity.
+- **Unified Execution**: Every shell command is spawned and tracked by the core, regardless of which UI triggered it.
+- **Event-Driven State**: The core emits events (`task_start`, `task_output`, `task_end`) that both the TUI and Web UI subscribe to, ensuring perfect real-time synchronization.
+
+### The Diagnostic Core (`src/core/AuditEngine.js`)
+Diagnostics are no longer "simulated." The AuditEngine provides a shared, zero-mock logic for:
+- **Runtime Telemetry**: Real-time checking of Node, Python, Rust, Go, and more.
+- **System Health**: Reliable audit reporting for both CLI and Web views.
+
+---
+
 ## Data Flow
+
 
 ### Complete Flow Diagram
 ```
@@ -556,7 +576,7 @@ When a process is running and `activeTaskId` is set:
   "aiModel": "deepseek/deepseek-r1",
   "aiToken": "your-api-token-here",
   "projectMeta": {
-    "/path/to/project": { "port": "3000" }
+    "/path/to/project": { "port": "7654" }
   }
 }
 ```

@@ -1,5 +1,4 @@
-/* global fetch */
-import React, {useState, memo} from 'react';
+import React, {useState, memo, useRef, useEffect} from 'react';
 import {Box, Text, useInput} from 'ink';
 import fs from 'fs';
 import path from 'path';
@@ -59,8 +58,18 @@ function buildProjectContext(project, rootPath) {
   return lines.join('\n');
 }
 
-const AIHorizon = memo(({rootPath, selectedProject, CursorText, config, setConfig, saveConfig}) => {
+const AIHorizon = memo(({rootPath, selectedProject, CursorText, config, setConfig, saveConfig, analysisContext, clearContext}) => {
   const [step, setStep] = useState(config?.aiToken ? 'analyze' : 'provider');
+  
+  useEffect(() => {
+    if (analysisContext && step === 'analyze' && status === 'ready') {
+      setStep('chat');
+      setChatHistory([{ role: 'user', content: `The following error occurred while running a task:\n${analysisContext}\n\nPlease analyze this error and suggest a fix.` }]);
+      runChatAnalysis(`The following error occurred while running a task:\n${analysisContext}\n\nPlease analyze this error and suggest a fix.`);
+      if (clearContext) clearContext();
+    }
+  }, [analysisContext]);
+
   const providerIndex = AI_PROVIDERS.findIndex(p => p.id === (config?.aiProvider || 'openrouter'));
   const [providerIdx, setProviderIdx] = useState(providerIndex >= 0 ? providerIndex : 0);
   const [model, setModel] = useState(config?.aiModel || 'deepseek/deepseek-r1');
@@ -74,8 +83,25 @@ const AIHorizon = memo(({rootPath, selectedProject, CursorText, config, setConfi
   const [editMode, setEditMode] = useState(false);
   const [editInput, setEditInput] = useState('');
   const [editCursor, setEditCursor] = useState(0);
+  const [chatHistory, setChatHistory] = useState([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatCursor, setChatCursor] = useState(0);
+  const abortControllerRef = useRef(null);
+
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   const runRealAnalysis = async () => {
+    if (abortControllerRef.current) abortControllerRef.current.abort();
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+
     setStatus('busy');
     setError(null);
     setRawAIResponse('');
@@ -96,61 +122,51 @@ ${projectContext}
 Return ONLY a JSON object with this structure:
 {"build": "build command here", "run": "run command here", "install": "install command here", "test": "test command here"}
 
-Use the project's detected type (${selectedProject.type}) to ensure commands are correct. Do NOT wrap the JSON in markdown code blocks.`;
+Use the project's detected type (${selectedProject.type}) to ensure commands are correct.`;
 
       let response;
       let aiText = '';
 
+      const fetchOptions = {
+        method: 'POST',
+        signal,
+        headers: { 'Content-Type': 'application/json' }
+      };
+
       if (provider.id === 'openrouter') {
-        response = await fetch(provider.endpoint, {
-          method: 'POST',
-          headers: { 
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'HTTP-Referer': 'https://github.com/CrimsonDevil333333/project-compass',
-            'X-Title': 'Project Compass'
-          },
-          body: JSON.stringify({
-            model: model,
-            messages: [{ role: 'user', content: prompt }]
-          })
+        fetchOptions.headers['Authorization'] = `Bearer ${token}`;
+        fetchOptions.headers['HTTP-Referer'] = 'https://github.com/CrimsonDevil333333/project-compass';
+        fetchOptions.headers['X-Title'] = 'Project Compass';
+        fetchOptions.body = JSON.stringify({
+          model: model,
+          messages: [{ role: 'user', content: prompt }]
         });
+        response = await fetch(provider.endpoint, fetchOptions);
         const data = await response.json();
         if (!response.ok) throw new Error(data.error?.message || data.error || 'OpenRouter Error');
         aiText = data.choices?.[0]?.message?.content || '';
       } else if (provider.id === 'gemini') {
         const url = provider.endpoint.replace('{model}', model) + `?key=${token}`;
-        response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-        });
+        fetchOptions.body = JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] });
+        response = await fetch(url, fetchOptions);
         const data = await response.json();
         if (!response.ok) throw new Error(data.error?.message || data.error || 'Gemini Error');
         aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
       } else if (provider.id === 'claude') {
-        response = await fetch(provider.endpoint, {
-          method: 'POST',
-          headers: { 
-            'x-api-key': token,
-            'anthropic-version': '2023-06-01',
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: model,
-            max_tokens: 1024,
-            messages: [{ role: 'user', content: prompt }]
-          })
+        fetchOptions.headers['x-api-key'] = token;
+        fetchOptions.headers['anthropic-version'] = '2023-06-01';
+        fetchOptions.body = JSON.stringify({
+          model: model,
+          max_tokens: 1024,
+          messages: [{ role: 'user', content: prompt }]
         });
+        response = await fetch(provider.endpoint, fetchOptions);
         const data = await response.json();
         if (!response.ok) throw new Error(data.error?.message || data.error || 'Claude Error');
         aiText = data.content?.[0]?.text || '';
       } else if (provider.id === 'ollama') {
-        response = await fetch(provider.endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: model, prompt: prompt, stream: false })
-        });
+        fetchOptions.body = JSON.stringify({ model: model, prompt: prompt, stream: false });
+        response = await fetch(provider.endpoint, fetchOptions);
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || data.message || 'Ollama Error');
         aiText = data.response || '';
@@ -160,54 +176,171 @@ Use the project's detected type (${selectedProject.type}) to ensure commands are
 
       setRawAIResponse(aiText);
 
+      // Robust JSON extraction
       let jsonStr = aiText;
-      const codeBlockMatch = aiText.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
-      if (codeBlockMatch) {
-        jsonStr = codeBlockMatch[1];
+      const jsonStart = aiText.indexOf('{');
+      const jsonEnd = aiText.lastIndexOf('}');
+      if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+        jsonStr = aiText.substring(jsonStart, jsonEnd + 1);
+      } else {
+        throw new Error("AI response did not contain a valid JSON object.");
       }
-      const jsonMatch = jsonStr.match(/\{[\s\S]*?\}/);
-      if (!jsonMatch) throw new Error("AI returned invalid JSON format. Raw response:\n" + aiText.slice(0, 500));
 
-      const parsed = JSON.parse(jsonMatch[0]);
-      const mapped = [
-        { label: 'AI Build', command: parseShellWords(parsed.build || '') },
-        { label: 'AI Run', command: parseShellWords(parsed.run || '') },
-        { label: 'AI Install', command: parseShellWords(parsed.install || '') },
-        { label: 'AI Test', command: parseShellWords(parsed.test || '') }
-      ].filter(cmd => cmd.command.length > 0 && cmd.command[0] !== '');
+      try {
+        const parsed = JSON.parse(jsonStr);
+        const mapped = [
+          { label: 'AI Build', command: parseShellWords(parsed.build || '') },
+          { label: 'AI Run', command: parseShellWords(parsed.run || '') },
+          { label: 'AI Install', command: parseShellWords(parsed.install || '') },
+          { label: 'AI Test', command: parseShellWords(parsed.test || '') }
+        ].filter(cmd => cmd.command.length > 0 && cmd.command[0] !== '');
 
-      if (mapped.length === 0) throw new Error("AI returned empty commands. Raw response:\n" + aiText.slice(0, 500));
+        if (mapped.length === 0) throw new Error("AI returned empty commands.");
 
-      setSuggestions(mapped);
-      setSelectedSuggestion(0);
-      setStatus('done');
+        setSuggestions(mapped);
+        setSelectedSuggestion(0);
+        setStatus('done');
+      } catch (parseErr) {
+        throw new Error(`Failed to parse AI response as JSON: ${parseErr.message}\n\nExtracted content:\n${jsonStr.slice(0, 500)}`);
+      }
     } catch (err) {
+      if (err.name === 'AbortError') return;
       setError(err.message);
       setStatus('ready');
+    } finally {
+      abortControllerRef.current = null;
     }
   };
+
+  const runChatAnalysis = async (userInput) => {
+    if (abortControllerRef.current) abortControllerRef.current.abort();
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+
+    setStatus('busy');
+    setError(null);
+    const provider = AI_PROVIDERS[providerIdx];
+
+    try {
+      const projectContext = buildProjectContext(selectedProject, rootPath);
+      const systemPrompt = `You are an expert developer assistant for the project "${selectedProject.name}".
+Project Context:
+${projectContext}
+
+Help the user with their questions about this project. Be concise but thorough.`;
+
+      const messages = [
+        { role: 'system', content: systemPrompt },
+        ...chatHistory,
+        { role: 'user', content: userInput }
+      ];
+
+      let response;
+      let aiText = '';
+
+      const fetchOptions = {
+        method: 'POST',
+        signal,
+        headers: { 'Content-Type': 'application/json' }
+      };
+
+      if (provider.id === 'openrouter') {
+        fetchOptions.headers['Authorization'] = `Bearer ${token}`;
+        fetchOptions.body = JSON.stringify({ model: model, messages });
+        response = await fetch(provider.endpoint, fetchOptions);
+        const data = await response.json();
+        aiText = data.choices?.[0]?.message?.content || '';
+      } else if (provider.id === 'gemini') {
+        const url = provider.endpoint.replace('{model}', model) + `?key=${token}`;
+        const contents = messages.filter(m => m.role !== 'system').map(m => ({
+          role: m.role === 'user' ? 'user' : 'model',
+          parts: [{ text: m.content }]
+        }));
+        fetchOptions.body = JSON.stringify({ contents });
+        response = await fetch(url, fetchOptions);
+        const data = await response.json();
+        aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      } else if (provider.id === 'claude') {
+        fetchOptions.headers['x-api-key'] = token;
+        fetchOptions.headers['anthropic-version'] = '2023-06-01';
+        fetchOptions.body = JSON.stringify({
+          model: model,
+          max_tokens: 1024,
+          system: systemPrompt,
+          messages: messages.filter(m => m.role !== 'system')
+        });
+        response = await fetch(provider.endpoint, fetchOptions);
+        const data = await response.json();
+        aiText = data.content?.[0]?.text || '';
+      } else if (provider.id === 'ollama') {
+        fetchOptions.body = JSON.stringify({ model: model, messages, stream: false });
+        response = await fetch(provider.endpoint, fetchOptions);
+        const data = await response.json();
+        aiText = data.message?.content || '';
+      }
+
+      if (!aiText) throw new Error('Empty response from AI provider');
+
+      setChatHistory(prev => [...prev, { role: 'user', content: userInput }, { role: 'assistant', content: aiText }]);
+      setStatus('chatting');
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      setError(err.message);
+      setStatus('chatting');
+    } finally {
+      abortControllerRef.current = null;
+    }
+  };
+
+
 
   useInput((input, key) => {
     if (editMode) {
       if (key.return) {
-        const command = parseShellWords(editInput);
-        if (command.length) {
-          setSuggestions(prev => prev.map((suggestion, idx) => idx === selectedSuggestion ? {...suggestion, command} : suggestion));
-        }
-        setEditMode(false); setEditInput(''); setEditCursor(0);
-        return;
-      }
-      if (key.escape) { setEditMode(false); setEditInput(''); setEditCursor(0); return; }
-      if (key.backspace || key.delete) {
-        if (editCursor > 0) { setEditInput(prev => prev.slice(0, editCursor - 1) + prev.slice(editCursor)); setEditCursor(c => c - 1); }
-        return;
-      }
-      if (key.leftArrow) { setEditCursor(c => Math.max(0, c - 1)); return; }
-      if (key.rightArrow) { setEditCursor(c => Math.min(editInput.length, c + 1)); return; }
-      if (input && !key.ctrl && !key.meta) {
-        setEditInput(prev => prev.slice(0, editCursor) + input + prev.slice(editCursor)); setEditCursor(c => c + input.length);
+        if (cursor === 1) setModel(editInput);
+        if (cursor === 2) setToken(editInput);
+        setEditMode(false);
+      } else if (key.escape) {
+        setEditMode(false);
+      } else if (key.backspace || key.delete) {
+        setEditInput(prev => prev.slice(0, -1));
+        setEditCursor(prev => Math.max(0, prev - 1));
+      } else if (key.leftArrow) {
+        setEditCursor(prev => Math.max(0, prev - 1));
+      } else if (key.rightArrow) {
+        setEditCursor(prev => Math.min(editInput.length, prev + 1));
+      } else if (input) {
+        setEditInput(prev => prev + input);
+        setEditCursor(prev => prev + 1);
       }
       return;
+    }
+
+    if (step === 'chat') {
+      if (key.return && chatInput.trim()) {
+        runChatAnalysis(chatInput);
+        setChatInput('');
+        setChatCursor(0);
+      } else if (key.escape) {
+        setStep('analyze');
+      } else if (key.backspace || key.delete) {
+        setChatInput(prev => prev.slice(0, -1));
+        setChatCursor(prev => Math.max(0, prev - 1));
+      } else if (key.leftArrow) {
+        setChatCursor(prev => Math.max(0, prev - 1));
+      } else if (key.rightArrow) {
+        setChatCursor(prev => Math.min(chatInput.length, prev + 1));
+      } else if (input) {
+        setChatInput(prev => prev + input);
+        setChatCursor(prev => prev + 1);
+      }
+      return;
+    }
+
+    if (key.upArrow) setCursor(prev => Math.max(0, prev - 1));
+    if (key.downArrow) {
+      const max = step === 'provider' ? 3 : 2;
+      setCursor(prev => Math.min(max, prev + 1));
     }
 
     if (step === 'provider') {
@@ -265,7 +398,12 @@ Use the project's detected type (${selectedProject.type}) to ensure commands are
           return;
         }
       }
+      if (input?.toLowerCase() === 'c') {
+        setStep('chat');
+        return;
+      }
       if (input === 'r') {
+
         const nextConfig = { ...config, aiToken: '' };
         setConfig(nextConfig); saveConfig(nextConfig);
         setStep('provider');
@@ -350,8 +488,34 @@ Use the project's detected type (${selectedProject.type}) to ensure commands are
           create(Text, {color: 'red'}, error.length > 500 ? error.slice(0, 500) + '...' : error)
         )
       ),
-      create(Text, {dimColor: true, marginTop: 1}, 'Esc: Return, R: Reset Credentials')
+      create(Text, {dimColor: true, marginTop: 1}, 'Esc: Return, R: Reset Credentials, C: Open Context Chat')
+    ),
+
+    step === 'chat' && create(
+      Box,
+      {flexDirection: 'column', flexGrow: 1},
+      create(Text, {bold: true, color: 'cyan', marginBottom: 1}, '💬 Project Context Chat: ' + selectedProject.name),
+      create(
+        Box,
+        {flexDirection: 'column', borderStyle: 'single', borderColor: 'gray', padding: 1, flexGrow: 1, minHeight: 10},
+        chatHistory.length === 0 && create(Text, {dimColor: true}, 'Ask anything about the project (e.g. "How do I run tests?", "What are the dependencies?")'),
+        ...chatHistory.slice(-10).map((msg, i) => create(
+          Box,
+          {key: i, marginBottom: 1, flexDirection: 'column'},
+          create(Text, {bold: true, color: msg.role === 'user' ? 'blue' : 'green'}, msg.role === 'user' ? '👤 YOU' : '🤖 AI'),
+          create(Text, null, msg.content)
+        )),
+        status === 'busy' && create(Text, {color: 'yellow'}, ' ⏳ AI is thinking...')
+      ),
+      create(
+        Box,
+        {flexDirection: 'row', marginTop: 1},
+        create(Text, {bold: true}, ' > '),
+        create(CursorText, {value: chatInput, cursorIndex: chatCursor})
+      ),
+      create(Text, {dimColor: true, marginTop: 1}, 'Enter: Send, Esc: Back to Analysis')
     )
+
   );
 });
 
