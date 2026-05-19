@@ -13,6 +13,7 @@ import {CONFIG_PATH, ensureConfigDir, loadConfig, saveConfig} from './configPath
 import { orchestrator } from './core/Orchestrator.js';
 import { startServer, setupSystemdService } from './server.js';
 import { startMcpServer } from './mcp.js';
+import VERSION from './version.js';
 
 
 // Modular Components
@@ -178,7 +179,7 @@ const Splash = () => {
       create(Text, {color: 'cyan'}, 'Initializing high-fidelity systems'),
       create(Text, null, '.'.repeat((frame % 4)))
     ),
-    create(Text, {dimColor: true, marginTop: 1}, 'Version 4.5.0 · Production Grade')
+    create(Text, {dimColor: true, marginTop: 1}, `Version ${VERSION} · Production Grade`)
   );
 };
 

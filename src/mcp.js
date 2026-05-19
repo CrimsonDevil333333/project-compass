@@ -5,11 +5,12 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { orchestrator } from "./core/Orchestrator.js";
+import VERSION from './version.js';
 
 const server = new Server(
   {
     name: "project-compass",
-    version: "5.0.0",
+    version: VERSION,
   },
   {
     capabilities: {

@@ -11,6 +11,7 @@ import { checkBinary } from './detectors/utils.js';
 
 import { fileURLToPath } from 'url';
 import { runFullAudit } from './core/AuditEngine.js';
+import VERSION from './version.js';
 
 const app = express();
 
@@ -187,7 +188,7 @@ WantedBy=multi-user.target
 export function startServer(host = '0.0.0.0', port = 7654) {
   server.listen(port, host, () => {
 
-    console.log(`\n  🧭 Project Compass Server (v5.1.0)`);
+    console.log(`\n  🧭 Project Compass Server (v${VERSION})`);
     console.log(`  🏠 Host: http://${host}:${port}`);
     console.log(`  ⚡ WebSockets: ws://${host}:${port}\n`);
   });

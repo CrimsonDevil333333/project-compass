@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Text } from 'ink';
+import VERSION from '../version.js';
 
 export default function Header({ projectCountLabel, rootPath, running, statusHint, toggleHint, orbitHint, artHint }) {
   return React.createElement(
@@ -17,7 +18,7 @@ export default function Header({ projectCountLabel, rootPath, running, statusHin
       React.createElement(
         Box,
         { flexDirection: 'column' },
-        React.createElement(Text, { color: 'magenta', bold: true }, '🧭 PROJECT COMPASS v4.5.0'),
+        React.createElement(Text, { color: 'magenta', bold: true }, `🧭 PROJECT COMPASS v${VERSION}`),
         React.createElement(Text, { dimColor: true }, `📂 ${rootPath.length > 40 ? '...' + rootPath.slice(-37) : rootPath}`)
       ),
       React.createElement(
