@@ -1,6 +1,6 @@
 {
   "name": "project-compass",
-  "version": "5.0.0",
+  "version": "5.1.0",
   "description": "🧭 High-fidelity TUI & Web workspace navigator - Agentic AI project intelligence for polyglot stacks",
   "main": "src/cli.js",
   "bin": {

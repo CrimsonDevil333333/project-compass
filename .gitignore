@@ -10,3 +10,4 @@ dist/
 build/
 
 memory/
+project-compass.service

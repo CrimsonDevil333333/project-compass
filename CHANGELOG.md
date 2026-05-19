@@ -5,6 +5,13 @@ All notable changes to Project Compass will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.1.0] - 2026-05-20
+
+### Fixed
+- **Systemd Service Generalization**: Removed hardcoded local service file and refactored generation logic to be system-agnostic.
+- **Service Installation Options**: Added support and documentation for both System-wide and User-level systemd services.
+- **Gitignore Hygiene**: Added `project-compass.service` to `.gitignore` to prevent accidental commits of local configurations.
+
 ## [5.0.0] - 2026-05-20
 
 ### Added

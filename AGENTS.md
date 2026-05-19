@@ -16,7 +16,7 @@ Welcome to Project Compass. This file provides **COMPLETE** context for AI agent
 8. [TUI Keyboard Shortcuts (Complete List)](#tui-keyboard-shortcuts-complete-list)
 9. [Supported Languages](#supported-languages)
 10. [Built-in Frameworks](#built-in-frameworks)
-11. [Recent Fixes (v5.0.0)](#recent-fixes-v500)
+11. [Recent Fixes (v5.1.0)](#recent-fixes-v500)
 12. [Component Details](#component-details)
 13. [Detection System](#detection-system)
 14. [State Management](#state-management)
@@ -31,7 +31,7 @@ Welcome to Project Compass. This file provides **COMPLETE** context for AI agent
 
 **Project Compass** is a futuristic project navigator and runner designed for modern polygot development. It provides a high-fidelity terminal UI (using Ink) and a synchronized Web Dashboard to manage complex workspaces with integrated Agentic AI intelligence.
 
-**Version:** 5.0.0  
+**Version:** 5.1.0  
 **Last Updated:** 2026-05-20  
 **Author:** Satyaa & Clawdy  
 **License:** MIT  
@@ -54,7 +54,7 @@ Welcome to Project Compass. This file provides **COMPLETE** context for AI agent
 
 | Attribute | Value |
 |-----------|-------|
-| **Version** | 5.0.0 |
+| **Version** | 5.1.0 |
 | **NPM Package** | `project-compass` |
 | **Node.js Requirement** | ^18.0.0 (ESM support) |
 | **Build Status** | Stable |
@@ -70,7 +70,7 @@ Welcome to Project Compass. This file provides **COMPLETE** context for AI agent
 
 ```
 project-compass/
-├── package.json                    # NPM package config (v5.0.0)
+├── package.json                    # NPM package config (v5.1.0)
 ├── README.md                      # Main documentation (COMPREHENSIVE)
 ├── AGENTS.md                     # THIS FILE (AI agent context)
 ├── PROJECT_CONTEXT.md             # Technical context for agents

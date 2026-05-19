@@ -134,9 +134,10 @@ app.post('/api/ai-analyze', async (req, res) => {
 
 export function setupSystemdService(host, port) {
   const serviceName = 'project-compass';
-  const binPath = process.argv[1];
-  const user = process.env.USER;
+  const binPath = path.resolve(process.argv[1]);
+  const user = process.env.USER || 'root';
   const workingDir = process.cwd();
+  const nodePath = process.execPath;
 
   const serviceConfig = `[Unit]
 Description=Project Compass Web Server
@@ -146,21 +147,38 @@ After=network.target
 Type=simple
 User=${user}
 WorkingDirectory=${workingDir}
-ExecStart=${process.execPath} ${binPath} --server --host ${host} --port ${port}
+ExecStart=${nodePath} ${binPath} --server --host ${host} --port ${port}
 Restart=on-failure
+Environment=NODE_ENV=production
 
 [Install]
 WantedBy=multi-user.target
 `;
 
   const servicePath = `/etc/systemd/system/${serviceName}.service`;
-  console.log(`\n🚀 Generating systemd service at ${servicePath}...`);
+  const userServicePath = `~/.config/systemd/user/${serviceName}.service`;
+  
+  console.log(`\n🚀 Generating systemd service configuration...`);
   
   try {
-    // We need sudo to write to /etc
-    fs.writeFileSync('./project-compass.service', serviceConfig);
-    console.log(`✅ Service file created locally at ./project-compass.service`);
-    console.log(`👉 Run: sudo mv ./project-compass.service ${servicePath} && sudo systemctl enable --now ${serviceName}`);
+    const localPath = './project-compass.service';
+    fs.writeFileSync(localPath, serviceConfig);
+    console.log(`✅ Service file created locally at ${path.resolve(localPath)}`);
+    
+    console.log(`\n${'─'.repeat(50)}`);
+    console.log(`🔧 INSTALLATION OPTIONS:`);
+    console.log(`\n1. SYSTEM-WIDE SERVICE (Requires sudo):`);
+    console.log(`   sudo mv ${localPath} ${servicePath}`);
+    console.log(`   sudo systemctl daemon-reload`);
+    console.log(`   sudo systemctl enable --now ${serviceName}`);
+    
+    console.log(`\n2. USER SERVICE (Recommended for dev):`);
+    console.log(`   mkdir -p ~/.config/systemd/user/`);
+    console.log(`   mv ${localPath} ${userServicePath}`);
+    console.log(`   systemctl --user daemon-reload`);
+    console.log(`   systemctl --user enable --now ${serviceName}`);
+    console.log(`${'─'.repeat(50)}\n`);
+    
   } catch (err) {
     console.error(`❌ Failed to generate service: ${err.message}`);
   }
@@ -169,7 +187,7 @@ WantedBy=multi-user.target
 export function startServer(host = '0.0.0.0', port = 7654) {
   server.listen(port, host, () => {
 
-    console.log(`\n  🧭 Project Compass Server (v5.0.0)`);
+    console.log(`\n  🧭 Project Compass Server (v5.1.0)`);
     console.log(`  🏠 Host: http://${host}:${port}`);
     console.log(`  ⚡ WebSockets: ws://${host}:${port}\n`);
   });
