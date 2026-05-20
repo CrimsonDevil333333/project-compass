@@ -4,7 +4,7 @@ import {getAddCmd, getRemoveCmd} from '../packageCommands.js';
 
 const create = React.createElement;
 
-const PackageRegistry = memo(({selectedProject, projects = [], onRunCommand, CursorText, onSelectProject}) => {
+const PackageRegistry = memo(({selectedProject, projects = [], onRunCommand, CursorText, onSelectProject, onReturn}) => {
   const [view, setView] = useState(selectedProject ? 'manage' : 'select'); // select | manage
   const [mode, setMode] = useState('list'); // list | add | remove
   const [input, setInput] = useState('');
@@ -22,6 +22,10 @@ const PackageRegistry = memo(({selectedProject, projects = [], onRunCommand, Cur
       if (key.return && projects[selIdx]) {
         if (onSelectProject) onSelectProject(selIdx);
         setView('manage');
+        return;
+      }
+      if (key.escape) {
+        if (onReturn) onReturn();
         return;
       }
       return;
@@ -53,10 +57,15 @@ const PackageRegistry = memo(({selectedProject, projects = [], onRunCommand, Cur
       return;
     }
 
-    if (inputStr.toLowerCase() === 'a') { setMode('add'); setInput(''); setCursor(0); return; }
-    if (inputStr.toLowerCase() === 'r') { setMode('remove'); setInput(''); setCursor(0); return; }
-    if (inputStr.toLowerCase() === 's') { setView('select'); return; }
-    if (inputStr.toLowerCase() === 'v' && projectType === 'Python') {
+    if (key.escape) {
+      if (onReturn) onReturn();
+      return;
+    }
+
+    if (inputStr && inputStr.toLowerCase() === 'a') { setMode('add'); setInput(''); setCursor(0); return; }
+    if (inputStr && inputStr.toLowerCase() === 'r') { setMode('remove'); setInput(''); setCursor(0); return; }
+    if (inputStr && inputStr.toLowerCase() === 's') { setView('select'); return; }
+    if (inputStr && inputStr.toLowerCase() === 'v' && projectType === 'Python') {
       onRunCommand({label: 'Create venv', command: ['python3', '-m', 'venv', '.venv']}, activeProject);
       return;
     }
@@ -93,7 +102,10 @@ const PackageRegistry = memo(({selectedProject, projects = [], onRunCommand, Cur
           create(
             Box,
             {flexDirection: 'row', flexWrap: 'wrap'},
-            ...deps.map(d => create(Text, {key: d, dimColor: true}, ` ${d} `))
+            ...deps.map((d, index) => {
+              const name = typeof d === 'string' ? d : (d && typeof d === 'object' && d.name ? d.name : String(d));
+              return create(Text, {key: `${name}-${index}`, dimColor: true}, ` ${name} `);
+            })
           ),
           create(
             Box,

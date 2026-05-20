@@ -103,6 +103,20 @@ function buildDetailCommands(project, config) {
   return [...builtins, ...custom];
 }
 
+function truncatePath(filePath, maxLength = 35) {
+  if (!filePath) return '.';
+  if (filePath.length <= maxLength) return filePath;
+  const parts = filePath.split(path.sep);
+  if (parts.length <= 2) {
+    return '...' + filePath.slice(-(maxLength - 3));
+  }
+  const first = parts[0];
+  const last = parts.slice(-2).join(path.sep);
+  const combined = `${first}${path.sep}...${path.sep}${last}`;
+  if (combined.length <= maxLength) return combined;
+  return '...' + filePath.slice(-(maxLength - 3));
+}
+
 function CursorText({value, cursorIndex, active = true}) {
   const before = value.slice(0, cursorIndex);
   const charAt = value[cursorIndex] || ' ';
@@ -124,7 +138,7 @@ const OutputPanel = memo(({activeTask, logOffset}) => {
   const visibleLogs = logs.slice(logWindowStart, logWindowEnd);
   
   const logNodes = visibleLogs.length 
-    ? visibleLogs.map((line, i) => create(Text, {key: i}, line)) 
+    ? visibleLogs.map((line, i) => create(Text, {key: i, wrap: 'wrap'}, line)) 
     : [create(Text, {key: 'empty', dimColor: true}, 'Select a task or run a command to see logs.')];
 
   const borderColor = !activeTask ? 'gray' : 
@@ -301,6 +315,9 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
 
   useEffect(() => {
     const handleStart = (task) => {
+      if (task.process) {
+        runningProcessMap.current.set(task.id, task.process);
+      }
       setTasks(prev => {
         if (prev.some(t => t.id === task.id)) return prev;
         return [...prev, task];
@@ -313,6 +330,7 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
     };
 
     const handleEnd = (task) => {
+      runningProcessMap.current.delete(task.id);
       setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: task.status, endTime: task.endTime } : t));
     };
 
@@ -354,6 +372,13 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
       addLogToTask(activeTaskId, kleur.red('✗ Export failed'));
     }
   }, [tasks, activeTaskId, addLogToTask]);
+
+  const clearAndSwitch = useCallback((view) => {
+    console.clear();
+    setMainView(view);
+    setViewMode('list');
+    setShowHelp(false);
+  }, []);
 
     useInput((input, key) => {
 
@@ -458,13 +483,6 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
 
     const normalizedInput = input?.toLowerCase();
     const shiftCombo = (char) => key.shift && normalizedInput === char;
-
-    const clearAndSwitch = (view) => {
-      console.clear();
-      setMainView(view);
-      setViewMode('list');
-      setShowHelp(false);
-    };
     
     const findCommand = (project, key) => {
       let meta = project.commands?.[key];
@@ -478,7 +496,7 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
     };
 
     const actionKey = normalizedInput && ACTION_MAP[normalizedInput];
-    if (viewMode === 'detail' && actionKey && selectedProject) {
+    if (mainView === 'navigator' && viewMode === 'detail' && actionKey && selectedProject) {
       if (actionKey === 'run' && key.shift) {
         setPortConfigMode(true);
         const port = config.projectMeta?.[selectedProject.path]?.port || selectedProject.metadata?.port || '7654';
@@ -487,16 +505,20 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
         return;
       }
 
-      const commandMeta = findCommand(selectedProject, actionKey);
-      if (commandMeta) {
-        runProjectCommand(commandMeta, selectedProject);
+      if (key.shift && (actionKey === 'build' || actionKey === 'test')) {
+        // Fall through to allow Shift+B / Shift+T to toggle views
       } else {
-        const msg = kleur.yellow(`! No ${actionKey} command available for ${selectedProject.name}`);
-        const taskId = `task-${Date.now()}`;
-        setTasks(prev => [...prev, { id: taskId, name: `Notification`, status: 'failed', logs: [msg], project: '' }]);
-        globalThis.setTimeout(() => setTasks(prev => prev.filter(t => t.id !== taskId)), 3000);
+        const commandMeta = findCommand(selectedProject, actionKey);
+        if (commandMeta) {
+          runProjectCommand(commandMeta, selectedProject);
+        } else {
+          const msg = kleur.yellow(`! No ${actionKey} command available for ${selectedProject.name}`);
+          const taskId = `task-${Date.now()}`;
+          setTasks(prev => [...prev, { id: taskId, name: `Notification`, status: 'failed', logs: [msg], project: '' }]);
+          globalThis.setTimeout(() => setTasks(prev => prev.filter(t => t.id !== taskId)), 3000);
+        }
+        return;
       }
-      return;
     }
 
     if (shiftCombo('h')) { console.clear(); setConfig(prev => { const next = {...prev, showHelpCards: !prev.showHelpCards}; saveConfig(next); return next; }); return; }
@@ -523,7 +545,7 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
     }
     
     if (key.escape) {
-      if (mainView !== 'navigator') {
+      if (mainView === 'studio' || mainView === 'tasks') {
         clearAndSwitch('navigator');
         return;
       }
@@ -536,6 +558,17 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
         return Math.max(0, Math.min(maxScroll, prev + delta));
       });
     };
+
+    if (mainView === 'navigator') {
+      if (key.upArrow && key.shift) {
+        scrollLogs(1);
+        return;
+      }
+      if (key.downArrow && key.shift) {
+        scrollLogs(-1);
+        return;
+      }
+    }
 
     if (mainView === 'tasks') {
       if (tasks.length > 0) {
@@ -629,9 +662,9 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
 
     if (input === '/' && mainView === 'navigator') { setSearchMode(true); return; }
     
-    if (normalizedInput === '?') { console.clear(); setShowHelp((prev) => !prev); return; }
+    if (normalizedInput === '?' && mainView === 'navigator') { console.clear(); setShowHelp((prev) => !prev); return; }
 
-    if (shiftCombo('l') && lastCommandRef.current) { runProjectCommand(lastCommandRef.current.commandMeta, lastCommandRef.current.project); return; }
+    if (mainView === 'navigator' && shiftCombo('l') && lastCommandRef.current) { runProjectCommand(lastCommandRef.current.commandMeta, lastCommandRef.current.project); return; }
 
     if (key.upArrow && !key.shift && projects.length > 0) { setSelectedIndex((prev) => Math.max(0, prev - 1)); return; }
     if (key.downArrow && !key.shift && projects.length > 0) { setSelectedIndex((prev) => Math.min(projects.length - 1, prev + 1)); return; }
@@ -654,7 +687,7 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
     
         if (shiftCombo('c') && viewMode === 'detail' && selectedProject) { setCustomMode(true); setCustomInput(''); setCustomCursor(0); return; }
     
-    if (viewMode === 'detail' && normalizedInput && detailShortcutMap.has(normalizedInput)) {
+    if (mainView === 'navigator' && viewMode === 'detail' && normalizedInput && detailShortcutMap.has(normalizedInput)) {
       if (!isNaN(parseInt(normalizedInput))) {
         runProjectCommand(detailShortcutMap.get(normalizedInput), selectedProject);
         return;
@@ -684,7 +717,7 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
         selectedProject.missingBinaries && selectedProject.missingBinaries.length > 0 && create(Text, {color: 'red', bold: true}, '  ⚠️ MISSING RUNTIME')
       ),
       create(Text, {key: 'manifest', dimColor: true}, `${selectedProject.type} · ${selectedProject.manifest || 'detected manifest'}`),
-      create(Text, {key: 'loc', dimColor: true}, `Location: ${path.relative(rootPath, selectedProject.path) || '.'}`)
+      create(Text, {key: 'loc', dimColor: true}, `Location: ${truncatePath(path.relative(rootPath, selectedProject.path) || '.', 35)}`)
     ];
     if (selectedProject.description) content.push(create(Text, {key: 'desc'}, selectedProject.description));
     const frameworks = (selectedProject.frameworks || []).map((lib) => `${lib.icon} ${lib.name}`).join(', ');
@@ -701,10 +734,10 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
     detailedIndexed.forEach((command) => {
       content.push(
         create(Text, {key: `d-${command.shortcut}`}, `${command.shortcut}. ${command.label} ${command.source === 'custom' ? kleur.magenta('(custom)') : command.source === 'framework' ? kleur.cyan('(framework)') : ''}`),
-        create(Text, {key: `dl-${command.shortcut}`, dimColor: true}, `   ↳ ${command.command.join(' ')}`)
+        create(Text, {key: `dl-${command.shortcut}`, dimColor: true, wrap: 'wrap'}, `   ↳ ${command.command.join(' ')}`)
       );
     });
-    content.push(create(Text, {key: 'h-l', dimColor: true, marginTop: 1}, 'Shift+C: custom cmd · Shift+R: port · Alt+B/Alt+T/Alt+R/Alt+I: quick actions · Enter: close detail view.'));
+    content.push(create(Text, {key: 'h-l', dimColor: true, marginTop: 1, wrap: 'wrap'}, 'Shift+C: custom cmd · Shift+R: port · B/T/R/I: quick actions · Enter: close detail view.'));
     return content;
   }, [viewMode, selectedProject, rootPath, detailedIndexed]);
 
@@ -726,9 +759,9 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
     switch (mainView) {
       case 'studio': return create(Studio);
       case 'tasks': return create(TaskManager, {tasks, activeTaskId, renameMode, renameInput, renameCursor, CursorText});
-      case 'registry': return create(PackageRegistry, {selectedProject, projects, onRunCommand: runProjectCommand, CursorText, onSelectProject: (idx) => setSelectedIndex(idx)});
-      case 'architect': return create(ProjectArchitect, {rootPath, onRunCommand: runProjectCommand, CursorText, onReturn: () => setMainView('navigator')});
-      case 'ai': return create(AIHorizon, {rootPath, selectedProject, onRunCommand: runProjectCommand, CursorText, config, setConfig, saveConfig, analysisContext: aiAnalysisContext, clearContext: () => setAiAnalysisContext(null)});
+      case 'registry': return create(PackageRegistry, {selectedProject, projects, onRunCommand: runProjectCommand, CursorText, onSelectProject: (idx) => setSelectedIndex(idx), onReturn: () => clearAndSwitch('navigator')});
+      case 'architect': return create(ProjectArchitect, {rootPath, onRunCommand: runProjectCommand, CursorText, onReturn: () => clearAndSwitch('navigator')});
+      case 'ai': return create(AIHorizon, {rootPath, selectedProject, onRunCommand: runProjectCommand, CursorText, config, setConfig, saveConfig, analysisContext: aiAnalysisContext, clearContext: () => setAiAnalysisContext(null), onReturn: () => clearAndSwitch('navigator')});
       default: {
         const navigatorBody = [
           create(Header, {projectCountLabel, rootPath, running, statusHint, toggleHint, orbitHint, artHint}),
@@ -737,7 +770,7 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
             create(Box, {flexDirection: 'row', marginTop: 1}, ...ART_CHARS.map((char, i) => create(Text, {key: i, color: ART_COLORS[i % ART_COLORS.length]}, char.repeat(2)))),
             create(Box, {flexDirection: 'row', marginTop: 1}, ...artTileNodes)
           ),
-          create(Box, {key: 'projects-row', marginTop: 1, flexDirection: 'row', alignItems: 'stretch', width: '100%', flexWrap: 'wrap'},
+          create(Box, {key: 'projects-row', marginTop: 1, flexDirection: 'row', alignItems: 'stretch', width: '100%', flexWrap: 'nowrap'},
             create(Box, {flexGrow: 1, flexBasis: 0, minWidth: PROJECTS_MIN_WIDTH, marginRight: 1, borderStyle: 'round', borderColor: 'magenta', padding: 1}, 
               create(Text, {bold: true, color: 'magenta'}, 'Projects'), 
               create(Box, {flexDirection: 'column', marginTop: 1}, create(Navigator, {
@@ -830,6 +863,10 @@ function parseArgs() {
 
 async function main() {
   const args = parseArgs();
+  if (process.env.TUI_TEST || args.mode === 'test') {
+    process.stdin.isTTY = true;
+    process.stdin.setRawMode = () => {};
+  }
   if (args.version) {
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
     const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf-8'));

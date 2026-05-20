@@ -33,6 +33,10 @@ const ProjectArchitect = memo(({rootPath, onRunCommand, CursorText, onReturn}) =
       if (key.upArrow) setSelectedIdx(prev => (prev - 1 + frameworks.length) % frameworks.length);
       if (key.downArrow) setSelectedIdx(prev => (prev + 1) % frameworks.length);
       if (key.return) setStep('path');
+      if (key.escape) {
+        if (onReturn) onReturn();
+        return;
+      }
       return;
     }
 

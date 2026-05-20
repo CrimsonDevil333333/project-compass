@@ -58,7 +58,7 @@ function buildProjectContext(project, rootPath) {
   return lines.join('\n');
 }
 
-const AIHorizon = memo(({rootPath, selectedProject, CursorText, config, setConfig, saveConfig, analysisContext, clearContext}) => {
+const AIHorizon = memo(({rootPath, selectedProject, CursorText, config, setConfig, saveConfig, analysisContext, clearContext, onReturn}) => {
   const [step, setStep] = useState(config?.aiToken ? 'analyze' : 'provider');
   
   useEffect(() => {
@@ -344,6 +344,10 @@ Help the user with their questions about this project. Be concise but thorough.`
     }
 
     if (step === 'provider') {
+      if (key.escape) {
+        if (onReturn) onReturn();
+        return;
+      }
       if (key.upArrow) setProviderIdx(p => (p - 1 + AI_PROVIDERS.length) % AI_PROVIDERS.length);
       if (key.downArrow) setProviderIdx(p => (p + 1) % AI_PROVIDERS.length);
       if (key.return) {
@@ -376,6 +380,10 @@ Help the user with their questions about this project. Be concise but thorough.`
         setToken(prev => prev.slice(0, cursor) + input + prev.slice(cursor)); setCursor(c => c + input.length);
       }
     } else if (step === 'analyze') {
+      if (key.escape) {
+        if (onReturn) onReturn();
+        return;
+      }
       if (key.return && status === 'ready' && selectedProject) {
         runRealAnalysis();
       }
@@ -458,7 +466,7 @@ Help the user with their questions about this project. Be concise but thorough.`
         status === 'done' && create(Box, {flexDirection: 'column'},
           create(Text, {color: 'green', bold: true}, ' ✅ DNA Mapped via AI Agent!'),
           create(Text, null, ' Review ' + suggestions.length + ' suggested commands below.'),
-          ...suggestions.map((suggestion, index) => create(Text, {key: `${suggestion.label}-${index}`, color: index === selectedSuggestion ? 'cyan' : 'white'}, `${index === selectedSuggestion ? '→' : ' '} ${suggestion.label}: ${suggestion.command.join(' ')}`)),
+          ...suggestions.map((suggestion, index) => create(Text, {key: `${suggestion.label}-${index}`, color: index === selectedSuggestion ? 'cyan' : 'white', wrap: 'truncate-end'}, `${index === selectedSuggestion ? '→' : ' '} ${suggestion.label}: ${suggestion.command.join(' ')}`)),
           editMode && create(Box, {flexDirection: 'row', marginTop: 1},
             create(Text, null, 'Edit command: '),
             create(CursorText, {value: editInput, cursorIndex: editCursor})
@@ -473,13 +481,13 @@ Help the user with their questions about this project. Be concise but thorough.`
           Box,
           {flexDirection: 'column', marginTop: 1, borderStyle: 'single', borderColor: 'gray', padding: 1},
           create(Text, {bold: true, color: 'cyan'}, '📄 Raw AI Response:'),
-          create(Text, {dimColor: true}, rawAIResponse.slice(0, 2000))
+          create(Text, {dimColor: true, wrap: 'wrap'}, rawAIResponse.slice(0, 2000))
         ),
         status === 'busy' && rawAIResponse && create(
           Box,
           {flexDirection: 'column', marginTop: 1, borderStyle: 'single', borderColor: 'gray', padding: 1},
           create(Text, {bold: true, color: 'yellow'}, '📄 Partial Response:'),
-          create(Text, {dimColor: true}, rawAIResponse.slice(0, 1000))
+          create(Text, {dimColor: true, wrap: 'wrap'}, rawAIResponse.slice(0, 1000))
         ),
         error && create(
           Box,
@@ -503,7 +511,7 @@ Help the user with their questions about this project. Be concise but thorough.`
           Box,
           {key: i, marginBottom: 1, flexDirection: 'column'},
           create(Text, {bold: true, color: msg.role === 'user' ? 'blue' : 'green'}, msg.role === 'user' ? '👤 YOU' : '🤖 AI'),
-          create(Text, null, msg.content)
+          create(Text, {wrap: 'wrap'}, msg.content)
         )),
         status === 'busy' && create(Text, {color: 'yellow'}, ' ⏳ AI is thinking...')
       ),
