@@ -5,6 +5,34 @@ All notable changes to Project Compass will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.2.0] - 2026-05-20
+
+### Added
+- **Task Persistence Layer** (`src/core/TaskPersistence.js`): Every task's stdout/stderr is now tee'd to a dedicated log file at `~/.project-compass/tasks/<taskId>.log` in real-time. Task metadata (PID, status, command, project) is snaphotted to `~/.project-compass/tasks.json` after every state change.
+- **Detach & Exit** (D/K/N Quit Modal): Pressing Shift+Q now shows a 3-way modal — `D` to detach all running processes (they keep running as background processes after TUI exit), `K` to kill all and exit, `N` to cancel.
+- **Session Restore**: On TUI re-open, detached tasks from the previous session are rehydrated and shown in a dismissable banner. Tasks whose PID is still alive are marked `detached` (re-attachable). Tasks whose process ended while the TUI was away are marked `orphaned`.
+- **Live Re-attach** (Shift+A in Task Manager): Re-attaches to a detached task — reads historical logs from the log file, then starts live-tailing the log file via a 100ms polling loop for real-time streaming. No daemon process required.
+- **Shift+Z**: Dismiss the session restore banner without switching views.
+- **Task Rename Persistence**: Renaming a task (Shift+R) now persists to `config.json` so the renamed label survives restarts.
+- **`src/core/TaskPersistence.js`**: New module — `saveTasksManifest`, `loadTasksManifest`, `createTaskLogStream`, `readTaskLogs`, `tailTaskLog`, `pruneOldTaskLogs`, `deleteTaskLog`.
+- **TASKS_DIR / TASKS_MANIFEST_PATH** exports in `configPaths.js`.
+
+### Changed
+- **Shift+D** now properly marks a task as `detached` (the process keeps running) instead of just hiding it from the active task slot.
+- **Task Manager** fully rewritten: shows duration, project name, PID, detached/orphaned/restored badges, status icons and color coding, scrollable window, last-log preview for active task.
+- **Output panel** shows `DETACHED` / `ORPHANED` badges and appropriate hints.
+- **Status normalization**: All task statuses are now `running`, `success`, `failed`, `detached`, `orphaned`, `killed` (no more ambiguous `finished`).
+- **Orbit tile** in the art board now shows detached task count when nothing is actively running.
+
+### Fixed
+- `logOffset` was not reset when switching between tasks — now resets to 0 on every `setActiveTaskId` call.
+- `Shift+T` (Task Manager) no longer causes a `console.clear()` flash.
+- `Shift+L` (rerun last command) no longer stacks gimmicky error tasks — errors are auto-dismissed after 4s.
+- Task renames now persist across sessions via `config.taskRenames`.
+- `Shift+D` was previously just `setActiveTaskId(null)` leaving the task invisible but still `running` in the list.
+- ANSI escape codes are stripped before storing log lines in memory (log files receive clean text).
+- Port config and custom command input modes now show inline banners in the navigator instead of being invisible.
+
 ## [5.1.0] - 2026-05-20
 
 ### Fixed

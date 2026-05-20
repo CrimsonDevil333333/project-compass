@@ -31,7 +31,7 @@ Welcome to Project Compass. This file provides **COMPLETE** context for AI agent
 
 **Project Compass** is a futuristic project navigator and runner designed for modern polygot development. It provides a high-fidelity terminal UI (using Ink) and a synchronized Web Dashboard to manage complex workspaces with integrated Agentic AI intelligence.
 
-**Version:** 5.1.0  
+**Version:** 5.2.0  
 **Last Updated:** 2026-05-20  
 **Author:** Satyaa & Clawdy  
 **License:** MIT  
@@ -46,7 +46,9 @@ Welcome to Project Compass. This file provides **COMPLETE** context for AI agent
 - **Multi-Language Detection**: Node.js, Python, Rust, Go, Java, PHP, Ruby, .NET
 - **Deep Scan Mode**: Unlimited discovery depth (`--deep`)
 - **Git Visibility**: Real-time branch and status integration in TUI
-- **Task Management**: Background orchestration with status-coded UI
+- **Task Persistence**: Running tasks survive TUI exit — detach, persist, re-attach with live streaming
+- **Session Restore**: Previous detached tasks rehydrated on next TUI launch with PID liveness check
+- **Live Re-attach**: Reconnect to detached processes with full historical + live log streaming
 
 ---
 
@@ -54,7 +56,7 @@ Welcome to Project Compass. This file provides **COMPLETE** context for AI agent
 
 | Attribute | Value |
 |-----------|-------|
-| **Version** | 5.1.0 |
+| **Version** | 5.2.0 |
 | **NPM Package** | `project-compass` |
 | **Node.js Requirement** | ^18.0.0 (ESM support) |
 | **Build Status** | Stable |
@@ -104,20 +106,25 @@ project-compass/
 ├── node_modules/                # Dependencies (NOT in repo)
 └── ~/.project-compass/           # User config directory (NOT in repo)
     ├── config.json             # Main configuration
-    └── plugins.json            # Custom framework plugins
+    ├── plugins.json            # Custom framework plugins
+    ├── tasks.json              # Persisted task manifest (PIDs, status, paths)
+    └── tasks/                  # Per-task log files (<taskId>.log)
 ```
 
 ### Key Files for AI Agents
 
 | File | Lines | Purpose | When to Read |
 |------|-------|---------|----------------|
-| `src/cli.js` | 1-840 | Main app, all state, input handling | Working on TUI, CLI, or state |
+| `src/cli.js` | 1-900+ | Main app, all state, input handling | Working on TUI, CLI, or state |
+| `src/core/Orchestrator.js` | 1-340+ | Brain: task engine, scan, persist, detach/reattach | Working on tasks or orchestration |
+| `src/core/TaskPersistence.js` | 1-255+ | Log files, manifest I/O, tail streaming | Working on task persistence |
 | `src/projectDetection.js` | 1-189 | Detection orchestrator | Working on detection system |
 | `src/detectors/utils.js` | 1-148 | Shared utilities | Working on detectors |
 | `src/detectors/frameworks.js` | 1-877 | Framework plugins | Working on framework detection |
 | `src/components/AIHorizon.js` | 1-426 | AI analysis | Working on AI features |
 | `src/components/Navigator.js` | 1-110 | Project list | Working on navigation |
-| `src/components/TaskManager.js` | 1-82 | Task management | Working on tasks |
+| `src/components/TaskManager.js` | 1-160+ | Task management (full overhaul v5.2.0) | Working on tasks |
+| `src/configPaths.js` | 1-48 | Config paths, TASKS_DIR, TASKS_MANIFEST_PATH | Working on persistence |
 | `AGENTS.md` | 1-600+ | THIS FILE | Start here for context |
 | `PROJECT_CONTEXT.md` | 1-400+ | Technical context | Deep technical work |
 
@@ -140,11 +147,11 @@ project-compass/
 
 | API | Purpose | Usage |
 |-----|---------|-------|
-| `fs` | File system operations | Reading manifests, writing config |
+| `fs` | File system operations | Reading manifests, writing config, task log files |
 | `path` | Path manipulation | Resolving paths, joining |
 | `fetch` | HTTP requests | AI provider API calls |
-| `setInterval/setTimeout` | Timers | Startup animation, scroll |
-| `process` | Process info | Exit codes, signals |
+| `setInterval/setTimeout` | Timers | Startup animation, scroll, tail polling |
+| `process` | Process info | Exit codes, signals, PID liveness checks |
 
 ---
 
@@ -377,7 +384,7 @@ project-compass --ai-analyze           # Shows message to use TUI mode
 | `Shift+T` | **Orbit Task Manager** | `tasks` |
 | `Shift+P` | **Package Registry** | `registry` |
 | `Shift+N` | **Project Architect** | `architect` |
-| `Shift+A` | **Omni-Studio** | `studio` |
+| `Shift+A` | **Omni-Studio** (from navigator) / **Re-attach** (from Task Manager) | `studio` / tasks view |
 
 ### UI Toggles (Saved to Config)
 
@@ -387,18 +394,28 @@ project-compass --ai-analyze           # Shows message to use TUI mode
 | `Shift+H` | Toggle **Help Cards** UI | `showHelpCards` |
 | `Shift+S` | Toggle **Structure Guide** | `showStructureGuide` |
 
-### Task Management
+### Task Management & Persistence
 
 | Key | Action | Context |
 |-----|--------|---------|
-| `Shift+K` | **Kill** running process | Task Manager |
-| `Shift+R` | **Rename** task / Configure Port | Task Manager / Detail View |
-| `Shift+D` | **Detach** from active task | Navigator |
+| `Shift+K` | **Kill** running/detached process | Task Manager |
+| `Shift+R` | **Rename** task (persisted to config) / Configure Port | Task Manager / Detail View |
+| `Shift+D` | **Detach** active task — process keeps running, logs go to file | Navigator |
+| `Shift+A` | **Re-attach** to detached/orphaned task — live tail + historical | Task Manager |
+| `Shift+Z` | **Dismiss** session restore banner | Navigator |
 | `Shift+X` | **Clear** active task output logs | Navigator |
 | `Shift+E` | **Export** logs to `.txt` file | Navigator |
 | `Shift+L` | **Rerun** the last executed command | Navigator |
 | `↑` / `↓` | Move focus between tasks | Task Manager |
-| `Enter` | Select/deselect task | Task Manager |
+| `Enter` | Return to Navigator | Task Manager |
+
+### Quit Modal (Shift+Q when tasks are running)
+
+| Key | Action |
+|-----|--------|
+| `D` | **Detach All** — all running tasks kept alive, TUI exits cleanly |
+| `K` | **Kill All** — SIGKILL all processes, then exit |
+| `N` | **Cancel** — return to TUI |
 
 ### Log Scrolling
 

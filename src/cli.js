@@ -7,14 +7,13 @@ import fs from 'fs';
 import kleur from 'kleur';
 import {execa} from 'execa';
 import {discoverProjects, SCHEMA_GUIDE} from './projectDetection.js';
-import {parseShellWords, peekScriptCommand} from './detectors/utils.js';
+import {parseShellWords} from './detectors/utils.js';
 import {CONFIG_PATH, ensureConfigDir, loadConfig, saveConfig} from './configPaths.js';
 
 import { orchestrator } from './core/Orchestrator.js';
 import { startServer, setupSystemdService } from './server.js';
 import { startMcpServer } from './mcp.js';
 import VERSION from './version.js';
-
 
 // Modular Components
 import Studio from './components/Studio.js';
@@ -48,6 +47,9 @@ const COMMAND_FALLBACKS = {
   install: ['setup', 'bootstrap', 'fetch']
 };
 
+// ─────────────────────────────────────────────────────────────
+// Hooks
+// ─────────────────────────────────────────────────────────────
 
 function useScanner(rootPath, initialDepth = 7) {
   const [projects, setProjects] = useState([]);
@@ -56,7 +58,7 @@ function useScanner(rootPath, initialDepth = 7) {
 
   useEffect(() => {
     let isMounted = true;
-    
+
     const performScan = async () => {
       setLoading(true);
       try {
@@ -70,11 +72,11 @@ function useScanner(rootPath, initialDepth = 7) {
     };
 
     performScan();
-    
+
     const handleUpdate = (updatedProjects) => {
       if (isMounted) setProjects([...updatedProjects]);
     };
-    
+
     orchestrator.on('scan_complete', handleUpdate);
     return () => {
       isMounted = false;
@@ -85,8 +87,9 @@ function useScanner(rootPath, initialDepth = 7) {
   return {projects, loading, error, refresh: () => orchestrator.scan(rootPath, initialDepth)};
 }
 
-
-
+// ─────────────────────────────────────────────────────────────
+// Utilities
+// ─────────────────────────────────────────────────────────────
 
 function buildDetailCommands(project, config) {
   if (!project) return [];
@@ -107,9 +110,7 @@ function truncatePath(filePath, maxLength = 35) {
   if (!filePath) return '.';
   if (filePath.length <= maxLength) return filePath;
   const parts = filePath.split(path.sep);
-  if (parts.length <= 2) {
-    return '...' + filePath.slice(-(maxLength - 3));
-  }
+  if (parts.length <= 2) return '...' + filePath.slice(-(maxLength - 3));
   const first = parts[0];
   const last = parts.slice(-2).join(path.sep);
   const combined = `${first}${path.sep}...${path.sep}${last}`;
@@ -117,14 +118,16 @@ function truncatePath(filePath, maxLength = 35) {
   return '...' + filePath.slice(-(maxLength - 3));
 }
 
+// ─────────────────────────────────────────────────────────────
+// Small components
+// ─────────────────────────────────────────────────────────────
+
 function CursorText({value, cursorIndex, active = true}) {
   const before = value.slice(0, cursorIndex);
   const charAt = value[cursorIndex] || ' ';
   const after = value.slice(cursorIndex + 1);
-
   return create(
-    Text,
-    null,
+    Text, null,
     before,
     active ? create(Text, {backgroundColor: 'white', color: 'black'}, charAt) : charAt,
     after
@@ -136,14 +139,29 @@ const OutputPanel = memo(({activeTask, logOffset}) => {
   const logWindowStart = Math.max(0, logs.length - OUTPUT_WINDOW_SIZE - logOffset);
   const logWindowEnd = Math.max(0, logs.length - logOffset);
   const visibleLogs = logs.slice(logWindowStart, logWindowEnd);
-  
-  const logNodes = visibleLogs.length 
-    ? visibleLogs.map((line, i) => create(Text, {key: i, wrap: 'wrap'}, line)) 
+
+  const logNodes = visibleLogs.length
+    ? visibleLogs.map((line, i) => create(Text, {key: i, wrap: 'wrap'}, line))
     : [create(Text, {key: 'empty', dimColor: true}, 'Select a task or run a command to see logs.')];
 
-  const borderColor = !activeTask ? 'gray' : 
-                    activeTask.status === 'running' ? 'yellow' : 
-                    activeTask.status === 'finished' ? 'green' : 'red';
+  const borderColor = !activeTask ? 'gray'
+    : activeTask.status === 'running' ? 'yellow'
+    : activeTask.status === 'success' ? 'green'
+    : activeTask.status === 'detached' ? 'blue'
+    : activeTask.status === 'orphaned' ? 'gray'
+    : 'red';
+
+  // Status badge for detached/orphaned tasks
+  const statusBadge = activeTask?.status === 'detached'
+    ? create(Box, {position: 'absolute', right: 2, top: 0},
+        create(Text, {backgroundColor: 'blue', color: 'white', bold: true}, ' DETACHED '))
+    : activeTask?.status === 'orphaned'
+    ? create(Box, {position: 'absolute', right: 2, top: 0},
+        create(Text, {backgroundColor: 'gray', color: 'white', bold: true}, ' ORPHANED '))
+    : logOffset > 0
+    ? create(Box, {position: 'absolute', right: 2, top: 0},
+        create(Text, {backgroundColor: 'white', color: 'black'}, ` ↑ SCROLLED ${logOffset} `))
+    : null;
 
   return create(
     Box,
@@ -158,15 +176,58 @@ const OutputPanel = memo(({activeTask, logOffset}) => {
       overflow: 'hidden'
     },
     ...logNodes,
-    logOffset > 0 && create(
-      Box,
-      { position: 'absolute', right: 2, top: 0 },
-      create(Text, { backgroundColor: 'white', color: 'black' }, ` ↑ SCROLLED ${logOffset} `)
-    )
+    statusBadge
   );
 });
 
+// ─────────────────────────────────────────────────────────────
+// Quit Modal (D / K / N)
+// ─────────────────────────────────────────────────────────────
+const QuitModal = ({tasks}) => {
+  const running = tasks.filter(t => t.status === 'running');
+  const detached = tasks.filter(t => t.status === 'detached');
+  return create(
+    Box,
+    {flexDirection: 'column', borderStyle: 'double', borderColor: 'red', padding: 1},
+    create(Text, {bold: true, color: 'red'}, '⚠️  Confirm Exit'),
+    create(Text, {marginTop: 1}, `${running.length} task${running.length === 1 ? '' : 's'} currently running.`),
+    detached.length > 0 && create(Text, null, `${detached.length} task${detached.length === 1 ? '' : 's'} already detached.`),
+    create(Text, {marginTop: 1, bold: true, color: 'yellow'}, 'What would you like to do?'),
+    create(Box, {marginTop: 1, flexDirection: 'column'},
+      create(Text, null, `  ${kleur.bold().green('D')} ─ Detach all & exit  ${kleur.dim('(processes keep running, logs persist)')}`),
+      create(Text, null, `  ${kleur.bold().red('K')} ─ Kill all & exit     ${kleur.dim('(stop all processes immediately)')}`),
+      create(Text, null, `  ${kleur.bold().white('N')} ─ Cancel              ${kleur.dim('(go back)')}`),
+    ),
+    create(Text, {marginTop: 1, dimColor: true}, 'Detached tasks can be re-attached next time you open Project Compass.')
+  );
+};
 
+// ─────────────────────────────────────────────────────────────
+// Session Restore Banner
+// ─────────────────────────────────────────────────────────────
+const SessionRestoreBanner = ({restoredTasks, onDismiss}) => {
+  const detached = restoredTasks.filter(t => t.status === 'detached' && t.pidAlive);
+  const orphaned = restoredTasks.filter(t => t.status === 'orphaned' || (t.status === 'detached' && !t.pidAlive));
+  return create(
+    Box,
+    {flexDirection: 'column', borderStyle: 'single', borderColor: 'blue', padding: 1, marginBottom: 1},
+    create(Box, {flexDirection: 'row', justifyContent: 'space-between'},
+      create(Text, {bold: true, color: 'blue'}, '📦 Session Restored'),
+      create(Text, {dimColor: true}, 'Shift+Z to dismiss')
+    ),
+    detached.length > 0 && create(Text, {color: 'blue'},
+      `  ⊘ ${detached.length} detached task${detached.length === 1 ? '' : 's'} still running (PID alive)`
+    ),
+    orphaned.length > 0 && create(Text, {color: 'gray'},
+      `  ? ${orphaned.length} task${orphaned.length === 1 ? '' : 's'} ended while away`
+    ),
+    create(Text, {dimColor: true}, '  Press Shift+T to open Task Manager and re-attach or review.')
+  );
+};
+
+// ─────────────────────────────────────────────────────────────
+// Splash screen
+// ─────────────────────────────────────────────────────────────
 const Splash = () => {
   const [frame, setFrame] = React.useState(0);
   React.useEffect(() => {
@@ -197,6 +258,9 @@ const Splash = () => {
   );
 };
 
+// ─────────────────────────────────────────────────────────────
+// Main Compass component
+// ─────────────────────────────────────────────────────────────
 
 function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
   const {exit} = useApp();
@@ -208,6 +272,7 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
     return () => clearTimeout(timer);
   }, []);
 
+  // ── Core state ────────────────────────────────────────────
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [viewMode, setViewMode] = useState('list');
   const [mainView, setMainView] = useState(initialView);
@@ -219,9 +284,6 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchCursor, setSearchCursor] = useState(0);
   const [customMode, setCustomMode] = useState(false);
-
-
-
   const [portConfigMode, setPortConfigMode] = useState(false);
   const [customInput, setCustomInput] = useState('');
   const [customCursor, setCustomCursor] = useState(0);
@@ -229,19 +291,22 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
   const [renameMode, setRenameMode] = useState(false);
   const [renameInput, setRenameInput] = useState('');
   const [renameCursor, setRenameCursor] = useState(0);
-  const [quitConfirm, setQuitConfirm] = useState(false);
+  // 'idle' | 'confirm' — 'confirm' shows D/K/N modal
+  const [quitState, setQuitState] = useState('idle');
   const [config, setConfig] = useState(() => loadConfig());
   const [stdinBuffer, setStdinBuffer] = useState('');
   const [stdinCursor, setStdinCursor] = useState(0);
+  // Session restore banner
+  const [sessionRestored, setSessionRestored] = useState([]);
+  const [showRestoreBanner, setShowRestoreBanner] = useState(false);
 
-
-
-  const runningProcessMap = useRef(new Map());
   const lastCommandRef = useRef(null);
 
+  // ── Derived state ─────────────────────────────────────────
   const activeTask = useMemo(() => tasks.find(t => t.id === activeTaskId), [tasks, activeTaskId]);
   const running = activeTask?.status === 'running';
   const hasRunningTasks = useMemo(() => tasks.some(t => t.status === 'running'), [tasks]);
+  const hasDetachedTasks = useMemo(() => tasks.some(t => t.status === 'detached'), [tasks]);
 
   const filteredProjects = useMemo(() => {
     if (!searchQuery) return projects;
@@ -251,7 +316,13 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
 
   const selectedProject = useMemo(() => filteredProjects[selectedIndex] || null, [filteredProjects, selectedIndex]);
 
+  // ── Helper: set active task ID AND reset log offset ───────
+  const switchActiveTask = useCallback((taskId) => {
+    setActiveTaskId(taskId);
+    setLogOffset(0);
+  }, []);
 
+  // ── Add a log line to a task in React state ────────────────
   const addLogToTask = useCallback((taskId, line) => {
     setTasks(prev => {
       const idx = prev.findIndex(t => t.id === taskId);
@@ -267,6 +338,7 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
     });
   }, []);
 
+  // ── Detail commands ───────────────────────────────────────
   const detailedIndexed = useMemo(() => buildDetailCommands(selectedProject, config).map((command, index) => {
     const isOver9 = index >= 9;
     const shortcut = isOver9 ? `S+${String.fromCharCode(65 + index - 9)}` : `${index + 1}`;
@@ -285,112 +357,200 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
     return map;
   }, [detailedIndexed]);
 
+  // ── Kill a task ───────────────────────────────────────────
   const handleKillTask = useCallback((taskId) => {
-    const proc = runningProcessMap.current.get(taskId);
-    if (proc) {
-      addLogToTask(taskId, kleur.yellow('! Triggering emergency kill sequence...'));
-      try {
-        if (process.platform === 'win32') {
-          execa('taskkill', ['/pid', proc.pid, '/f', '/t']);
-        } else if (proc.pid) {
-          process.kill(-proc.pid, 'SIGKILL');
-        } else {
-          proc.kill('SIGKILL');
-        }
-      } catch (e) {
-        addLogToTask(taskId, kleur.red(`✗ Kill failed: ${e.message}`));
-      }
-    } else {
-      setTasks(prev => prev.filter(t => t.id !== taskId));
-      if (activeTaskId === taskId) setActiveTaskId(null);
-    }
-  }, [activeTaskId, addLogToTask]);
+    orchestrator.killTask(taskId);
+    setTasks(prev => prev.map(t =>
+      t.id === taskId ? { ...t, status: 'killed', endTime: Date.now() } : t
+    ));
+  }, []);
 
-  const killAllTasks = useCallback(() => {
-    runningProcessMap.current.forEach((proc, tid) => {
-      handleKillTask(tid);
+  // ── Kill all tasks ────────────────────────────────────────
+  const handleKillAllAndExit = useCallback(() => {
+    orchestrator.killAllTasks();
+    process.stdout.write('\x1b[2J\x1b[0;0H');
+    exit();
+  }, [exit]);
+
+  // ── Detach all and exit ───────────────────────────────────
+  const handleDetachAllAndExit = useCallback(() => {
+    orchestrator.detachAllTasks();
+    setTasks(prev => prev.map(t =>
+      t.status === 'running' ? { ...t, status: 'detached', detachedAt: Date.now() } : t
+    ));
+    process.stdout.write('\x1b[2J\x1b[0;0H');
+    // Allow a tiny moment for file writes to flush, then exit
+    setTimeout(() => {
+      process.stdout.write('\x1b[?25h');
+      process.exit(0);
+    }, 150);
+  }, []);
+
+  // ── Detach a single task ──────────────────────────────────
+  const handleDetachTask = useCallback((taskId) => {
+    orchestrator.detachTask(taskId);
+    setTasks(prev => prev.map(t =>
+      t.id === taskId ? { ...t, status: 'detached', detachedAt: Date.now() } : t
+    ));
+    if (activeTaskId === taskId) switchActiveTask(null);
+  }, [activeTaskId, switchActiveTask]);
+
+  // ── Re-attach to a detached task ─────────────────────────
+  const handleReattachTask = useCallback((taskId) => {
+    const result = orchestrator.reattachTask(taskId, ({ logs }) => {
+      // Called on every new line from tail
+      setTasks(prev => prev.map(t =>
+        t.id === taskId ? { ...t, logs: [...logs] } : t
+      ));
     });
-    runningProcessMap.current.clear();
-  }, [handleKillTask]);
+    if (!result) return;
 
+    // Update local task state with historical logs and new status
+    setTasks(prev => prev.map(t => {
+      if (t.id !== taskId) return t;
+      return {
+        ...t,
+        logs: result.logs,
+        status: result.pidAlive ? 'running' : 'orphaned',
+      };
+    }));
+
+    switchActiveTask(taskId);
+    addLogToTask(taskId, result.pidAlive
+      ? kleur.blue('⟳ Re-attached to running process. Live streaming active.')
+      : kleur.gray('? Process ended while detached. Showing historical logs.')
+    );
+  }, [addLogToTask, switchActiveTask]);
+
+  // ── Subscribe to orchestrator events ─────────────────────
   useEffect(() => {
     const handleStart = (task) => {
-      if (task.process) {
-        runningProcessMap.current.set(task.id, task.process);
-      }
       setTasks(prev => {
         if (prev.some(t => t.id === task.id)) return prev;
-        return [...prev, task];
+        return [...prev, { ...task, logs: task.logs || [] }];
       });
-      if (!activeTaskId) setActiveTaskId(task.id);
+      switchActiveTask(task.id);
     };
 
-    const handleOutput = ({ taskId, chunk, logs }) => {
+    const handleOutput = ({ taskId, logs }) => {
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, logs } : t));
     };
 
     const handleEnd = (task) => {
-      runningProcessMap.current.delete(task.id);
-      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: task.status, endTime: task.endTime } : t));
+      setTasks(prev => prev.map(t =>
+        t.id === task.id ? { ...t, status: task.status, endTime: task.endTime } : t
+      ));
+    };
+
+    const handleDetached = (task) => {
+      setTasks(prev => prev.map(t =>
+        t.id === task.id ? { ...t, status: 'detached', detachedAt: task.detachedAt } : t
+      ));
+    };
+
+    const handleRehydrated = (task) => {
+      setTasks(prev => {
+        if (prev.some(t => t.id === task.id)) return prev;
+        return [...prev, { ...task, rehydrated: true }];
+      });
+    };
+
+    const handleSessionRestore = (restoredTasks) => {
+      setSessionRestored(restoredTasks);
+      setShowRestoreBanner(true);
+    };
+
+    const handleReattached = (task) => {
+      setTasks(prev => prev.map(t =>
+        t.id === task.id ? { ...t, status: 'running' } : t
+      ));
     };
 
     orchestrator.on('task_start', handleStart);
     orchestrator.on('task_output', handleOutput);
     orchestrator.on('task_end', handleEnd);
+    orchestrator.on('task_detached', handleDetached);
+    orchestrator.on('task_rehydrated', handleRehydrated);
+    orchestrator.on('session_restore', handleSessionRestore);
+    orchestrator.on('task_reattached', handleReattached);
 
     return () => {
       orchestrator.off('task_start', handleStart);
       orchestrator.off('task_output', handleOutput);
       orchestrator.off('task_end', handleEnd);
+      orchestrator.off('task_detached', handleDetached);
+      orchestrator.off('task_rehydrated', handleRehydrated);
+      orchestrator.off('session_restore', handleSessionRestore);
+      orchestrator.off('task_reattached', handleReattached);
     };
-  }, [activeTaskId]);
+  }, [switchActiveTask]);
 
+  // ── Run a project command ─────────────────────────────────
   const runProjectCommand = useCallback((commandMeta, targetProject = null) => {
     const project = targetProject || selectedProject;
-    
     try {
-      // If no project is selected, run as a system-wide command (scaffolding, etc.)
+      // If same command was last run, mark the old task as superseded before running
+      if (lastCommandRef.current) {
+        const { commandMeta: lastCmd, project: lastProj } = lastCommandRef.current;
+        if (lastProj?.id === (project?.id || 'system') &&
+            lastCmd?.label === commandMeta?.label) {
+          // Don't do anything special — the new task will just be added alongside
+        }
+      }
       const taskId = orchestrator.runCommand(project?.id || 'system', null, commandMeta);
-      setActiveTaskId(taskId);
+      switchActiveTask(taskId);
       lastCommandRef.current = { project, commandMeta };
     } catch (err) {
       const errorTaskId = `error-${Date.now()}`;
-      setTasks(prev => [...prev, { id: errorTaskId, name: 'Execution Error', status: 'failed', logs: [kleur.red(`✗ ${err.message}`)] }]);
-      globalThis.setTimeout(() => setTasks(prev => prev.filter(t => t.id !== errorTaskId)), 3000);
+      setTasks(prev => [...prev, {
+        id: errorTaskId, name: 'Execution Error', status: 'failed',
+        logs: [`✗ ${err.message}`], projectName: project?.name || 'system',
+        startTime: Date.now(), endTime: Date.now()
+      }]);
+      globalThis.setTimeout(() => setTasks(prev => prev.filter(t => t.id !== errorTaskId)), 4000);
     }
-  }, [selectedProject]);
+  }, [selectedProject, switchActiveTask]);
 
-
+  // ── Export logs ───────────────────────────────────────────
   const exportLogs = useCallback(() => {
     const taskToExport = tasks.find(t => t.id === activeTaskId);
     if (!taskToExport || !taskToExport.logs.length) return;
     try {
-      const exportPath = path.resolve(process.cwd(), `compass-${taskToExport.id}.txt`);
+      const safe = activeTaskId.replace(/[^a-zA-Z0-9_:\-.]/g, '_');
+      const exportPath = path.resolve(process.cwd(), `compass-${safe}.txt`);
       fs.writeFileSync(exportPath, taskToExport.logs.join('\n'));
-      addLogToTask(activeTaskId, kleur.green(`✓ Logs exported to ${exportPath}`));
+      addLogToTask(activeTaskId, `✓ Logs exported to ${exportPath}`);
     } catch {
-      addLogToTask(activeTaskId, kleur.red('✗ Export failed'));
+      addLogToTask(activeTaskId, '✗ Export failed');
     }
   }, [tasks, activeTaskId, addLogToTask]);
 
+  // ── View switcher ─────────────────────────────────────────
   const clearAndSwitch = useCallback((view) => {
-    console.clear();
     setMainView(view);
     setViewMode('list');
     setShowHelp(false);
   }, []);
 
-    useInput((input, key) => {
+  // ─────────────────────────────────────────────────────────
+  // Input handler
+  // ─────────────────────────────────────────────────────────
+  useInput((input, key) => {
 
-    if (quitConfirm) {
-      if (input?.toLowerCase() === 'y') { killAllTasks(); process.stdout.write('\x1b[2J\x1b[0;0H'); exit(); return; }
-      if (input?.toLowerCase() === 'n' || key.escape) { setQuitConfirm(false); return; }
+    // ── Quit modal (D / K / N) ────────────────────────────
+    if (quitState === 'confirm') {
+      const lower = input?.toLowerCase();
+      if (lower === 'd') { handleDetachAllAndExit(); return; }
+      if (lower === 'k') { handleKillAllAndExit(); return; }
+      if (lower === 'n' || key.escape) { setQuitState('idle'); return; }
+      // Also accept Y as kill (legacy muscle memory)
+      if (lower === 'y') { handleKillAllAndExit(); return; }
       return;
     }
 
     const isCtrlC = (key.ctrl && input === 'c') || input === '\u0003';
 
-    
+    // ── Port config input mode ────────────────────────────
     if (portConfigMode) {
       if (key.return) {
         const portVal = customInput.trim();
@@ -414,13 +574,17 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
         }
         return;
       }
+      if (key.leftArrow) { setCustomCursor(c => Math.max(0, c - 1)); return; }
+      if (key.rightArrow) { setCustomCursor(c => Math.min(customInput.length, c + 1)); return; }
       if (input && /[0-9]/.test(input)) {
         setCustomInput((prev) => prev.slice(0, customCursor) + input + prev.slice(customCursor));
         setCustomCursor(c => c + input.length);
       }
       return;
     }
-        if (customMode) {
+
+    // ── Custom command input mode ─────────────────────────
+    if (customMode) {
       if (key.return) {
         const raw = customInput.trim();
         const selProj = selectedProject;
@@ -458,9 +622,19 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
       return;
     }
 
+    // ── Rename mode ───────────────────────────────────────
     if (renameMode) {
       if (key.return) {
-        setTasks(prev => prev.map(t => t.id === activeTaskId ? {...t, name: renameInput} : t));
+        if (renameInput.trim() && activeTaskId) {
+          orchestrator.renameTask(activeTaskId, renameInput.trim());
+          setTasks(prev => prev.map(t => t.id === activeTaskId ? {...t, name: renameInput.trim(), label: renameInput.trim()} : t));
+          // Also persist rename to config for re-hydration
+          setConfig(prev => {
+            const next = {...prev, taskRenames: {...(prev.taskRenames || {}), [activeTaskId]: renameInput.trim()}};
+            saveConfig(next);
+            return next;
+          });
+        }
         setRenameMode(false); setRenameInput(''); setRenameCursor(0);
         return;
       }
@@ -483,7 +657,7 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
 
     const normalizedInput = input?.toLowerCase();
     const shiftCombo = (char) => key.shift && normalizedInput === char;
-    
+
     const findCommand = (project, key) => {
       let meta = project.commands?.[key];
       if (meta) return meta;
@@ -495,6 +669,7 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
       return null;
     };
 
+    // ── Detail view quick actions (B/T/R/I) ───────────────
     const actionKey = normalizedInput && ACTION_MAP[normalizedInput];
     if (mainView === 'navigator' && viewMode === 'detail' && actionKey && selectedProject) {
       if (actionKey === 'run' && key.shift) {
@@ -512,45 +687,69 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
         if (commandMeta) {
           runProjectCommand(commandMeta, selectedProject);
         } else {
-          const msg = kleur.yellow(`! No ${actionKey} command available for ${selectedProject.name}`);
-          const taskId = `task-${Date.now()}`;
-          setTasks(prev => [...prev, { id: taskId, name: `Notification`, status: 'failed', logs: [msg], project: '' }]);
-          globalThis.setTimeout(() => setTasks(prev => prev.filter(t => t.id !== taskId)), 3000);
+          const errorTaskId = `notif-${Date.now()}`;
+          setTasks(prev => [...prev, {
+            id: errorTaskId, name: `No ${actionKey} command`,
+            status: 'failed',
+            logs: [`! No ${actionKey} command available for ${selectedProject.name}`],
+            projectName: selectedProject.name,
+            startTime: Date.now(), endTime: Date.now()
+          }]);
+          globalThis.setTimeout(() => setTasks(prev => prev.filter(t => t.id !== errorTaskId)), 3000);
         }
         return;
       }
     }
 
-    if (shiftCombo('h')) { console.clear(); setConfig(prev => { const next = {...prev, showHelpCards: !prev.showHelpCards}; saveConfig(next); return next; }); return; }
-    if (shiftCombo('s')) { console.clear(); setConfig(prev => { const next = {...prev, showStructureGuide: !prev.showStructureGuide}; saveConfig(next); return next; }); return; }
+    // ── View/config toggles ───────────────────────────────
+    if (shiftCombo('h')) { setConfig(prev => { const next = {...prev, showHelpCards: !prev.showHelpCards}; saveConfig(next); return next; }); return; }
+    if (shiftCombo('s')) { setConfig(prev => { const next = {...prev, showStructureGuide: !prev.showStructureGuide}; saveConfig(next); return next; }); return; }
     if (shiftCombo('a')) { clearAndSwitch(mainView === 'navigator' ? 'studio' : 'navigator'); return; }
     if (shiftCombo('p')) { clearAndSwitch(mainView === 'navigator' ? 'registry' : 'navigator'); return; }
     if (shiftCombo('n')) { clearAndSwitch(mainView === 'navigator' ? 'architect' : 'navigator'); return; }
     if (shiftCombo('o')) { clearAndSwitch(mainView === 'navigator' ? 'ai' : 'navigator'); return; }
-    if (shiftCombo('x')) { console.clear(); setTasks(prev => prev.map(t => t.id === activeTaskId ? {...t, logs: []} : t)); setLogOffset(0); return; }
+    if (shiftCombo('b')) { setConfig(prev => { const next = {...prev, showArtBoard: !prev.showArtBoard}; saveConfig(next); return next; }); return; }
+
+    if (shiftCombo('x')) { setTasks(prev => prev.map(t => t.id === activeTaskId ? {...t, logs: []} : t)); setLogOffset(0); return; }
     if (shiftCombo('e')) { exportLogs(); return; }
-    if (shiftCombo('d')) { console.clear(); setActiveTaskId(null); return; }
-    if (shiftCombo('b')) { console.clear(); setConfig(prev => { const next = {...prev, showArtBoard: !prev.showArtBoard}; saveConfig(next); return next; }); return; }
-    
-    if (shiftCombo('t')) { 
+
+    // Shift+D: detach current active task (mark as detached, not just hide)
+    if (shiftCombo('d')) {
+      if (activeTaskId) {
+        handleDetachTask(activeTaskId);
+      } else {
+        switchActiveTask(null);
+      }
+      return;
+    }
+
+    // Dismiss session restore banner
+    if (shiftCombo('z') && showRestoreBanner) { setShowRestoreBanner(false); return; }
+
+    // Shift+T: Task Manager (no console.clear flash)
+    if (shiftCombo('t')) {
       setMainView((prev) => {
-        console.clear();
         if (prev === 'tasks') return 'navigator';
-        if (tasks.length > 0 && !activeTaskId) setActiveTaskId(tasks[0].id);
+        if (tasks.length > 0 && !activeTaskId) switchActiveTask(tasks[0].id);
         return 'tasks';
       });
       setViewMode('list');
       setShowHelp(false);
-      return; 
+      return;
     }
-    
+
     if (key.escape) {
-      if (mainView === 'studio' || mainView === 'tasks') {
+      if (mainView !== 'navigator') {
         clearAndSwitch('navigator');
+        return;
+      }
+      if (viewMode === 'detail') {
+        setViewMode('list');
         return;
       }
     }
 
+    // ── Log scrolling (Shift+Up/Down in navigator) ────────
     const scrollLogs = (delta) => {
       setLogOffset((prev) => {
         const logs = activeTask?.logs || [];
@@ -560,22 +759,45 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
     };
 
     if (mainView === 'navigator') {
-      if (key.upArrow && key.shift) {
-        scrollLogs(1);
-        return;
-      }
-      if (key.downArrow && key.shift) {
-        scrollLogs(-1);
-        return;
-      }
+      if (key.upArrow && key.shift) { scrollLogs(1); return; }
+      if (key.downArrow && key.shift) { scrollLogs(-1); return; }
     }
 
+    // ── Task Manager view input ───────────────────────────
     if (mainView === 'tasks') {
       if (tasks.length > 0) {
-        if (key.upArrow) { setActiveTaskId(prev => tasks[(tasks.findIndex(t => t.id === prev) - 1 + tasks.length) % tasks.length]?.id); return; }
-        if (key.downArrow) { setActiveTaskId(prev => tasks[(tasks.findIndex(t => t.id === prev) + 1) % tasks.length]?.id); return; }
+        if (key.upArrow) {
+          setActiveTaskId(prev => {
+            const idx = tasks.findIndex(t => t.id === prev);
+            const next = tasks[(idx - 1 + tasks.length) % tasks.length];
+            setLogOffset(0);
+            return next?.id;
+          });
+          return;
+        }
+        if (key.downArrow) {
+          setActiveTaskId(prev => {
+            const idx = tasks.findIndex(t => t.id === prev);
+            const next = tasks[(idx + 1) % tasks.length];
+            setLogOffset(0);
+            return next?.id;
+          });
+          return;
+        }
         if (shiftCombo('k') && activeTaskId) { handleKillTask(activeTaskId); return; }
-        if (shiftCombo('r') && activeTaskId) { setRenameMode(true); setRenameInput(activeTask.name); setRenameCursor(activeTask.name.length); return; }
+        if (shiftCombo('r') && activeTaskId && activeTask) {
+          setRenameMode(true);
+          setRenameInput(activeTask.name);
+          setRenameCursor(activeTask.name.length);
+          return;
+        }
+        // Shift+A: re-attach to detached/orphaned task
+        if (shiftCombo('a') && activeTaskId && activeTask) {
+          if (activeTask.status === 'detached' || activeTask.status === 'orphaned') {
+            handleReattachTask(activeTaskId);
+          }
+          return;
+        }
         if (isCtrlC) { handleKillTask(activeTaskId); return; }
       }
       if (key.return) { setMainView('navigator'); return; }
@@ -586,60 +808,64 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
       return;
     }
 
-    if (running && activeTaskId && runningProcessMap.current.has(activeTaskId)) {
-      if (isCtrlC) { handleKillTask(activeTaskId); setStdinBuffer(''); setStdinCursor(0); return; }
-      if (key.return) {
-        const proc = runningProcessMap.current.get(activeTaskId);
-        proc?.stdin?.write(stdinBuffer + '\n'); setStdinBuffer(''); setStdinCursor(0); return;
-      }
-      if (key.backspace || key.delete) {
-        if (stdinCursor > 0) {
-          setStdinBuffer(prev => prev.slice(0, stdinCursor - 1) + prev.slice(stdinCursor));
-          setStdinCursor(c => Math.max(0, c - 1));
+    // ── Stdin input (when process running) ────────────────
+    if (running && activeTaskId) {
+      const proc = orchestrator.processMap?.get(activeTaskId);
+      if (proc) {
+        if (isCtrlC) { handleKillTask(activeTaskId); setStdinBuffer(''); setStdinCursor(0); return; }
+        if (key.return) {
+          proc.stdin?.write(stdinBuffer + '\n');
+          setStdinBuffer(''); setStdinCursor(0);
+          return;
+        }
+        if (key.backspace || key.delete) {
+          if (stdinCursor > 0) {
+            setStdinBuffer(prev => prev.slice(0, stdinCursor - 1) + prev.slice(stdinCursor));
+            setStdinCursor(c => Math.max(0, c - 1));
+          }
+          return;
+        }
+        if (key.leftArrow) { setStdinCursor(c => Math.max(0, c - 1)); return; }
+        if (key.rightArrow) { setStdinCursor(c => Math.min(stdinBuffer.length, c + 1)); return; }
+        if (input) {
+          setStdinBuffer(prev => prev.slice(0, stdinCursor) + input + prev.slice(stdinCursor));
+          setStdinCursor(c => c + input.length);
         }
         return;
       }
-      if (key.leftArrow) { setStdinCursor(c => Math.max(0, c - 1)); return; }
-      if (key.rightArrow) { setStdinCursor(c => Math.min(stdinBuffer.length, c + 1)); return; }
-      if (input) {
-        setStdinBuffer(prev => prev.slice(0, stdinCursor) + input + prev.slice(stdinCursor));
-        setStdinCursor(c => c + input.length);
-      }
-      return;
     }
 
+    // ── AI analyze failed task ────────────────────────────
     if (input?.toLowerCase() === 'a' && activeTask?.status === 'failed') {
       const logs = activeTask.logs.slice(-100).join('\n');
-      const ctx = `Task "${activeTask.name}" failed for project "${activeTask.project}".\nLogs:\n${logs}`;
+      const ctx = `Task "${activeTask.name}" failed for project "${activeTask.projectName || activeTask.projectId}".\nLogs:\n${logs}`;
       setAiAnalysisContext(ctx);
       clearAndSwitch('ai');
       return;
     }
 
+    // ── Pagination ────────────────────────────────────────
     const pageLimit = config.maxVisibleProjects || 3;
     const totalProjects = filteredProjects.length;
-    
+
     if (key.pageUp && totalProjects > pageLimit) {
       setSelectedIndex((prev) => Math.max(0, prev - pageLimit));
-      console.clear();
       return;
     }
-    
+
     if (key.pageDown && totalProjects > pageLimit) {
       setSelectedIndex((prev) => {
         const next = prev + pageLimit;
-        // If next jump exceeds project list, stay at the start of the last page
         if (next >= totalProjects) {
-           const lastPageStart = Math.floor((totalProjects - 1) / pageLimit) * pageLimit;
-           return lastPageStart;
+          const lastPageStart = Math.floor((totalProjects - 1) / pageLimit) * pageLimit;
+          return lastPageStart;
         }
         return next;
       });
-      console.clear();
       return;
     }
-    
 
+    // ── Search mode ───────────────────────────────────────
     if (searchMode) {
       if (key.return || key.escape) { setSearchMode(false); return; }
       if (key.backspace || key.delete) {
@@ -661,38 +887,54 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
     }
 
     if (input === '/' && mainView === 'navigator') { setSearchMode(true); return; }
-    
-    if (normalizedInput === '?' && mainView === 'navigator') { console.clear(); setShowHelp((prev) => !prev); return; }
+    if (normalizedInput === '?' && mainView === 'navigator') { setShowHelp((prev) => !prev); return; }
 
-    if (mainView === 'navigator' && shiftCombo('l') && lastCommandRef.current) { runProjectCommand(lastCommandRef.current.commandMeta, lastCommandRef.current.project); return; }
+    // Shift+L: rerun last command
+    if (mainView === 'navigator' && shiftCombo('l') && lastCommandRef.current) {
+      runProjectCommand(lastCommandRef.current.commandMeta, lastCommandRef.current.project);
+      return;
+    }
 
+    // ── Navigator arrow keys ──────────────────────────────
     if (key.upArrow && !key.shift && projects.length > 0) { setSelectedIndex((prev) => Math.max(0, prev - 1)); return; }
     if (key.downArrow && !key.shift && projects.length > 0) { setSelectedIndex((prev) => Math.min(projects.length - 1, prev + 1)); return; }
+
     if (key.return) {
       if (!selectedProject) return;
-      console.clear();
       setViewMode((prev) => (prev === 'detail' ? 'list' : 'detail'));
       return;
     }
+
+    // ── Quit ─────────────────────────────────────────────
     if (shiftCombo('q') || isCtrlC) {
-      if (hasRunningTasks) setQuitConfirm(true); else { process.stdout.write('\x1b[2J\x1b[0;0H'); exit(); }
+      if (hasRunningTasks || hasDetachedTasks) {
+        setQuitState('confirm');
+      } else {
+        process.stdout.write('\x1b[2J\x1b[0;0H');
+        exit();
+      }
       return;
     }
-    
+
+    // ── AI on key 0 from detail view ─────────────────────
     if (normalizedInput === '0' && viewMode === 'detail' && selectedProject) {
       clearAndSwitch('ai');
       return;
     }
 
-    
-        if (shiftCombo('c') && viewMode === 'detail' && selectedProject) { setCustomMode(true); setCustomInput(''); setCustomCursor(0); return; }
-    
+    // ── Add custom command ────────────────────────────────
+    if (shiftCombo('c') && viewMode === 'detail' && selectedProject) {
+      setCustomMode(true); setCustomInput(''); setCustomCursor(0);
+      return;
+    }
+
+    // ── Detail view numbered shortcuts ───────────────────
     if (mainView === 'navigator' && viewMode === 'detail' && normalizedInput && detailShortcutMap.has(normalizedInput)) {
       if (!isNaN(parseInt(normalizedInput))) {
         runProjectCommand(detailShortcutMap.get(normalizedInput), selectedProject);
         return;
       }
-      const reserved = ['a', 'p', 'n', 'x', 'e', 'd', 'b', 't', 'q', 'h', 's', 'l', 'c', 'i', 'o'];
+      const reserved = ['a', 'p', 'n', 'x', 'e', 'd', 'b', 't', 'q', 'h', 's', 'l', 'c', 'i', 'o', 'z'];
       if (key.shift && !reserved.includes(normalizedInput)) {
         runProjectCommand(detailShortcutMap.get(normalizedInput), selectedProject);
         return;
@@ -700,9 +942,12 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
     }
   });
 
+  // ── Computed display values ───────────────────────────────
   const projectCountLabel = useMemo(() => `${projects.length} project${projects.length === 1 ? '' : 's'}`, [projects.length]);
   const toggleHint = config.showHelpCards ? 'Shift+H hide help' : 'Shift+H show help';
-  const statusHint = activeTask ? `[${activeTask.status.toUpperCase()}] ${activeTask.name}` : 'Idle Navigator';
+  const statusHint = activeTask
+    ? `[${activeTask.status.toUpperCase()}] ${activeTask.name}`
+    : 'Idle Navigator';
   const orbitHint = mainView === 'tasks' ? 'Tasks View' : `Orbit: ${tasks.length} tasks`;
   const artHint = config.showArtBoard ? 'Shift+B hide art' : 'Shift+B show art';
 
@@ -710,20 +955,21 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
     if (viewMode !== 'detail' || !selectedProject) {
       return [create(Text, {key: 'e-h', dimColor: true}, 'Press Enter on a project to reveal details.')];
     }
-    
+
     const content = [
-      create(Box, {key: 'title-row', flexDirection: 'row'}, 
+      create(Box, {key: 'title-row', flexDirection: 'row'},
         create(Text, {color: 'cyan', bold: true}, `${selectedProject.icon} ${selectedProject.name}`),
-        selectedProject.missingBinaries && selectedProject.missingBinaries.length > 0 && create(Text, {color: 'red', bold: true}, '  ⚠️ MISSING RUNTIME')
+        selectedProject.missingBinaries?.length > 0 && create(Text, {color: 'red', bold: true}, '  ⚠️ MISSING RUNTIME')
       ),
       create(Text, {key: 'manifest', dimColor: true}, `${selectedProject.type} · ${selectedProject.manifest || 'detected manifest'}`),
       create(Text, {key: 'loc', dimColor: true}, `Location: ${truncatePath(path.relative(rootPath, selectedProject.path) || '.', 35)}`)
     ];
+
     if (selectedProject.description) content.push(create(Text, {key: 'desc'}, selectedProject.description));
     const frameworks = (selectedProject.frameworks || []).map((lib) => `${lib.icon} ${lib.name}`).join(', ');
     if (frameworks) content.push(create(Text, {key: 'frames', dimColor: true}, `Frameworks: ${frameworks}`));
-    
-    if (selectedProject.missingBinaries && selectedProject.missingBinaries.length > 0) {
+
+    if (selectedProject.missingBinaries?.length > 0) {
       content.push(
         create(Text, {key: 'm-t', color: 'red', bold: true, marginTop: 1}, 'MISSING BINARIES:'),
         create(Text, {key: 'm-l', color: 'red'}, `Please install: ${selectedProject.missingBinaries.join(', ')}`)
@@ -744,17 +990,19 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
   const artTileNodes = useMemo(() => [
     {label: 'Pulse', detail: projectCountLabel, accent: 'magenta', icon: '●', subtext: `Workspace · ${path.basename(rootPath) || rootPath}`},
     {label: 'Focus', detail: selectedProject?.name || 'Selection', accent: 'cyan', icon: '◆', subtext: `${selectedProject?.type || 'Stack'}`},
-    {label: 'Orbit', detail: `${tasks.length} tasks`, accent: 'yellow', icon: '■', subtext: running ? 'Busy streaming...' : 'Idle'}
+    {label: 'Orbit', detail: `${tasks.length} tasks`, accent: 'yellow', icon: '■', subtext: running ? 'Busy streaming...' : hasDetachedTasks ? `${tasks.filter(t => t.status === 'detached').length} detached` : 'Idle'}
   ].map(tile => create(Box, {key: tile.label, flexDirection: 'column', padding: 1, marginRight: 1, borderStyle: 'single', borderColor: tile.accent, minWidth: 24},
     create(Text, {color: tile.accent, bold: true}, `${tile.icon} ${tile.label}`),
     create(Text, {bold: true}, tile.detail),
     create(Text, {dimColor: true}, tile.subtext)
-  )), [projectCountLabel, rootPath, selectedProject, tasks.length, running]);
+  )), [projectCountLabel, rootPath, selectedProject, tasks, running, hasDetachedTasks]);
 
-  if (quitConfirm) {
-    return create(Box, {flexDirection: 'column', borderStyle: 'round', borderColor: 'red', padding: 1}, create(Text, {bold: true, color: 'red'}, '⚠️ Confirm Exit'), create(Text, null, `There are ${tasks.filter(t=>t.status==='running').length} tasks still running in the background.`), create(Text, null, 'Are you sure you want to quit and stop all processes?'), create(Text, {marginTop: 1}, kleur.bold('Y') + ' to Quit, ' + kleur.bold('N') + ' to Cancel'));
+  // ── Quit modal ────────────────────────────────────────────
+  if (quitState === 'confirm') {
+    return create(QuitModal, {tasks});
   }
 
+  // ── Render view ───────────────────────────────────────────
   const renderView = () => {
     switch (mainView) {
       case 'studio': return create(Studio);
@@ -765,46 +1013,82 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
       default: {
         const navigatorBody = [
           create(Header, {projectCountLabel, rootPath, running, statusHint, toggleHint, orbitHint, artHint}),
+
+          // Session restore banner
+          showRestoreBanner && sessionRestored.length > 0 && create(SessionRestoreBanner, {
+            key: 'restore-banner',
+            restoredTasks: sessionRestored,
+            onDismiss: () => setShowRestoreBanner(false)
+          }),
+
           config.showArtBoard && create(Box, {key: 'artboard', flexDirection: 'column', marginTop: 1, borderStyle: 'round', borderColor: 'gray', padding: 1},
             create(Box, {flexDirection: 'row', justifyContent: 'space-between'}, create(Text, {color: 'magenta', bold: true}, 'Art-coded build atlas'), create(Text, {dimColor: true}, 'press ? for overlay help')),
             create(Box, {flexDirection: 'row', marginTop: 1}, ...ART_CHARS.map((char, i) => create(Text, {key: i, color: ART_COLORS[i % ART_COLORS.length]}, char.repeat(2)))),
             create(Box, {flexDirection: 'row', marginTop: 1}, ...artTileNodes)
           ),
+
           create(Box, {key: 'projects-row', marginTop: 1, flexDirection: 'row', alignItems: 'stretch', width: '100%', flexWrap: 'nowrap'},
-            create(Box, {flexGrow: 1, flexBasis: 0, minWidth: PROJECTS_MIN_WIDTH, marginRight: 1, borderStyle: 'round', borderColor: 'magenta', padding: 1}, 
-              create(Text, {bold: true, color: 'magenta'}, 'Projects'), 
+            create(Box, {flexGrow: 1, flexBasis: 0, minWidth: PROJECTS_MIN_WIDTH, marginRight: 1, borderStyle: 'round', borderColor: 'magenta', padding: 1},
+              create(Text, {bold: true, color: 'magenta'}, 'Projects'),
               create(Box, {flexDirection: 'column', marginTop: 1}, create(Navigator, {
-            projects, 
-            selectedIndex, 
-            rootPath, 
-            loading, 
-            error, 
-            maxVisibleProjects: config.maxVisibleProjects || 3,
-            searchQuery: (searchMode || searchQuery) ? searchQuery : null,
-            CursorText,
-            searchCursor
-          }))
+                projects,
+                selectedIndex,
+                rootPath,
+                loading,
+                error,
+                maxVisibleProjects: config.maxVisibleProjects || 3,
+                searchQuery: (searchMode || searchQuery) ? searchQuery : null,
+                CursorText,
+                searchCursor
+              }))
             ),
-            create(Box, {flexGrow: 1.3, flexBasis: 0, minWidth: DETAILS_MIN_WIDTH, borderStyle: 'round', borderColor: 'cyan', padding: 1, flexDirection: 'column'}, create(Text, {bold: true, color: 'cyan'}, 'Details'), ...detailContent)
+            create(Box, {flexGrow: 1.3, flexBasis: 0, minWidth: DETAILS_MIN_WIDTH, borderStyle: 'round', borderColor: 'cyan', padding: 1, flexDirection: 'column'},
+              create(Text, {bold: true, color: 'cyan'}, 'Details'),
+              ...detailContent
+            )
           ),
+
+          // Input / port config banners
+          portConfigMode && create(Box, {key: 'port-cfg', marginTop: 1, flexDirection: 'row', borderStyle: 'round', borderColor: 'yellow', paddingX: 1},
+            create(Text, {color: 'yellow', bold: true}, ' Configure Port → '),
+            create(CursorText, {value: customInput, cursorIndex: customCursor})
+          ),
+          customMode && create(Box, {key: 'custom-cmd', marginTop: 1, flexDirection: 'row', borderStyle: 'round', borderColor: 'magenta', paddingX: 1},
+            create(Text, {color: 'magenta', bold: true}, ' Add Command (label|cmd) → '),
+            create(CursorText, {value: customInput, cursorIndex: customCursor})
+          ),
+
           create(Box, {key: 'output-row', marginTop: 1, flexDirection: 'column'},
-            create(Box, {flexDirection: 'row', justifyContent: 'space-between'}, create(Text, {bold: true, color: 'yellow'}, `Output: ${activeTask?.name || 'None'}`), create(Text, {dimColor: true}, logOffset ? `Scrolled ${logOffset} lines` : 'Live log view')),
+            create(Box, {flexDirection: 'row', justifyContent: 'space-between'},
+              create(Text, {bold: true, color: 'yellow'}, `Output: ${activeTask?.name || 'None'}`),
+              activeTask?.status === 'detached'
+                ? create(Text, {color: 'blue'}, `Detached · Shift+T → Task Manager → Shift+A to reattach`)
+                : activeTask?.status === 'orphaned'
+                ? create(Text, {color: 'gray'}, `Orphaned (process ended) · historical logs only`)
+                : create(Text, {dimColor: true}, logOffset ? `Scrolled ${logOffset} lines` : 'Live log view')
+            ),
             create(OutputPanel, {activeTask, logOffset}),
             create(Footer, {toggleHint, running, stdinBuffer, stdinCursor, CursorText})
           ),
+
           config.showHelpCards && create(Box, {key: 'help-cards', marginTop: 1, flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap'}, [
-            {label: 'Navigation', color: 'magenta', body: ['↑/↓: focus, PgUp/Dn: Page, Enter: Details', 'Shift+↑ / ↓ scroll output', 'Shift+H toggle help cards', 'Shift+D detach from task']},
-            {label: 'Management', color: 'cyan', body: ['Shift+P Package Registry', 'Shift+N Project Architect', 'Shift+X clear / Shift+E export']},
-            {label: 'Orbit & AI', color: 'yellow', body: ['Shift+T: Tasks, Shift+O: AI, 0: Analyze', 'Shift+A studio / Shift+O AI Horizon', 'Shift+S structure / Shift+Q quit']}
+            {label: 'Navigation', color: 'magenta', body: ['↑/↓: focus, PgUp/Dn: Page, Enter: Details', 'Shift+↑/↓ scroll output, /: search', 'Shift+H toggle help, Shift+D detach task']},
+            {label: 'Management', color: 'cyan', body: ['Shift+P Package Registry', 'Shift+N Project Architect', 'Shift+X clear · Shift+E export · Shift+L rerun']},
+            {label: 'Tasks & AI', color: 'yellow', body: ['Shift+T Tasks · Shift+O AI · 0: Analyze', 'Shift+A reattach · Shift+K kill · Shift+Z dismiss', 'Shift+Q quit (D=detach · K=kill · N=cancel)']}
           ].map((card, idx) => create(Box, {key: card.label, flexGrow: 1, flexBasis: 0, minWidth: HELP_CARD_MIN_WIDTH, marginRight: idx < 2 ? 1 : 0, marginBottom: 1, borderStyle: 'round', borderColor: card.color, padding: 1, flexDirection: 'column'}, create(Text, {color: card.color, bold: true, marginBottom: 1}, card.label), ...card.body.map((line, lidx) => create(Text, {key: lidx, dimColor: card.color === 'yellow'}, line))))),
-          config.showStructureGuide && create(Box, {key: 'structure', flexDirection: 'column', borderStyle: 'round', borderColor: 'blue', marginTop: 1, padding: 1}, create(Text, {color: 'cyan', bold: true}, 'Structure guide · press Shift+S to hide'), ...SCHEMA_GUIDE.map(e => create(Text, {key: e.type, dimColor: true}, `• ${e.icon} ${e.label}: ${e.files.join(', ')}`))),
+
+          config.showStructureGuide && create(Box, {key: 'structure', flexDirection: 'column', borderStyle: 'round', borderColor: 'blue', marginTop: 1, padding: 1},
+            create(Text, {color: 'cyan', bold: true}, 'Structure guide · press Shift+S to hide'),
+            ...SCHEMA_GUIDE.map(e => create(Text, {key: e.type, dimColor: true}, `• ${e.icon} ${e.label}: ${e.files.join(', ')}`))),
+
           showHelp && create(Box, {key: 'overlay', flexDirection: 'column', borderStyle: 'double', borderColor: 'cyan', marginTop: 1, padding: 1},
             create(Text, {color: 'cyan', bold: true}, '📖 Help Overview'),
             create(Text, null, 'Shift+T Tasks · Shift+P Packages · Shift+N Architect · Shift+O AI · Shift+A Studio'),
-            create(Text, null, 'Alt+B/Alt+T/Alt+R/Alt+I Build/Test/Run/Install   Shift+C custom cmd   Shift+R port'),
+            create(Text, null, 'B/T/R/I Build/Test/Run/Install   Shift+C custom cmd   Shift+R port'),
             create(Text, null, 'Shift+K kill · Shift+R rename · Shift+D detach · Shift+X clear · Shift+E export · Shift+L rerun'),
-            create(Text, null, 'Shift+H help cards · Shift+S structure · Shift+B art · Shift+Q quit'),
-            create(Text, null, '↑/↓ navigate · Enter detail · Esc back · ? close')
+            create(Text, null, 'Shift+A reattach (in Tasks view) · Shift+Z dismiss banner · Shift+Q quit'),
+            create(Text, null, 'Quit modal: D=detach all · K=kill all · N=cancel'),
+            create(Text, null, '↑/↓ navigate · Enter detail · Esc back · / search · ? close')
           )
         ];
         return create(Box, {flexDirection: 'column'}, ...navigatorBody);
@@ -812,14 +1096,13 @@ function Compass({rootPath, initialView = 'navigator', scanDepth = 7}) {
     }
   };
 
-
   if (showSplash) return create(Splash);
-
   return create(Box, {flexDirection: 'column', padding: 1, width: '100%'}, renderView());
 }
 
-
-
+// ─────────────────────────────────────────────────────────────
+// CLI argument parsing
+// ─────────────────────────────────────────────────────────────
 
 function parseArgs() {
   const args = {};
@@ -846,7 +1129,6 @@ function parseArgs() {
     else if (token === '--name' && tokens[i + 1]) { args.name = tokens[i + 1]; i += 1; }
     else if (token === '--studio-check') args.studioCheck = true;
     else if (token === '--ai-analyze') args.aiAnalyze = true;
-
     else if (token === '--deep') args.deep = true;
     else if (token === '--server') args.server = true;
     else if (token === '--mcp') args.mcp = true;
@@ -855,11 +1137,12 @@ function parseArgs() {
     else if (token === '--setup-service') args.setupService = true;
     else if (token === '--update') args.update = true;
   }
-
   return args;
 }
 
-
+// ─────────────────────────────────────────────────────────────
+// Main entry point
+// ─────────────────────────────────────────────────────────────
 
 async function main() {
   const args = parseArgs();
@@ -906,24 +1189,26 @@ async function main() {
     console.log('  --setup-service  Generate systemd service for background mode');
     console.log('  --update         Update Project Compass to the latest version');
     console.log('');
-
-    console.log(kleur.bold(kleur.magenta('🎮 TUI SHORTCUTS (ACTIVE IN NAVIGATOR):')));
-
+    console.log(kleur.bold(kleur.magenta('🎮 TUI SHORTCUTS:')));
     console.log('  /                Enter Search/Filter mode');
     console.log('  Shift+T          Orbit Task Manager');
     console.log('  Shift+O          AI Horizon Analysis');
     console.log('  Shift+P          Package Registry');
     console.log('  Shift+N          Project Architect');
+    console.log('  Shift+D          Detach current task (process keeps running)');
+    console.log('  Shift+A          Re-attach to detached task (in Task Manager)');
+    console.log('  Shift+Z          Dismiss session restore banner');
+    console.log('  Shift+Q          Quit (D=detach all, K=kill all, N=cancel)');
     console.log('  Enter            Toggle Detailed Project View');
     console.log('  Esc              Global back / Clear focus');
     console.log('');
     console.log(kleur.dim('For more documentation, visit: https://github.com/CrimsonDevil333333/project-compass'));
     return;
   }
+
   const rootPath = args.root ? path.resolve(args.root) : process.cwd();
 
   if (args.listProjects) {
-
     const projects = await discoverProjects(rootPath);
     if (args.json) {
       console.log(JSON.stringify(projects, (key, value) => key === 'commands' ? Object.keys(value) : value, 2));
@@ -968,8 +1253,7 @@ async function main() {
     const cmd = getAddCmd(target, args.addPkg);
     if (!cmd) { console.error(`Cannot add package: unsupported project type ${target.type}`); process.exit(1); }
     console.log(`Adding ${args.addPkg} to ${target.name}...`);
-    const subprocess = execa(cmd[0], cmd.slice(1), { cwd: target.path, stdio: 'inherit' });
-    await subprocess;
+    await execa(cmd[0], cmd.slice(1), { cwd: target.path, stdio: 'inherit' });
     return;
   }
 
@@ -980,8 +1264,7 @@ async function main() {
     const cmd = getRemoveCmd(target, args.removePkg);
     if (!cmd) { console.error(`Cannot remove package: unsupported project type ${target.type}`); process.exit(1); }
     console.log(`Removing ${args.removePkg} from ${target.name}...`);
-    const subprocess = execa(cmd[0], cmd.slice(1), { cwd: target.path, stdio: 'inherit' });
-    await subprocess;
+    await execa(cmd[0], cmd.slice(1), { cwd: target.path, stdio: 'inherit' });
     return;
   }
 
@@ -1007,8 +1290,7 @@ async function main() {
       await execa('mkdir', ['-p', targetPath]);
       await execa('go', ['mod', 'init', projectName], { cwd: targetPath });
     } else {
-      const subprocess = execa(cmd[0], cmd.slice(1), { stdio: 'inherit' });
-      await subprocess;
+      await execa(cmd[0], cmd.slice(1), { stdio: 'inherit' });
     }
     console.log(`✓ Project created at ${targetPath}`);
     return;
@@ -1019,8 +1301,7 @@ async function main() {
     console.log(kleur.dim('──────────────────────────────────\n'));
     console.log(kleur.cyan('📡 Checking for latest version on npmjs.com...'));
     try {
-      const subprocess = execa('npm', ['install', '-g', 'project-compass@latest'], { stdio: 'inherit' });
-      await subprocess;
+      await execa('npm', ['install', '-g', 'project-compass@latest'], { stdio: 'inherit' });
       console.log(kleur.green('\n✨ Update successful! Project Compass is now at the latest production build.'));
     } catch (err) {
       console.log(kleur.red(`\n❌ Update failed: ${err.message}`));
@@ -1030,7 +1311,6 @@ async function main() {
   }
 
   if (args.setupService) {
-
     setupSystemdService(args.host || '0.0.0.0', args.port || 7654);
     return;
   }
@@ -1045,12 +1325,9 @@ async function main() {
     return;
   }
 
-
-
   if (args.studioCheck) {
     console.log(kleur.bold(kleur.magenta('\n  🧭 Omni-Studio Diagnostic Audit')));
     console.log(kleur.dim('  ─────────────────────────────────\n'));
-    
     const checks = [
       {name: 'Node.js', binary: 'node', versionCmd: ['-v']},
       {name: 'npm', binary: 'npm', versionCmd: ['-v']},
@@ -1062,7 +1339,6 @@ async function main() {
       {name: 'Ruby', binary: 'ruby', versionCmd: ['-v']},
       {name: '.NET', binary: 'dotnet', versionCmd: ['--version']}
     ];
-
     for (const lang of checks) {
       try {
         const { stdout, stderr } = await execa(lang.binary, lang.versionCmd);
@@ -1076,20 +1352,21 @@ async function main() {
     return;
   }
 
-
   if (args.aiAnalyze) {
     console.log('AI Analysis is only available in TUI mode. Run: project-compass');
     return;
   }
 
   const scanDepth = args.deep ? Infinity : 7;
-  const { waitUntilExit } = render(create(Compass, {rootPath: args.root || process.cwd(), initialView: args.view || 'navigator', scanDepth}));
-  
-  // Robust process cleanup on exit
+  const { waitUntilExit } = render(create(Compass, {
+    rootPath: args.root || process.cwd(),
+    initialView: args.view || 'navigator',
+    scanDepth
+  }));
+
+  // Ensure cursor is restored and we clean up on signal
   const cleanup = () => {
     process.stdout.write('\x1b[?25h'); // Show cursor
-    // The Compass component handles killing processes via useEffect cleanup if designed correctly,
-    // but we force exit here to be sure.
     process.exit(0);
   };
 
@@ -1099,8 +1376,7 @@ async function main() {
   await waitUntilExit();
 }
 
-
-main().catch((error) => { 
-  console.error(kleur.red('█ CRITICAL ERROR:'), error); 
-  process.exit(1); 
+main().catch((error) => {
+  console.error(kleur.red('█ CRITICAL ERROR:'), error);
+  process.exit(1);
 });
